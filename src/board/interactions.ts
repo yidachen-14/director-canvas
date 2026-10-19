@@ -169,7 +169,7 @@ export function attachInteractions(board: Board): void {
       if (type) {
         const kind = board.tool;
         board.setTool('select');
-        const editable = ['text', 'note', 'sticky', 'callout'].includes(kind);
+        const editable = ['text', 'note', 'sticky', 'callout', 'checklist'].includes(kind);
         board.createCard(kind, w, { edit: editable });
         lastPlaceAt = Date.now();
       }

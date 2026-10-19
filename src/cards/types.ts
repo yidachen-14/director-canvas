@@ -31,6 +31,8 @@ export interface CardHandle {
    * Return true when handled (the board then ignores it).
    */
   onKey?(e: KeyboardEvent): boolean;
+  /** Card-specific entries for its right-click menu (only when it is the sole selection). */
+  menu?(menu: import('obsidian').Menu): void;
 }
 
 export interface CardType {

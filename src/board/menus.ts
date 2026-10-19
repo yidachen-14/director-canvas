@@ -91,7 +91,7 @@ function boardMenu(menu: Menu, board: Board, at: Point): void {
       const type = types.find(x => x.id === id);
       if (!type) continue;
       m.addItem(i => i.setTitle(t(type.label)).setIcon(type.icon).onClick(() => {
-        board.createCard(id, at, { edit: ['text', 'note', 'sticky', 'callout'].includes(id) });
+        board.createCard(id, at, { edit: ['text', 'note', 'sticky', 'callout', 'checklist'].includes(id) });
       }));
     }
   });
@@ -109,6 +109,7 @@ function cardMenu(menu: Menu, board: Board, at: Point): void {
       menu.addItem(i => i.setTitle(t('Edit')).setIcon('pencil').setSection('edit').onClick(() => board.startEditing(nodes[0].id)));
     }
   }
+  if (!multi && nodes[0]) board.cards.get(nodes[0].id)?.handle.menu?.(menu);
   menu.addItem(i => i.setTitle(t('Copy')).setIcon('copy').setSection('edit').onClick(() => { board.root.focus(); document.execCommand('copy'); }));
   menu.addItem(i => i.setTitle(t('Cut')).setIcon('scissors').setSection('edit').onClick(() => { board.root.focus(); document.execCommand('cut'); }));
   menu.addItem(i => i.setTitle(t('Duplicate')).setIcon('copy-plus').setSection('edit').onClick(() => duplicateSelection(board)));

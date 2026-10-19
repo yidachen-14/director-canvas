@@ -5,6 +5,8 @@ import { nodeRect, unionRect } from '../model/board-model';
 import type { Point } from './viewport';
 import { fileKindOf } from '../cards/util';
 import { t } from '../i18n';
+import { htmlToMarkdown } from '../richtext/markdown';
+import { textCardData, textCardSize } from '../cards/text-cards';
 
 const MARK = 'visual-canvas';
 
@@ -46,18 +48,12 @@ export async function pasteInto(board: Board, data: DataTransfer, at: Point): Pr
     return;
   }
   if (text || html) {
+    // Formatted text (web pages, Word, Docs) keeps its headings, lists and emphasis.
+    let md = text;
+    if (html) { try { md = htmlToMarkdown(html) || text; } catch { md = text; } }
     const kind = board.settings.pasteTextKind;
-    board.createCard(kind, at, { data: { text }, size: textCardSize(text, kind) });
+    board.createCard(kind, at, { data: textCardData(kind, md, board.settings), size: textCardSize(kind, md) });
   }
-}
-
-/** A sensible size for a card holding pasted text. */
-function textCardSize(text: string, kind: string): { width: number; height: number } {
-  const lines = text.split('\n');
-  const longest = Math.max(...lines.map(l => l.length));
-  const width = Math.min(560, Math.max(kind === 'text' ? 120 : 260, Math.min(longest, 60) * 9 + 48));
-  const height = Math.min(640, Math.max(kind === 'text' ? 40 : 120, lines.length * 26 + 40));
-  return { width, height };
 }
 
 export function pasteNodes(board: Board, payload: ClipPayload, at: Point): void {

@@ -165,6 +165,8 @@ export class Board {
     this.worldEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
     this.root.style.setProperty('--vc-zoom', String(zoom));
     this.applyGrid();
+    // Floating handles were placed for the old view.
+    this.overlayEl.querySelectorAll<HTMLElement>('.vc-block-handle').forEach(h => h.hide());
     this.fire('viewport');
   }
 

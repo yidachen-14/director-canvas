@@ -1,6 +1,6 @@
 export interface Point { x: number; y: number; }
 
-export const MIN_ZOOM = 0.05;
+export const MIN_ZOOM = 0.02;
 export const MAX_ZOOM = 8;
 
 /** Pan and zoom. A world point p shows on screen at p * zoom + (x, y). */
