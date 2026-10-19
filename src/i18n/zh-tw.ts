@@ -89,6 +89,8 @@ export const ZH_TW: Record<string, string> = {
   'General': '一般',
   'Open .canvas files with Visual Canvas': '用 Visual Canvas 開啟 .canvas 檔',
   'Boards open here instead of the core Canvas. You can always switch a board back from its header.': '白板改由 Visual Canvas 開啟，不使用內建 Canvas。隨時可以從白板右上角切回內建 Canvas。',
+  'Only in these folders': '只在這些資料夾生效',
+  'One folder per line. Leave empty to open every board with Visual Canvas.': '一行一個資料夾。留空則所有白板都用 Visual Canvas 開啟。',
   'Toolbar': '工具列',
   'Position': '位置',
   'Bottom': '下方',

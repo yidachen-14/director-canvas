@@ -16,7 +16,7 @@ export default class VisualCanvasPlugin extends Plugin {
     registerAllCards();
 
     this.registerView(VIEW_TYPE, leaf => new CanvasView(leaf, this));
-    this.register(installCanvasTakeover(() => this.settings.openCanvasByDefault));
+    this.register(installCanvasTakeover(path => this.takesOver(path)));
     this.addSettingTab(new VisualCanvasSettingTab(this.app, this));
 
     this.addRibbonIcon('layout-dashboard', t('New Visual Canvas board'), () => { void this.createBoard(); });
@@ -62,14 +62,25 @@ export default class VisualCanvasPlugin extends Plugin {
 
     // Boards already open in the core view switch over when the plugin loads.
     this.app.workspace.onLayoutReady(() => {
-      if (!this.settings.openCanvasByDefault) return;
-      this.app.workspace.getLeavesOfType('canvas').forEach(leaf => { void switchCanvasView(leaf, 'visual'); });
+      this.app.workspace.getLeavesOfType('canvas').forEach(leaf => {
+        const file = (leaf.getViewState().state as { file?: string } | undefined)?.file;
+        if (this.takesOver(file)) void switchCanvasView(leaf, 'visual');
+      });
     });
   }
 
   onunload(): void {
     // Hand open boards back to the core view so no pane is left blank.
     this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach(leaf => { void switchCanvasView(leaf, 'native'); });
+  }
+
+  /** Whether a board at `path` opens with Visual Canvas. */
+  takesOver(path: string | undefined): boolean {
+    if (!this.settings.openCanvasByDefault) return false;
+    const folders = this.settings.takeoverFolders.map(f => f.replace(/^\/+|\/+$/g, '')).filter(Boolean);
+    if (!folders.length) return true;
+    if (!path) return false;
+    return folders.some(f => path === f || path.startsWith(f + '/'));
   }
 
   async saveSettings(): Promise<void> {

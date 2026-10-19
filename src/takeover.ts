@@ -15,7 +15,7 @@ type SetViewState = (this: WorkspaceLeaf, viewState: ViewState, eState?: unknown
  * core canvas view is redirected to ours, unless the caller explicitly asked
  * for the native view. Returns the function that restores the original.
  */
-export function installCanvasTakeover(isEnabled: () => boolean): () => void {
+export function installCanvasTakeover(isEnabled: (path: string | undefined) => boolean): () => void {
   const proto = WorkspaceLeaf.prototype as unknown as { setViewState: SetViewState };
   const original = proto.setViewState;
   const patched: SetViewState = function (this: WorkspaceLeaf, viewState, eState) {
@@ -24,7 +24,7 @@ export function installCanvasTakeover(isEnabled: () => boolean): () => void {
       if (state[NATIVE_FLAG]) {
         const { [NATIVE_FLAG]: _drop, ...rest } = state;
         viewState = { ...viewState, state: rest };
-      } else if (isEnabled()) {
+      } else if (isEnabled(typeof state.file === 'string' ? state.file : undefined)) {
         viewState = { ...viewState, type: VIEW_TYPE };
       }
     }

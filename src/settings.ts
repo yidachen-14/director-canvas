@@ -7,6 +7,8 @@ export type TextCardKind = 'text' | 'note' | 'sticky' | 'callout';
 export interface VisualCanvasSettings {
   language: Language;
   openCanvasByDefault: boolean;
+  /** Only boards inside these folders open with Visual Canvas; empty = every board. */
+  takeoverFolders: string[];
 
   toolbarPosition: ToolbarPosition;
   toolbarSize: ToolbarSize;
@@ -40,6 +42,7 @@ export interface VisualCanvasSettings {
 export const DEFAULT_SETTINGS: VisualCanvasSettings = {
   language: 'zh-TW',
   openCanvasByDefault: true,
+  takeoverFolders: [],
 
   toolbarPosition: 'bottom',
   toolbarSize: 'M',

@@ -43,6 +43,16 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
       .setName(t('Open .canvas files with Visual Canvas'))
       .setDesc(t('Boards open here instead of the core Canvas. You can always switch a board back from its header.'))
       .addToggle(tg => tg.setValue(s.openCanvasByDefault).onChange(async (v) => { s.openCanvasByDefault = v; await this.save(false); }));
+    new Setting(el)
+      .setName(t('Only in these folders'))
+      .setDesc(t('One folder per line. Leave empty to open every board with Visual Canvas.'))
+      .addTextArea(ta => {
+        ta.inputEl.rows = 3;
+        ta.setPlaceholder('_VC測試').setValue(s.takeoverFolders.join('\n')).onChange(async (v) => {
+          s.takeoverFolders = v.split('\n').map(x => x.trim()).filter(Boolean);
+          await this.save(false);
+        });
+      });
 
     // ── Toolbar ──
     new Setting(el).setName(t('Toolbar')).setHeading();
