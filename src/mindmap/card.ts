@@ -39,6 +39,8 @@ export interface MindMapControl {
   selected(): string[];
   rootSelected(): boolean;
   apply(fn: (d: MMData) => void): void;
+  /** Show a change without storing it (live colour picking). */
+  preview(fn: (d: MMData) => void): void;
 }
 
 export class MindMapCard implements CardHandle, MindMapControl {
@@ -55,6 +57,13 @@ export class MindMapCard implements CardHandle, MindMapControl {
   private primary: string | null = null;
   private editingId: string | null = null;
   private replaceOnEdit = false;
+  /**
+   * The selected topic waits for typing: it is editable (caret and highlight hidden) and focused,
+   * with its text selected, so an input method composes right inside it and the first keystroke
+   * replaces the text, like Boardmix.
+   */
+  private armedId: string | null = null;
+  private typingFromArmed = false;
   private committed: unknown = null;
   private offs: (() => void)[] = [];
   private pendingRender = 0;
@@ -167,10 +176,18 @@ export class MindMapCard implements CardHandle, MindMapControl {
       if (next) this.setSel([next]);
       return true;
     }
-    if (key === ' ') { this.replaceOnEdit = true; this.ctx.board.startEditing(this.node.id); return true; }
-    // Typing starts editing the topic, the keystroke replacing its text.
-    if ((key.length === 1 || key === 'Process') && !e.ctrlKey && !e.metaKey) {
-      this.replaceOnEdit = true;
+    const armedHere = !!this.armedId && this.armedId === cur && this.body.ownerDocument.activeElement === this.topicEls.get(cur);
+    if (key === ' ') {
+      this.typingFromArmed = armedHere;
+      this.replaceOnEdit = !armedHere;
+      this.ctx.board.startEditing(this.node.id);
+      this.body.ownerDocument.execCommand('insertText', false, ' ');
+      return true;
+    }
+    // Typing starts editing the topic, the keystroke (or the input method) replacing its text.
+    if ((key.length === 1 || key === 'Process' || e.keyCode === 229) && !e.ctrlKey && !e.metaKey) {
+      this.typingFromArmed = armedHere;
+      this.replaceOnEdit = !armedHere;
       this.ctx.board.startEditing(this.node.id);
       return false;
     }
@@ -231,6 +248,14 @@ export class MindMapCard implements CardHandle, MindMapControl {
   rootSelected(): boolean { return this.sel.has(this.data.root.id); }
   mapData(): MMData { return this.data; }
 
+  preview(fn: (d: MMData) => void): void {
+    const keep = this.data;
+    const d = cloneData(keep);
+    fn(d);
+    this.data = d;
+    try { this.renderNow(); } finally { this.data = keep; }
+  }
+
   /** Change the map as one undo step; the card grows or shrinks around the central topic. */
   apply(fn: (d: MMData) => void): void {
     const d = cloneData(this.data);
@@ -256,6 +281,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
     this.paintSelection();
     this.drawOverlay();
     this.ctx.board.notifySelection();
+    this.arm();
   }
 
   private isSole(): boolean {
@@ -271,6 +297,39 @@ export class MindMapCard implements CardHandle, MindMapControl {
       this.paintSelection();
     }
     this.drawOverlay();
+    this.arm();
+  }
+
+  /** Make the one selected topic wait for typing (see armedId). */
+  private arm(): void {
+    const b = this.ctx.board;
+    const want = !this.editingId && this.sel.size === 1 && this.primary && this.isSole() && b.tool === 'select' && !b.editingId ? this.primary : null;
+    if (this.armedId && this.armedId !== want) this.disarmEl(this.armedId);
+    this.armedId = null;
+    if (!want || !this.body.isConnected) return;
+    const el = this.topicEls.get(want);
+    if (!el) return;
+    this.armedId = want;
+    el.setAttr('contenteditable', 'plaintext-only');
+    el.setAttr('data-vc-armed', '');
+    const doc = el.ownerDocument;
+    const active = doc.activeElement as HTMLElement | null;
+    // Never pull focus out of a field the user is typing in (a hex code in a panel, a search box).
+    if (active && active !== el && active.closest('input, textarea, select, [contenteditable="true"], [contenteditable="plaintext-only"]:not([data-vc-armed])')) return;
+    if (active !== el) el.focus({ preventScroll: true });
+    const range = doc.createRange();
+    range.selectNodeContents(el);
+    const sel = doc.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  }
+
+  private disarmEl(id: string): void {
+    const el = this.topicEls.get(id);
+    if (!el || el.hasClass('is-editing')) return;
+    el.removeAttribute('contenteditable');
+    el.removeAttribute('data-vc-armed');
+    if (el.ownerDocument.activeElement === el) this.ctx.board.root.focus({ preventScroll: true });
   }
 
   private pruneSelection(): void {
@@ -313,6 +372,12 @@ export class MindMapCard implements CardHandle, MindMapControl {
         const tid = tp.id;
         el.addEventListener('input', () => { if (this.editingId === tid) this.layoutDom(); });
         el.addEventListener('keydown', e => this.onEditKey(e, tid));
+        const typeIn = () => {
+          if (this.armedId === tid && !this.editingId) { this.typingFromArmed = true; this.ctx.board.startEditing(this.node.id); }
+        };
+        // Input methods and dictation can write without a keystroke first.
+        el.addEventListener('compositionstart', typeIn);
+        el.addEventListener('beforeinput', typeIn);
         el.addEventListener('blur', () => { if (this.editingId === tid) window.setTimeout(() => { if (this.editingId === tid) this.ctx.board.stopEditing(); }, 0); });
       }
       const st = this.styles.get(tp.id)!;
@@ -332,7 +397,9 @@ export class MindMapCard implements CardHandle, MindMapControl {
     for (const [id, el] of this.topicEls) if (!keep.has(id)) { this.sizeWatch.unobserve(el); el.remove(); this.topicEls.delete(id); }
     this.paintSelection();
     if (!this.body.isConnected) return null;
-    return this.layoutDom();
+    const geo = this.layoutDom();
+    if (!this.editingId) this.arm();
+    return geo;
   }
 
   /** Measure the topics, place them, and draw. */
@@ -545,6 +612,18 @@ export class MindMapCard implements CardHandle, MindMapControl {
   private beginEdit(id: string, at: { clientX: number; clientY: number } | null): boolean {
     const el = this.topicEls.get(id);
     if (!el) return false;
+    if (this.typingFromArmed && this.armedId === id) {
+      // Already editable, focused and selected: just switch to editing, leaving the keystroke to land.
+      this.typingFromArmed = false;
+      this.armedId = null;
+      this.editingId = id;
+      el.removeAttribute('data-vc-armed');
+      el.addClass('is-editing');
+      this.drawOverlay();
+      return true;
+    }
+    this.typingFromArmed = false;
+    if (this.armedId) { this.disarmEl(this.armedId); this.armedId = null; }
     if (!this.sel.has(id) || this.sel.size !== 1) { this.sel = new Set([id]); this.primary = id; this.paintSelection(); }
     this.editingId = id;
     this.drawOverlay();
@@ -571,12 +650,11 @@ export class MindMapCard implements CardHandle, MindMapControl {
     if (this.editingId !== id) return;
     e.stopPropagation();
     if (e.isComposing) return;
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.ctx.board.stopEditing(); this.ctx.board.root.focus({ preventScroll: true }); return; }
-    if (e.key === 'Escape') { e.preventDefault(); this.ctx.board.stopEditing(); this.ctx.board.root.focus({ preventScroll: true }); return; }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.ctx.board.stopEditing(); return; }
+    if (e.key === 'Escape') { e.preventDefault(); this.ctx.board.stopEditing(); return; }
     if (e.key === 'Tab') {
       e.preventDefault();
       this.ctx.board.stopEditing();
-      this.ctx.board.root.focus({ preventScroll: true });
       this.addChildTo(id);
     }
   }
@@ -721,10 +799,14 @@ export class MindMapCard implements CardHandle, MindMapControl {
     if (!this.isSole()) b.select([this.node.id]);
     if (!(this.sel.size > 1 && this.sel.has(id))) this.setSel([id]);
     // The central topic carries the whole map; other topics drag within it.
-    if (id === this.data.root.id) return;
+    if (id === this.data.root.id) {
+      e.preventDefault(); // keep the waiting selection; the board still moves the map
+      window.setTimeout(() => this.arm(), 0);
+      return;
+    }
     e.stopPropagation();
     e.preventDefault();
-    b.root.focus({ preventScroll: true });
+    if (!this.armedId) b.root.focus({ preventScroll: true });
     this.startTopicDrag(e, id);
   }
 

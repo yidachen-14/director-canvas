@@ -177,7 +177,7 @@ export function attachClipboard(board: Board): void {
   board.root.addEventListener('pointerleave', () => { lastPointer = null; });
 
   const focused = () => board.root.contains(doc.activeElement) && !board.editingId
-    && !(doc.activeElement as HTMLElement | null)?.closest('input, textarea, [contenteditable="true"], [contenteditable="plaintext-only"]');
+    && !(doc.activeElement as HTMLElement | null)?.closest('input, textarea, [contenteditable="true"], [contenteditable="plaintext-only"]:not([data-vc-armed])');
 
   const onCopy = (e: ClipboardEvent) => { if (focused()) copySelection(board, e); };
   const onCut = (e: ClipboardEvent) => { if (focused() && copySelection(board, e)) board.deleteSelection(); };

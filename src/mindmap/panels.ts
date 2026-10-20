@@ -6,6 +6,7 @@ import {
   MM_THEMES, branchSideways, eachTopic, findTopic, resolveStyles, themeById,
 } from './model';
 import type { MindMapControl } from './card';
+import { colorPicker } from '../ui/color-picker';
 
 // ── Icons (100 × 100) ─────────────────────────────────────────────────
 
@@ -101,10 +102,10 @@ function resolved(ctl: MindMapControl) {
   return resolveStyles(ctl.mapData()).get(primaryOf(ctl))!;
 }
 
-/** Change the style of every selected topic. */
-function styleSelected(ctl: MindMapControl, fn: (s: MMStyle) => void): void {
+/** Change the style of every selected topic (only shown, not stored, when previewing). */
+function styleSelected(ctl: MindMapControl, fn: (s: MMStyle) => void, preview = false): void {
   const ids = ctl.selected();
-  ctl.apply(d => {
+  const change = (d: MMData) => {
     for (const id of ids) {
       const f = findTopic(d.root, id);
       if (!f) continue;
@@ -113,14 +114,15 @@ function styleSelected(ctl: MindMapControl, fn: (s: MMStyle) => void): void {
       for (const k of Object.keys(s) as (keyof MMStyle)[]) if (s[k] === undefined) delete s[k];
       f.topic.style = Object.keys(s).length ? s : undefined;
     }
-  });
+  };
+  if (preview) ctl.preview(change); else ctl.apply(change);
 }
 
 /** Branch settings: the whole map from the central topic, otherwise the selected branches and below. */
-function branchSelected(ctl: MindMapControl, key: 'line' | 'branchColor', value: string | undefined): void {
+function branchSelected(ctl: MindMapControl, key: 'line' | 'branchColor', value: string | undefined, preview = false): void {
   const rootSel = ctl.rootSelected();
   const ids = ctl.selected();
-  ctl.apply(d => {
+  const change = (d: MMData) => {
     if (rootSel) {
       if (value === undefined) delete d[key]; else (d as unknown as Record<string, string>)[key] = value;
       eachTopic(d.root, tp => { delete tp[key]; });
@@ -132,7 +134,8 @@ function branchSelected(ctl: MindMapControl, key: 'line' | 'branchColor', value:
       eachTopic(f.topic, tp => { delete tp[key]; });
       if (value !== undefined) (f.topic as unknown as Record<string, string>)[key] = value;
     }
-  });
+  };
+  if (preview) ctl.preview(change); else ctl.apply(change);
 }
 
 function section(pop: HTMLElement, title: string, extra?: string): HTMLElement {
@@ -164,14 +167,25 @@ function palette(pop: HTMLElement, current: string | undefined, pick: (c: string
   }
 }
 
-function customColor(row: HTMLElement, current: string | undefined, pick: (c: string) => void): void {
-  const label = row.createEl('label', { cls: 'vc-mm-chip vc-mm-custom' });
-  const dot = label.createSpan('vc-mm-custom-dot');
+/** Which panel has its colour picker open (kept while the panel redraws after each change). */
+let openPicker: string | null = null;
+
+/** "Custom": a picker inside the panel; dragging previews, letting go applies. */
+function customColor(pop: HTMLElement, row: HTMLElement, key: string, current: string | undefined, set: (c: string, preview: boolean) => void): void {
+  const chip = row.createDiv({ cls: 'vc-mm-chip vc-mm-custom', attr: { role: 'button' } });
+  const dot = chip.createSpan('vc-mm-custom-dot');
   if (current && /^#/.test(current) && !PALETTE.some(p => same(p, current))) dot.style.background = current;
-  label.createSpan({ text: t('Custom') });
-  const input = label.createEl('input', { type: 'color' });
-  input.value = current && /^#[0-9a-f]{6}$/i.test(current) ? current : '#8b5cf6';
-  input.addEventListener('change', () => pick(input.value));
+  chip.createSpan({ text: t('Custom') });
+  let picker: HTMLElement | null = null;
+  const show = () => { picker = colorPicker(pop, current, { onInput: c => set(c, true), onCommit: c => set(c, false) }); };
+  chip.toggleClass('is-active', openPicker === key);
+  if (openPicker === key) show();
+  chip.addEventListener('click', () => {
+    if (openPicker === key) { openPicker = null; picker?.remove(); picker = null; chip.removeClass('is-active'); return; }
+    openPicker = key;
+    chip.addClass('is-active');
+    show();
+  });
 }
 
 function slider(pop: HTMLElement, label: string, value: number, set: (v: number) => void): void {
@@ -286,7 +300,7 @@ function fillPanel(pop: HTMLElement, ctl: MindMapControl): void {
   const row = pop.createDiv('vc-mm-row');
   chip(row, t('No fill'), raw.fill === 'none' || (!raw.fill && res.fill === 'none'), () => styleSelected(ctl, s => { s.fill = 'none'; }));
   chip(row, t('Theme default'), !raw.fill, () => styleSelected(ctl, s => { s.fill = undefined; s.fillOpacity = undefined; }));
-  customColor(row, raw.fill, c => styleSelected(ctl, s => { s.fill = c; }));
+  customColor(pop, row, 'fill', raw.fill, (c, pv) => styleSelected(ctl, s => { s.fill = c; }, pv));
 }
 
 function borderPanel(pop: HTMLElement, ctl: MindMapControl): void {
@@ -310,7 +324,7 @@ function borderPanel(pop: HTMLElement, ctl: MindMapControl): void {
   palette(pop, raw.borderColor, c => styleSelected(ctl, s => { s.borderColor = c; }));
   const row = pop.createDiv('vc-mm-row');
   chip(row, t('Theme default'), !raw.borderColor, () => styleSelected(ctl, s => { s.borderColor = undefined; s.borderOpacity = undefined; }));
-  customColor(row, raw.borderColor, c => styleSelected(ctl, s => { s.borderColor = c; }));
+  customColor(pop, row, 'border', raw.borderColor, (c, pv) => styleSelected(ctl, s => { s.borderColor = c; }, pv));
 }
 
 function shapePanel(pop: HTMLElement, ctl: MindMapControl): void {
@@ -335,7 +349,7 @@ function branchColorPanel(pop: HTMLElement, ctl: MindMapControl): void {
   palette(pop, own, c => branchSelected(ctl, 'branchColor', c));
   const row = pop.createDiv('vc-mm-row');
   chip(row, t('Theme default'), !own, () => branchSelected(ctl, 'branchColor', undefined));
-  customColor(row, own, c => branchSelected(ctl, 'branchColor', c));
+  customColor(pop, row, 'branch', own, (c, pv) => branchSelected(ctl, 'branchColor', c, pv));
 }
 
 // ── Bar items ─────────────────────────────────────────────────────────

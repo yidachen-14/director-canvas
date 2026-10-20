@@ -559,21 +559,55 @@ export class Board {
   }
 
   setColor(color: string | undefined): void {
+    if (this.colorGesture) { this.commitColor(color); return; }
     const nodes = this.selectedNodes();
     const edges = [...this.edgeSelection].map(id => this.model.edge(id)).filter((e): e is RawEdge => !!e);
     if (!nodes.length && !edges.length) return;
     this.model.transact(() => {
-      for (const n of nodes) {
-        if (n.vc?.kind === 'drawing') {
-          // Drawings take the colour as their ink.
-          recolorDrawing(n, color ? (cssColor(color) ?? color) : 'currentColor');
-          if (color) n.color = color; else delete n.color;
-        } else if (color) n.color = color; else delete n.color;
-        this.model.touch(n.id);
-      }
-      for (const e of edges) { if (color) e.color = color; else delete e.color; }
+      this.paintColor(color);
+      for (const n of nodes) this.model.touch(n.id);
       if (edges.length) this.model.touchEdges();
     });
+  }
+
+  private paintColor(color: string | undefined): { ids: string[]; edges: boolean } {
+    const nodes = this.selectedNodes();
+    const edges = [...this.edgeSelection].map(id => this.model.edge(id)).filter((e): e is RawEdge => !!e);
+    for (const n of nodes) {
+      if (n.vc?.kind === 'drawing') {
+        // Drawings take the colour as their ink.
+        recolorDrawing(n, color ? (cssColor(color) ?? color) : 'currentColor');
+        if (color) n.color = color; else delete n.color;
+      } else if (color) n.color = color; else delete n.color;
+    }
+    for (const e of edges) { if (color) e.color = color; else delete e.color; }
+    return { ids: nodes.map(n => n.id), edges: edges.length > 0 };
+  }
+
+  private colorGesture: ReturnType<BoardModel['beginGesture']> | null = null;
+
+  /** Show a colour on the selection while it is being picked; commitColor() makes it one undo step. */
+  previewColor(color: string): void {
+    if (!this.colorGesture) this.colorGesture = this.model.beginGesture();
+    const r = this.paintColor(color);
+    this.colorGesture.preview(r.ids, r.edges);
+  }
+
+  /** Keep whatever colour is being previewed (a panel closed mid-pick). */
+  finishColorPreview(): void {
+    const g = this.colorGesture;
+    if (!g) return;
+    this.colorGesture = null;
+    g.end();
+  }
+
+  commitColor(color: string | undefined): void {
+    const g = this.colorGesture;
+    if (!g) { this.setColor(color); return; }
+    const r = this.paintColor(color);
+    g.preview(r.ids, r.edges);
+    this.colorGesture = null;
+    g.end();
   }
 
   reorderSelection(where: 'front' | 'back'): void {

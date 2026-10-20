@@ -122,7 +122,7 @@ export function attachInteractions(board: Board): void {
     // Interactive bits inside cards (links, checkboxes, inputs) keep their own clicks;
     // media controls only once their card is selected, so a first click selects it.
     const t = e.target as HTMLElement;
-    if (t.closest('a, input, button, select, textarea, [contenteditable="true"], [contenteditable="plaintext-only"], .vc-interactive')) return;
+    if (t.closest('a, input, button, select, textarea, [contenteditable="true"], [contenteditable="plaintext-only"]:not([data-vc-armed]), .vc-interactive')) return;
     const mediaHost = t.closest('video, audio')?.closest<HTMLElement>('.vc-node');
     if (mediaHost && board.selection.has(mediaHost.dataset.id ?? '') && board.selection.size === 1) return;
     // Buttons inside cards (kanban, swatch, calendar) work once their card is the selection.
@@ -538,7 +538,7 @@ export function attachInteractions(board: Board): void {
   root.addEventListener('keydown', (e) => {
     if (board.editingId || e.defaultPrevented) return;
     const target = e.target as HTMLElement;
-    if (target !== root && target.closest('input, textarea, [contenteditable="true"], [contenteditable="plaintext-only"]')) return;
+    if (target !== root && target.closest('input, textarea, [contenteditable="true"], [contenteditable="plaintext-only"]:not([data-vc-armed])')) return;
     const mod = isMod(e);
 
     if (board.selection.size === 1 && !mod) {

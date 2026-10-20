@@ -13,7 +13,7 @@ export function installHotkeys(scope: Scope, board: () => Board | null): void {
     if (!b || b.editingId) return null;
     const el = document.activeElement as HTMLElement | null;
     if (!el || !b.root.contains(el)) return null;
-    if (el !== b.root && el.closest('input, textarea, [contenteditable="true"], [contenteditable="plaintext-only"]')) return null;
+    if (el !== b.root && el.closest('input, textarea, [contenteditable="true"], [contenteditable="plaintext-only"]:not([data-vc-armed])')) return null;
     return b;
   };
   const bind = (mods: Modifier[], key: string, fn: (b: Board) => void) => {

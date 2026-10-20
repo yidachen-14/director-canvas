@@ -6,6 +6,7 @@ import { duplicateSelection } from './interactions';
 import { showSelectionMenu } from './menus';
 import { cardKindOf, presetColor } from '../cards/util';
 import { getCardType } from '../cards/registry';
+import { colorPicker } from '../ui/color-picker';
 import { t } from '../i18n';
 
 /** Set an icon, falling back to the next name when this Obsidian's icon set lacks one. */
@@ -72,7 +73,7 @@ export class ContextBar {
     const show = nodes.length > 0 && !b.edgeSelection.size && b.tool === 'select' && !b.editingId;
     if (!show) { this.hide(); return; }
     const sole = nodes.length === 1 ? b.cards.get(nodes[0].id)?.handle : undefined;
-    const key = nodes.map(n => `${n.id}:${cardKindOf(n)}:${n.color ?? ''}`).join('|') + (sole?.barKey?.() ?? '');
+    const key = nodes.map(n => `${n.id}:${cardKindOf(n)}`).join('|') + (sole?.barKey?.() ?? '');
     if (key !== this.key || !this.el.isShown()) {
       this.key = key;
       this.closePop();
@@ -275,6 +276,13 @@ export class ContextBar {
     anchor.addClass('is-open');
     build(pop, () => this.closePop());
     this.placePop(anchor);
+    let lastH = pop.offsetHeight;
+    const ro = new ResizeObserver(() => {
+      if (this.pop !== pop || Math.abs(pop.offsetHeight - lastH) < 2) return;
+      lastH = pop.offsetHeight;
+      this.placePop(anchor);
+    });
+    ro.observe(pop);
     const doc = this.el.ownerDocument;
     const outside = (e: PointerEvent) => {
       const tgt = e.target as Node;
@@ -282,7 +290,7 @@ export class ContextBar {
       this.closePop();
     };
     doc.addEventListener('pointerdown', outside, true);
-    this.offPop = () => doc.removeEventListener('pointerdown', outside, true);
+    this.offPop = () => { doc.removeEventListener('pointerdown', outside, true); ro.disconnect(); };
   }
 
   private offPop: (() => void) | null = null;
@@ -296,26 +304,39 @@ export class ContextBar {
     pop.style.maxHeight = '';
     const pw = pop.offsetWidth;
     let ph = pop.offsetHeight;
-    let x = ar.left - root.left + ar.width / 2 - pw / 2;
-    // Below the bar if it fits, else above; if neither, the roomier side, scrolling inside.
-    const below = root.height - (br.bottom - root.top) - 14;
-    const above = br.top - root.top - 14;
-    // When the bar sits above the selection, open upwards first so the panel doesn't hide what it changes.
+    const W = root.width, H = root.height;
+    const cx = Math.max(8, Math.min(W - pw - 8, ar.left - root.left + ar.width / 2 - pw / 2));
+    const barTop = br.top - root.top, barBottom = br.bottom - root.top;
+    // What the panel changes must stay visible: the selection (a mind map topic, or the cards).
     const sel = this.anchorRect();
-    const selTop = sel ? this.board.vp.toScreen(sel.x, sel.y).y : Infinity;
-    const barAbove = br.bottom - root.top <= selTop + 2;
-    let y: number;
-    if (barAbove && ph <= above) y = br.top - root.top - ph - 6;
-    else if (ph <= below) y = br.bottom - root.top + 6;
-    else if (ph <= above) y = br.top - root.top - ph - 6;
-    else if (below >= above) { pop.style.maxHeight = `${Math.max(120, below)}px`; ph = pop.offsetHeight; y = br.bottom - root.top + 6; }
-    else { pop.style.maxHeight = `${Math.max(120, above)}px`; ph = pop.offsetHeight; y = br.top - root.top - ph - 6; }
-    x = Math.max(8, Math.min(root.width - pw - 8, x));
+    const vp = this.board.vp;
+    const s1 = sel ? vp.toScreen(sel.x, sel.y) : null, s2 = sel ? vp.toScreen(sel.x + sel.width, sel.y + sel.height) : null;
+    const S = s1 && s2 ? { l: s1.x - 6, t: s1.y - 6, r: s2.x + 6, b: s2.y + 6 } : null;
+    const hides = (x: number, y: number) => !!S && x < S.r && x + pw > S.l && y < S.b && y + ph > S.t;
+    const fits = (x: number, y: number) => x >= 8 && y >= 8 && x + pw <= W - 8 && y + ph <= H - 8;
+    const barAbove = !!S && barBottom <= S.t + 8;
+    const up = { x: cx, y: barTop - ph - 6 }, down = { x: cx, y: barBottom + 6 };
+    const sideY = Math.max(8, Math.min(H - ph - 8, barTop));
+    const right = S ? { x: S.r + 12, y: sideY } : null, left = S ? { x: S.l - pw - 12, y: sideY } : null;
+    const order = [barAbove ? up : down, barAbove ? down : up, right, left].filter((c): c is { x: number; y: number } => !!c);
+    const pick = order.find(c => fits(c.x, c.y) && !hides(c.x, c.y)) ?? order.find(c => fits(c.x, c.y));
+    let x: number, y: number;
+    if (pick) ({ x, y } = pick);
+    else {
+      // Nothing fits whole: the roomier side of the bar, scrolling inside.
+      const below = H - barBottom - 14, above = barTop - 14;
+      pop.style.maxHeight = `${Math.max(120, Math.max(below, above))}px`;
+      ph = pop.offsetHeight;
+      x = cx;
+      y = below >= above ? barBottom + 6 : barTop - ph - 6;
+    }
+    x = Math.max(8, Math.min(W - pw - 8, x));
     y = Math.max(8, y);
     pop.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
   }
 
   private closePop(): void {
+    this.board.finishColorPreview();
     this.offPop?.();
     this.offPop = null;
     this.popAnchor?.removeClass('is-open');
@@ -465,10 +486,26 @@ export class ContextBar {
       setTooltip(sw, t(c.label), { placement: 'bottom' });
       sw.addEventListener('click', () => { b.setColor(c.id); close(); });
     }
-    const custom = grid.createDiv({ cls: 'vc-ctx-color is-custom', attr: { 'aria-label': t('Custom colour') } });
+    // Custom: a picker inside the panel; the colour shows while dragging and is stored on release.
+    const custom = grid.createDiv({ cls: 'vc-ctx-color is-custom', attr: { role: 'button', 'aria-label': t('Custom colour') } });
     setTooltip(custom, t('Custom colour'), { placement: 'bottom' });
-    const input = custom.createEl('input', { type: 'color' });
-    if (cur && cur.startsWith('#')) { input.value = cur.slice(0, 7); custom.addClass('is-active'); custom.style.background = cur; }
-    input.addEventListener('change', () => { b.setColor(input.value); close(); });
+    if (cur && cur.startsWith('#')) { custom.addClass('is-active'); custom.style.background = cur; }
+    let picker: HTMLElement | null = null;
+    const show = () => {
+      picker = colorPicker(pop, cur && cur.startsWith('#') ? cur.slice(0, 7) : undefined, {
+        onInput: hex => b.previewColor(hex),
+        onCommit: hex => b.commitColor(hex),
+      });
+      this.placePop(this.popAnchor ?? custom);
+    };
+    if (this.customColorOpen) show();
+    custom.addEventListener('click', () => {
+      this.customColorOpen = !this.customColorOpen;
+      if (this.customColorOpen) show(); else { picker?.remove(); picker = null; }
+    });
+    void close;
   }
+
+  /** The colour panel's picker stays open while the panel redraws. */
+  private customColorOpen = false;
 }
