@@ -147,6 +147,9 @@ export class Board {
     return () => this.listeners.change.delete(fn);
   }
 
+  /** Something inside a card's selection changed (e.g. a mind map topic): update the bar. */
+  notifySelection(): void { this.fire('selection'); }
+
   private fire(kind: 'selection' | 'viewport' | 'tool' | 'edges'): void {
     for (const fn of this.listeners[kind]) fn();
   }

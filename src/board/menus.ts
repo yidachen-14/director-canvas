@@ -114,6 +114,11 @@ function boardMenu(menu: Menu, board: Board, at: Point): void {
 function cardMenu(menu: Menu, board: Board, at: Point): void {
   const multi = board.selection.size > 1;
   const nodes = board.selectedNodes();
+  // A part of the card is selected (a mind map topic): only its own menu.
+  if (!multi && nodes[0]) {
+    const handle = board.cards.get(nodes[0].id)?.handle;
+    if (handle?.barExclusive?.() && handle.menu) { handle.menu(menu); return; }
+  }
   if (!multi && nodes[0]) {
     const card = board.cards.get(nodes[0].id);
     if (card?.handle.edit && nodes[0].type !== 'file') {

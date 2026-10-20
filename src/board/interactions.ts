@@ -60,6 +60,10 @@ export function attachInteractions(board: Board): void {
     const order = [...nodes.filter(n => n.type !== 'group').reverse(), ...nodes.filter(n => n.type === 'group').reverse()];
     for (const n of order) {
       if (board.editingId === n.id) continue;
+      if (getCardType(cardKindOf(n))?.fixedSize) {
+        if (wx > n.x && wx < n.x + n.width && wy > n.y && wy < n.y + n.height) return null;
+        continue;
+      }
       const x0 = n.x, y0 = n.y, x1 = n.x + n.width, y1 = n.y + n.height;
       if (wx < x0 - out || wx > x1 + out || wy < y0 - out || wy > y1 + out) continue;
       const nearW = wx < x0 + inn, nearE = wx > x1 - inn, nearN = wy < y0 + inn, nearS = wy > y1 - inn;

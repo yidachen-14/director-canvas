@@ -5,6 +5,7 @@ import { ARRANGE, runArrange, type ArrangeDef } from './arrange-commands';
 import { duplicateSelection } from './interactions';
 import { showSelectionMenu } from './menus';
 import { cardKindOf, presetColor } from '../cards/util';
+import { getCardType } from '../cards/registry';
 import { t } from '../i18n';
 
 /** Set an icon, falling back to the next name when this Obsidian's icon set lacks one. */
@@ -43,6 +44,8 @@ export class ContextBar {
   private el: HTMLElement;
   private pop: HTMLElement | null = null;
   private key = '';
+  /** The selected cards' data changed since the bar was built. */
+  private dataDirty = false;
   private raf = 0;
 
   constructor(private board: Board) {
@@ -55,7 +58,10 @@ export class ContextBar {
     board.on('selection', schedule);
     board.on('viewport', () => this.place());
     board.on('tool', schedule);
-    board.addDisposer(board.onChange(schedule));
+    board.addDisposer(board.onChange((e) => {
+      if (!e.preview && (e.reset || e.ids.some(id => board.selection.has(id)))) this.dataDirty = true;
+      schedule();
+    }));
     board.addDisposer(() => { cancelAnimationFrame(this.raf); this.closePop(); this.el.remove(); });
   }
 
@@ -65,14 +71,17 @@ export class ContextBar {
     const nodes = b.selectedNodes();
     const show = nodes.length > 0 && !b.edgeSelection.size && b.tool === 'select' && !b.editingId;
     if (!show) { this.hide(); return; }
-    const key = nodes.map(n => `${n.id}:${cardKindOf(n)}:${n.color ?? ''}`).join('|');
+    const sole = nodes.length === 1 ? b.cards.get(nodes[0].id)?.handle : undefined;
+    const key = nodes.map(n => `${n.id}:${cardKindOf(n)}:${n.color ?? ''}`).join('|') + (sole?.barKey?.() ?? '');
     if (key !== this.key || !this.el.isShown()) {
       this.key = key;
       this.closePop();
       this.build();
-    } else {
-      this.updateActive();
+    } else if (this.dataDirty) {
+      // Same selection, its data changed: redraw the buttons, keeping an open panel open (and redrawn).
+      this.rebuildKeepingPanel();
     }
+    this.dataDirty = false;
     this.el.show();
     this.place();
   }
@@ -87,7 +96,7 @@ export class ContextBar {
 
   private place(): void {
     if (!this.el.isShown()) return;
-    const r = this.board.selectionRect();
+    const r = this.anchorRect();
     if (!r) return;
     const vp = this.board.vp;
     const a = vp.toScreen(r.x, r.y), b = vp.toScreen(r.x + r.width, r.y + r.height);
@@ -101,8 +110,27 @@ export class ContextBar {
     if (y < 8) y = b.y + gap; // no room above: below the selection
     if (y + h > height - 8) y = Math.max(8, Math.min(height - h - 8, a.y + 8)); // tall selection: inside its top
     x = Math.max(8, Math.min(width - w - 8, x));
+    // Parts of the card the bar must not cover (other mind map topics): try below, then around the whole card.
+    const nodes = this.board.selectedNodes();
+    const avoid = nodes.length === 1 ? this.board.cards.get(nodes[0].id)?.handle.barAvoid?.() ?? [] : [];
+    if (avoid.length) {
+      const boxes = avoid.map(q => { const p = vp.toScreen(q.x, q.y), p2 = vp.toScreen(q.x + q.width, q.y + q.height); return { l: p.x, t: p.y, r: p2.x, b: p2.y }; });
+      const card = this.board.selectionRect();
+      const c1 = card ? vp.toScreen(card.x, card.y) : a, c2 = card ? vp.toScreen(card.x + card.width, card.y + card.height) : b;
+      const clear = (cy: number) => cy >= 8 && cy + h <= height - 8 && !boxes.some(q => x < q.r && x + w > q.l && cy < q.b + 4 && cy + h > q.t - 4);
+      const tries = [a.y - h - gap, b.y + gap, c1.y - h - gap, c2.y + gap];
+      const pick = tries.find(clear);
+      if (pick !== undefined) y = pick;
+    }
     this.el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
     if (this.pop && this.popAnchor) this.placePop(this.popAnchor);
+  }
+
+  /** What the bar sits next to, in board coordinates. */
+  private anchorRect(): { x: number; y: number; width: number; height: number } | null {
+    const nodes = this.board.selectedNodes();
+    const anchor = nodes.length === 1 ? this.board.cards.get(nodes[0].id)?.handle.barAnchor?.() : null;
+    return anchor ?? this.board.selectionRect();
   }
 
   // ── content ─────────────────────────────────────────────
@@ -110,6 +138,7 @@ export class ContextBar {
   private build(): void {
     const el = this.el;
     el.empty();
+    this.builders.clear();
     const b = this.board;
     const nodes = b.selectedNodes();
     const multi = nodes.length > 1;
@@ -128,12 +157,15 @@ export class ContextBar {
       const card = b.cards.get(nodes[0].id);
       const items = card?.handle.barItems?.() ?? [];
       for (const it of items) this.item(it);
+      // A part of the card is selected (a mind map topic): only its own controls.
+      if (card?.handle.barExclusive?.()) { this.updateActive(); return; }
       if (items.length) this.sep();
-      if (cardKindOf(nodes[0]) !== 'text') this.dropdownButton('size', 'move-diagonal-2', t('Size'), (pop, close) => this.sizePanel(pop, close));
+      const kind = cardKindOf(nodes[0]);
+      if (kind !== 'text' && !getCardType(kind)?.fixedSize) this.dropdownButton('size', 'move-diagonal-2', t('Size'), (pop, close) => this.sizePanel(pop, close));
     }
 
     const drawingOnly = nodes.every(n => cardKindOf(n) === 'drawing');
-    this.dropdownButton('color', 'palette', drawingOnly ? t('Ink colour') : t('Colour'), (pop, close) => this.colorPanel(pop, close), true);
+    if (!nodes.every(n => getCardType(cardKindOf(n))?.noColor)) this.dropdownButton('color', 'palette', drawingOnly ? t('Ink colour') : t('Colour'), (pop, close) => this.colorPanel(pop, close), true);
     this.dropdownButton('layer', 'layers', t('Layer'), (pop, close) => {
       this.listItem(pop, 'bring-to-front', t('Bring to front'), () => { b.reorderSelection('front'); close(); });
       this.listItem(pop, 'send-to-back', t('Send to back'), () => { b.reorderSelection('back'); close(); });
@@ -154,19 +186,23 @@ export class ContextBar {
   private sep(): void { this.el.createDiv('vc-ctx-sep'); }
 
   private button(it: BarItem): HTMLElement {
+    if (it.dropdown) this.builders.set(it.id, it.dropdown);
     const btn = this.el.createDiv({ cls: 'vc-ctx-btn', attr: { role: 'button', 'aria-label': it.label, 'data-id': it.id } });
     setIconSafe(btn.createDiv('vc-ctx-icon'), iconFor(it.icon));
     if (it.text) btn.createDiv({ cls: 'vc-ctx-text', text: it.text });
     btn.toggleClass('is-active', !!it.active);
     setTooltip(btn, it.label, { placement: 'top' });
+    let timer = 0;
     btn.addEventListener('click', () => {
+      // A click decides; a hover-open still waiting must not undo it.
+      window.clearTimeout(timer);
       if (it.dropdown) { if (this.popAnchor !== btn || !this.hoverOpened) this.togglePop(btn, it.dropdown); this.hoverOpened = false; }
       else { this.closePop(); it.run?.(); }
     });
     if (it.dropdown) {
       // Like Boardmix: resting the pointer on a button opens its panel.
-      let timer = 0;
       btn.addEventListener('mouseenter', () => {
+        window.clearTimeout(timer);
         timer = window.setTimeout(() => {
           if (this.popAnchor === btn) return;
           this.togglePop(btn, it.dropdown!);
@@ -181,8 +217,30 @@ export class ContextBar {
 
   private item(it: BarItem): void {
     const btn = this.button(it);
+    if (it.swatch !== undefined) {
+      const dot = btn.createDiv('vc-ctx-swatch-dot');
+      if (it.swatch === 'none' || !it.swatch) dot.addClass('is-none'); else dot.style.background = it.swatch;
+    }
     if (it.dropdown) btn.createDiv('vc-ctx-caret');
   }
+
+  /** Rebuild the buttons; a panel that was open is opened again (with fresh content) and keeps its scroll. */
+  private rebuildKeepingPanel(): void {
+    const openId = this.popAnchor?.dataset.id;
+    const scroll = this.pop?.scrollTop ?? 0;
+    const builder = openId ? this.builders.get(openId) : undefined;
+    this.closePop();
+    this.build();
+    if (!openId || !builder) return;
+    const btn = this.el.querySelector<HTMLElement>(`.vc-ctx-btn[data-id="${CSS.escape(openId)}"]`);
+    const fresh = this.builders.get(openId);
+    if (!btn || !fresh) return;
+    this.togglePop(btn, fresh);
+    if (this.pop) this.pop.scrollTop = scroll;
+  }
+
+  /** Dropdown builders of the current buttons, by button id. */
+  private builders = new Map<string, (pop: HTMLElement, close: () => void) => void>();
 
   private dropdownButton(id: string, icon: string, label: string, build: (pop: HTMLElement, close: () => void) => void, swatch = false): HTMLElement {
     const btn = this.button({ id, icon, label, dropdown: build });
@@ -235,11 +293,23 @@ export class ContextBar {
     const root = this.board.root.getBoundingClientRect();
     const ar = anchor.getBoundingClientRect();
     const br = this.el.getBoundingClientRect();
-    const pw = pop.offsetWidth, ph = pop.offsetHeight;
+    pop.style.maxHeight = '';
+    const pw = pop.offsetWidth;
+    let ph = pop.offsetHeight;
     let x = ar.left - root.left + ar.width / 2 - pw / 2;
-    // Open away from the selection: below the bar when the bar is above it.
-    let y = br.bottom - root.top + 6;
-    if (y + ph > root.height - 8) y = br.top - root.top - ph - 6;
+    // Below the bar if it fits, else above; if neither, the roomier side, scrolling inside.
+    const below = root.height - (br.bottom - root.top) - 14;
+    const above = br.top - root.top - 14;
+    // When the bar sits above the selection, open upwards first so the panel doesn't hide what it changes.
+    const sel = this.anchorRect();
+    const selTop = sel ? this.board.vp.toScreen(sel.x, sel.y).y : Infinity;
+    const barAbove = br.bottom - root.top <= selTop + 2;
+    let y: number;
+    if (barAbove && ph <= above) y = br.top - root.top - ph - 6;
+    else if (ph <= below) y = br.bottom - root.top + 6;
+    else if (ph <= above) y = br.top - root.top - ph - 6;
+    else if (below >= above) { pop.style.maxHeight = `${Math.max(120, below)}px`; ph = pop.offsetHeight; y = br.bottom - root.top + 6; }
+    else { pop.style.maxHeight = `${Math.max(120, above)}px`; ph = pop.offsetHeight; y = br.top - root.top - ph - 6; }
     x = Math.max(8, Math.min(root.width - pw - 8, x));
     y = Math.max(8, y);
     pop.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;

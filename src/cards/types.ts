@@ -33,6 +33,14 @@ export interface CardHandle {
   onKey?(e: KeyboardEvent): boolean;
   /** Card-specific buttons for the floating context bar (only when it is the sole selection). */
   barItems?(): BarItem[];
+  /** Changes when the card's bar should be rebuilt (e.g. a different part of it is selected). */
+  barKey?(): string;
+  /** Show only the card's own bar items (e.g. a mind map topic is selected). */
+  barExclusive?(): boolean;
+  /** Board rectangles the bar should not cover (e.g. other mind map topics). */
+  barAvoid?(): { x: number; y: number; width: number; height: number }[];
+  /** Board rectangle the bar sits above, instead of the whole card. */
+  barAnchor?(): { x: number; y: number; width: number; height: number } | null;
   /** Card-specific entries for its right-click menu (only when it is the sole selection). */
   menu?(menu: import('obsidian').Menu): void;
 }
@@ -45,6 +53,10 @@ export interface CardType {
   icon: string;
   /** Size of a newly placed card, in board units. */
   defaultSize: { width: number; height: number };
+  /** The card sizes itself: no resize handles. */
+  fixedSize?: boolean;
+  /** The card colours itself (no card colour in the bar). */
+  noColor?: boolean;
   /** Data for a new card of this kind, before id and position. */
   create?(ctx: { settings: import('../settings').VisualCanvasSettings }): Partial<RawNode>;
   mount(node: RawNode, el: HTMLElement, ctx: CardContext): CardHandle;
@@ -57,6 +69,8 @@ export interface BarItem {
   label: string;
   /** Shown next to the icon (a size, a short word). */
   text?: string;
+  /** A colour dot on the button (a css colour, or 'none'). */
+  swatch?: string;
   active?: boolean;
   run?: () => void;
   /** Opens a small panel under the button; build its content into `pop`. */
