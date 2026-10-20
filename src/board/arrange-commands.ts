@@ -3,7 +3,7 @@ import type { Board } from './board';
 import type { RawNode } from '../model/canvas-file';
 import { cardKindOf } from '../cards/util';
 import {
-  alignEdges, distribute, normalize, optimalArrange, packToAspect, pushTogether, shuffle, stack,
+  alignEdges, distribute, spaceEvenly, normalize, optimalArrange, packToAspect, pushTogether, shuffle, stack,
   type AlignEdge, type Box, type Direction, type Normalize, type Placement,
 } from './arrange';
 import { t } from '../i18n';
@@ -13,7 +13,7 @@ export type ArrangeCommand =
   | 'push-left' | 'push-right' | 'push-up' | 'push-down'
   | 'stack'
   | 'same-height' | 'same-width' | 'same-size' | 'same-area'
-  | 'row' | 'column'
+  | 'row' | 'column' | 'space-h' | 'space-v'
   | 'align-left' | 'align-hcenter' | 'align-right' | 'align-top' | 'align-vcenter' | 'align-bottom';
 
 export interface ArrangeDef { id: ArrangeCommand; label: string; icon: string; group: 'arrange' | 'push' | 'size' | 'distribute' | 'align'; keys?: string; }
@@ -36,6 +36,8 @@ export const ARRANGE: ArrangeDef[] = [
   { id: 'same-area', label: 'Same area', icon: 'square', group: 'size' },
   { id: 'row', label: 'Distribute in a row', icon: 'columns-3', group: 'distribute', keys: '⌥⇧⌘→' },
   { id: 'column', label: 'Distribute in a column', icon: 'rows-3', group: 'distribute', keys: '⌥⇧⌘↓' },
+  { id: 'space-h', label: 'Space evenly horizontally', icon: 'align-horizontal-space-around', group: 'align' },
+  { id: 'space-v', label: 'Space evenly vertically', icon: 'align-vertical-space-around', group: 'align' },
   { id: 'align-left', label: 'Align left edges', icon: 'align-start-vertical', group: 'align' },
   { id: 'align-hcenter', label: 'Align centres horizontally', icon: 'align-center-vertical', group: 'align' },
   { id: 'align-right', label: 'Align right edges', icon: 'align-end-vertical', group: 'align' },
@@ -80,9 +82,9 @@ let last: { cmd: ArrangeCommand; key: string; reversed: boolean } | null = null;
 
 export function runArrange(board: Board, cmd: ArrangeCommand): void {
   const nodes = arrangeTargets(board);
-  const needs = cmd.startsWith('align-') || cmd.startsWith('same-') ? 2 : 1;
+  const needs = cmd.startsWith('space-') ? 3 : cmd.startsWith('align-') || cmd.startsWith('same-') ? 2 : 1;
   if (nodes.length < needs) {
-    new Notice(needs > 1 ? t('Select at least two cards.') : t('Nothing to arrange: select cards, or add images to the board.'));
+    new Notice(needs === 3 ? t('Select at least three cards.') : needs > 1 ? t('Select at least two cards.') : t('Nothing to arrange: select cards, or add images to the board.'));
     return;
   }
   const boxes: Box[] = nodes.map(n => ({ id: n.id, x: n.x, y: n.y, w: n.width, h: n.height }));
@@ -113,6 +115,8 @@ export function runArrange(board: Board, cmd: ArrangeCommand): void {
       placement = normalize(boxes.filter(b => !SELF_SIZED.has(cardKindOf(board.model.node(b.id)!))), cmd.slice(5) as Normalize, board.settings.normalizeBase); break;
     case 'row': placement = distribute(boxes, 'h', gap); break;
     case 'column': placement = distribute(boxes, 'v', gap); break;
+    case 'space-h': placement = spaceEvenly(boxes, 'h'); break;
+    case 'space-v': placement = spaceEvenly(boxes, 'v'); break;
     default: placement = alignEdges(boxes, cmd.slice(6) as AlignEdge);
   }
   last = { cmd, key, reversed };

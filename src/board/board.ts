@@ -6,6 +6,7 @@ import { newId, type CanvasFile, type RawEdge, type RawNode } from '../model/can
 import { Viewport, gridLayers, type Point } from './viewport';
 import { edgeGeometry, edgeWidth, vcOf } from './connections';
 import type { ConnectController } from './connect-ui';
+import { drawingHit, recolorDrawing } from '../cards/drawing';
 import { cardKindOf, cssColor } from '../cards/util';
 import { getCardType, fallbackCard } from '../cards/registry';
 import type { CardHandle } from '../cards/types';
@@ -159,6 +160,9 @@ export class Board {
     if (s.backgroundColor) this.root.style.setProperty('--vc-bg', s.backgroundColor);
     else this.root.style.removeProperty('--vc-bg');
     this.root.setAttr('data-toolbar-size', s.toolbarSize);
+    this.root.style.setProperty('--vc-img-radius', `${s.imageRadius}px`);
+    this.root.style.setProperty('--vc-img-radius-on', s.imageRadius > 0 ? '1' : '0');
+    this.root.toggleClass('has-image-shadow', s.imageShadow);
     this.root.setAttr('data-toolbar-pos', s.toolbarPosition);
     this.applyGrid();
   }
@@ -238,7 +242,11 @@ export class Board {
   /** Topmost node under a world point (cards above groups); `margin` widens each card's hit area. */
   nodeAt(wx: number, wy: number, margin = 0): RawNode | null {
     const nodes = this.model.nodes;
-    const hit = (n: RawNode) => wx >= n.x - margin && wx <= n.x + n.width + margin && wy >= n.y - margin && wy <= n.y + n.height + margin;
+    const hit = (n: RawNode) => {
+      if (!(wx >= n.x - margin && wx <= n.x + n.width + margin && wy >= n.y - margin && wy <= n.y + n.height + margin)) return false;
+      // A drawing is picked by its ink, not its whole box.
+      return n.vc?.kind !== 'drawing' || drawingHit(n, wx, wy, 6 / this.vp.zoom + margin);
+    };
     for (let i = nodes.length - 1; i >= 0; i--) if (nodes[i].type !== 'group' && hit(nodes[i])) return nodes[i];
     for (let i = nodes.length - 1; i >= 0; i--) if (nodes[i].type === 'group' && hit(nodes[i])) return nodes[i];
     return null;
@@ -320,6 +328,7 @@ export class Board {
     this.editingId = null;
     this.cards.get(id)?.el.removeClass('is-editing');
     if (!this.destroyed) this.root.focus({ preventScroll: true });
+    this.fire('selection');
   }
 
   stopEditing(): void {
@@ -551,7 +560,14 @@ export class Board {
     const edges = [...this.edgeSelection].map(id => this.model.edge(id)).filter((e): e is RawEdge => !!e);
     if (!nodes.length && !edges.length) return;
     this.model.transact(() => {
-      for (const n of nodes) { if (color) n.color = color; else delete n.color; this.model.touch(n.id); }
+      for (const n of nodes) {
+        if (n.vc?.kind === 'drawing') {
+          // Drawings take the colour as their ink.
+          recolorDrawing(n, color ? (cssColor(color) ?? color) : 'currentColor');
+          if (color) n.color = color; else delete n.color;
+        } else if (color) n.color = color; else delete n.color;
+        this.model.touch(n.id);
+      }
       for (const e of edges) { if (color) e.color = color; else delete e.color; }
       if (edges.length) this.model.touchEdges();
     });

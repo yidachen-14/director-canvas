@@ -1,4 +1,4 @@
-import { type Command, type EditorState, type Transaction, TextSelection } from 'prosemirror-state';
+import { type Command, type EditorState, type Transaction, TextSelection, Selection, AllSelection } from 'prosemirror-state';
 import type { MarkType, NodeType, Attrs } from 'prosemirror-model';
 import { setBlockType, toggleMark, wrapIn, lift } from 'prosemirror-commands';
 import { wrapInList, liftListItem, sinkListItem } from 'prosemirror-schema-list';
@@ -109,6 +109,97 @@ function setTaskAttr(state: EditorState, tr: Transaction, task: boolean): Transa
   });
   return tr;
 }
+
+/**
+ * Turn line breaks inside the selected paragraphs into separate paragraphs
+ * (or list items), so each visible line can get its own checkbox.
+ */
+export function splitLines(state: EditorState): Transaction {
+  const tr = state.tr;
+  const { $from, $to } = state.selection;
+  const from = state.selection.from, to = state.selection.to;
+  const all: { pos: number; depth: number }[] = [];
+  state.doc.nodesBetween($from.start(), $to.end(), (node, pos) => {
+    if (node.type !== schema.nodes.paragraph) return true;
+    const inItem = state.doc.resolve(pos).parent.type === schema.nodes.list_item;
+    node.forEach((child, offset) => { if (child.type === schema.nodes.hard_break) all.push({ pos: pos + 1 + offset, depth: inItem ? 2 : 1 }); });
+    return false;
+  });
+  // Only the breaks that bound the selected lines: the lines around them stay together.
+  const before = all.filter(b => b.pos < from).pop();
+  const after = all.find(b => b.pos >= to);
+  const breaks = all.filter(b => (b.pos >= from && b.pos < to) || b === before || b === after);
+  for (const b of breaks.reverse()) tr.delete(b.pos, b.pos + 1).split(b.pos, b.depth);
+  return tr;
+}
+
+/** To-do on/off for the selected lines: every line becomes its own checkbox item. */
+export const toggleTaskLines: Command = (state, dispatch) => {
+  if (listKind(state) === 'task') return toggleList('task')(state, dispatch);
+  const tr = splitLines(state);
+  if (!tr.docChanged) return toggleList('task')(state, dispatch);
+  if (!dispatch) return true;
+  const next = state.apply(tr);
+  let inner: Transaction | null = null;
+  toggleList('task')(next, t2 => { inner = t2; });
+  if (inner) {
+    const done = inner as Transaction;
+    for (const step of done.steps) tr.step(step);
+    tr.setSelection(Selection.fromJSON(tr.doc, done.selection.toJSON()));
+  }
+  dispatch(tr);
+  return true;
+};
+
+/** Every line of the whole text becomes a to-do (existing lists turn into to-do lists, keeping ticks). */
+export const allToTasks: Command = (state, dispatch) => {
+  if (!dispatch) return true;
+  const all = state.apply(state.tr.setSelection(new AllSelection(state.doc)));
+  const tr = state.tr.setSelection(new AllSelection(state.doc));
+  const split = splitLines(all);
+  for (const step of split.steps) tr.step(step);
+  const n = schema.nodes;
+  const blocks: { node: import('prosemirror-model').Node; pos: number }[] = [];
+  tr.doc.forEach((node, pos) => blocks.push({ node, pos }));
+  for (const { node, pos } of blocks.reverse()) {
+    if (node.type === n.paragraph) {
+      const item = n.list_item.create({ checked: ' ' }, node);
+      tr.replaceWith(pos, pos + node.nodeSize, n.bullet_list.create({ tight: true }, item));
+    } else if (node.type === n.bullet_list || node.type === n.ordered_list) {
+      if (node.type === n.ordered_list) tr.setNodeMarkup(pos, n.bullet_list, { tight: node.attrs.tight });
+      node.forEach((li, off) => { if (li.attrs.checked === null) tr.setNodeMarkup(pos + 1 + off, undefined, { ...li.attrs, checked: ' ' }); });
+    }
+  }
+  // Neighbouring to-do lists become one list.
+  const joins: number[] = [];
+  let prev: import('prosemirror-model').Node | null = null;
+  tr.doc.forEach((node, pos) => {
+    if (prev && prev.type === n.bullet_list && node.type === n.bullet_list) joins.push(pos);
+    prev = node;
+  });
+  for (const pos of joins.reverse()) tr.join(pos);
+  dispatch(tr);
+  return true;
+};
+
+/** Remove the checkboxes from the whole text: to-do lists turn back into plain lines. */
+export const allFromTasks: Command = (state, dispatch) => {
+  if (!dispatch) return true;
+  const tr = state.tr;
+  const blocks: { node: import('prosemirror-model').Node; pos: number }[] = [];
+  state.doc.forEach((node, pos) => blocks.push({ node, pos }));
+  for (const { node, pos } of blocks.reverse()) {
+    if (node.type !== schema.nodes.bullet_list) continue;
+    let tasks = node.childCount > 0;
+    node.forEach(li => { if (li.attrs.checked === null) tasks = false; });
+    if (!tasks) continue;
+    const parts: import('prosemirror-model').Node[] = [];
+    node.forEach(li => li.forEach(c => parts.push(c)));
+    tr.replaceWith(pos, pos + node.nodeSize, parts);
+  }
+  dispatch(tr);
+  return true;
+};
 
 /** Toggle a list kind: off when already that kind, converted when another list. */
 export function toggleList(kind: 'bullet' | 'ordered' | 'task'): Command {

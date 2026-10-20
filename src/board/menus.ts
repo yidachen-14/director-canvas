@@ -22,7 +22,7 @@ const contributions: MenuContribution[] = [];
 export function contributeMenu(c: MenuContribution): void { contributions.push(c); }
 
 /** Card kinds offered in "New card" and on the toolbar, in this order. */
-export const CREATABLE = ['text', 'note', 'sticky', 'callout', 'checklist', 'kanban', 'column', 'group', 'mindmap', 'swatch', 'calendar', 'bookmark'];
+export const CREATABLE = ['text', 'note', 'sticky', 'callout', 'kanban', 'column', 'group', 'mindmap', 'swatch', 'calendar', 'bookmark'];
 
 type SubmenuItem = MenuItem & { setSubmenu?: () => Menu };
 
@@ -85,6 +85,13 @@ export function attachContextMenu(board: Board): void {
   });
 }
 
+/** The selection's right-click menu, opened from elsewhere (the context bar's "…"). */
+export function showSelectionMenu(board: Board, clientX: number, clientY: number): void {
+  const menu = new Menu();
+  cardMenu(menu, board, board.clientToWorld(clientX, clientY));
+  menu.showAtPosition({ x: clientX, y: clientY });
+}
+
 function boardMenu(menu: Menu, board: Board, at: Point): void {
   menu.addItem(i => i.setTitle(t('Paste')).setIcon('clipboard-paste').setSection('edit').onClick(() => { void pasteFromSystem(board, at); }));
   menu.addItem(i => i.setTitle(t('Select all')).setIcon('box-select').setSection('edit').onClick(() => board.select(board.model.nodes.map(n => n.id))));
@@ -94,7 +101,7 @@ function boardMenu(menu: Menu, board: Board, at: Point): void {
       const type = types.find(x => x.id === id);
       if (!type) continue;
       m.addItem(i => i.setTitle(t(type.label)).setIcon(type.icon).onClick(() => {
-        board.createCard(id, at, { edit: ['text', 'note', 'sticky', 'callout', 'checklist'].includes(id) });
+        board.createCard(id, at, { edit: ['text', 'note', 'sticky', 'callout'].includes(id) });
       }));
     }
   });

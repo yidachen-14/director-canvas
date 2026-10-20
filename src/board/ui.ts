@@ -16,7 +16,7 @@ export function contributeOverflow(a: OverflowAction): void { overflowActions.pu
 /** Kinds that only make sense as a mode, never dropped as a card. */
 const MODE_TOOLS = new Set(['select', 'hand', 'connect', 'pen']);
 /** Card kinds opened for typing as soon as they are made. */
-const EDITABLE = new Set(['text', 'note', 'sticky', 'callout', 'checklist']);
+const EDITABLE = new Set(['text', 'note', 'sticky', 'callout']);
 
 /** The card kind a tool can be dragged out as, if any. */
 function dragKind(tool: Tool): string | null {

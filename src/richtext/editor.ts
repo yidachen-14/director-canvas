@@ -1,4 +1,4 @@
-import { EditorState, Plugin, TextSelection, type Transaction } from 'prosemirror-state';
+import { AllSelection, EditorState, Plugin, TextSelection, type Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { Fragment, Slice, type Node as PMNode } from 'prosemirror-model';
 import { keymap } from 'prosemirror-keymap';
@@ -11,7 +11,7 @@ import { markdownInputRules } from './inputrules';
 import { slashMenu } from './slash';
 import { SelectionToolbar } from './toolbar';
 import { RawBlockView, TaskItemView, WikilinkView, type RichContext } from './nodeviews';
-import { indentItem, outdentItem, setAlign, setTextBlock, toggle, toggleList } from './commands';
+import { indentItem, outdentItem, setAlign, setTextBlock, toggle, toggleList, toggleTaskLines } from './commands';
 import type { App, Component } from 'obsidian';
 
 export interface RichTextOptions {
@@ -124,7 +124,7 @@ export class RichText {
       'Mod-Alt-3': setTextBlock('h3'),
       'Mod-Shift-7': toggleList('ordered'),
       'Mod-Shift-8': toggleList('bullet'),
-      'Mod-Shift-9': toggleList('task'),
+      'Mod-Shift-9': toggleTaskLines,
       'Mod-Shift-l': setAlign('left'),
       'Mod-Shift-e': setAlign('center'),
       'Mod-Shift-r': setAlign('right'),
@@ -227,6 +227,38 @@ export class RichText {
     if (!tr) return;
     this.view.dispatch(tr);
     if (!this.editing) this.commitIfChanged();
+  }
+
+  /** Run an editing command on the whole text (from outside the editor), then store it. */
+  runOnAll(cmd: (state: EditorState, dispatch?: (tr: Transaction) => void) => boolean): void {
+    const view = this.view;
+    const keep = view.state.selection;
+    view.dispatch(view.state.tr.setSelection(new AllSelection(view.state.doc)));
+    cmd(view.state, tr => view.dispatch(tr));
+    try { view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(Math.min(keep.from, view.state.doc.content.size))))); } catch { /* selection gone */ }
+    if (!this.editing) this.commitIfChanged();
+  }
+
+  /** Alignment of the first block (what the whole card reads as). */
+  alignment(): 'left' | 'center' | 'right' {
+    let a: string | null = null;
+    this.view.state.doc.descendants((n) => { if (a === null && n.isTextblock) { a = (n.attrs.align as string) || 'left'; } return a === null; });
+    return (a ?? 'left') as 'left' | 'center' | 'right';
+  }
+
+  /** Whether every top-level block is a to-do list. */
+  allTasks(): boolean {
+    const doc = this.view.state.doc;
+    let all = doc.childCount > 0;
+    let any = false;
+    doc.forEach((n) => {
+      if (n.type === schema.nodes.paragraph || n.type === schema.nodes.ordered_list) { all = false; return; }
+      if (n.type !== schema.nodes.bullet_list) return; // headings, code… don't count
+      any = true;
+      n.forEach((li) => { if (li.attrs.checked === null) all = false; });
+    });
+    if (!any) all = false;
+    return all;
   }
 
   isEmpty(): boolean {

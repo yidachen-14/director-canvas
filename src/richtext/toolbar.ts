@@ -3,7 +3,7 @@ import { TextSelection, type EditorState } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { schema } from './schema';
 import {
-  blockKind, clearFormatting, currentAlign, listKind, markActive, markAttrs, setAlign, setMark, setTextBlock, toggle, toggleList, toggleQuote,
+  blockKind, clearFormatting, currentAlign, listKind, markActive, markAttrs, setAlign, setMark, setTextBlock, toggle, toggleList, toggleQuote, toggleTaskLines,
 } from './commands';
 import { t } from '../i18n';
 
@@ -75,7 +75,7 @@ export class SelectionToolbar {
     this.sep();
     this.button('list', t('Bulleted list'), () => this.run(toggleList('bullet')), s => listKind(s) === 'bullet');
     this.button('list-ordered', t('Numbered list'), () => this.run(toggleList('ordered')), s => listKind(s) === 'ordered');
-    this.button('list-checks', t('To-do list'), () => this.run(toggleList('task')), s => listKind(s) === 'task');
+    this.button('list-checks', t('To-do list'), () => this.run(toggleTaskLines), s => listKind(s) === 'task');
     this.button('quote', t('Quote'), () => this.run(toggleQuote()));
     this.sep();
     this.button('link', t('Link'), () => this.editLink(), s => markActive(s, m.link));

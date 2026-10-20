@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('obsidian', () => ({ moment: () => ({}), Menu: class {}, Notice: class {}, TFile: class {}, normalizePath: (p: string) => p, setIcon: () => {}, requestUrl: async () => ({}) }));
+vi.mock('obsidian', () => ({ moment: () => ({}), Menu: class {}, Notice: class {}, TFile: class {}, FuzzySuggestModal: class {}, normalizePath: (p: string) => p, setIcon: () => {}, setTooltip: () => {}, getIcon: () => null, requestUrl: async () => ({}) }));
 
-import { parseKanban, serializeKanban, swatchText, inkFor } from '../src/cards/widgets';
+import { parseKanban, serializeKanban } from '../src/cards/widgets';
+import { nearestColorName, inkOn } from '../src/cards/named-colors';
+import { datedTasks, moveTaskDate, toggleTaskDone, addDays, weekStart } from '../src/cards/calendar';
 import { layoutColumn, COLUMN_HEADER, COLUMN_PAD } from '../src/board/columns';
 import type { RawNode } from '../src/model/canvas-file';
 
@@ -18,12 +20,27 @@ describe('kanban', () => {
 });
 
 describe('swatch', () => {
-  it('lists colours for the core Canvas', () => {
-    expect(swatchText([{ hex: '#aabbcc', name: 'Sky' }])).toBe('- `#AABBCC` Sky');
+  it('names the nearest colour', () => {
+    expect(nearestColorName('#9D2933', 'zh-TW')).toBe('胭脂');
+    expect(nearestColorName('#FE0101', 'en')).toBe('Red');
   });
   it('picks readable ink', () => {
-    expect(inkFor('#ffffff')).toBe('#1d1d1d');
-    expect(inkFor('#000000')).toBe('#ffffff');
+    expect(inkOn('#ffffff')).toContain('0,0,0');
+    expect(inkOn('#000000')).toContain('255');
+  });
+});
+
+describe('calendar', () => {
+  it('finds dated to-dos and moves them', () => {
+    const n = { id: 'a', type: 'text', x: 0, y: 0, width: 1, height: 1, text: 'x\n- [ ] 交分鏡 📅 2026-10-21\n- [x] done 📅 2026-10-22' };
+    const items = datedTasks(n);
+    expect(items.map(i => [i.date, i.label, i.done])).toEqual([['2026-10-21', '交分鏡', false], ['2026-10-22', 'done', true]]);
+    expect(moveTaskDate(n.text, 1, '2026-11-01')).toContain('📅 2026-11-01');
+    expect(toggleTaskDone(n.text, 1)).toContain('- [x] 交分鏡');
+  });
+  it('date maths', () => {
+    expect(addDays('2026-10-31', 1)).toBe('2026-11-01');
+    expect(weekStart('2026-10-25')).toBe('2026-10-19');
   });
 });
 

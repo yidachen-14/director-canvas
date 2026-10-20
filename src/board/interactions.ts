@@ -446,13 +446,19 @@ export function attachInteractions(board: Board): void {
       if (zone.includes('s')) h = o.h + dy;
       if (zone.includes('n')) { h = o.h - dy; y = o.y + dy; }
       const corner = zone.length === 2;
-      const aspect = corner && (keepAspectKind !== ev.shiftKey);
+      // Pictures always keep their proportions, from corners and edges alike (like Freeform);
+      // other cards keep them from a corner with Shift.
+      const aspect = keepAspectKind || (corner && ev.shiftKey);
       if (aspect) {
         // A picture's description is not part of its proportions.
         const ratio = o.w / Math.max(1, o.h - extra);
-        if (Math.abs(w - o.w) / o.w > Math.abs(h - o.h) / o.h) h = w / ratio + extra; else w = (h - extra) * ratio;
+        const byWidth = zone === 'e' || zone === 'w' || (corner && Math.abs(w - o.w) / o.w > Math.abs(h - o.h) / o.h);
+        if (byWidth) h = w / ratio + extra; else w = (h - extra) * ratio;
         if (zone.includes('w')) x = o.x + o.w - w;
         if (zone.includes('n')) y = o.y + o.h - h;
+        // An edge drag grows the other axis around the middle.
+        if (zone === 'e' || zone === 'w') y = o.y + (o.h - h) / 2;
+        if (zone === 'n' || zone === 's') x = o.x + (o.w - w) / 2;
       }
       if (w < MIN_W) { if (zone.includes('w')) x -= MIN_W - w; w = MIN_W; }
       if (h < MIN_H) { if (zone.includes('n')) y -= MIN_H - h; h = MIN_H; }
@@ -543,6 +549,7 @@ export function attachInteractions(board: Board): void {
       if (cmd) { runArrange(board, cmd); e.preventDefault(); return; }
     }
     if (mod) return; // ⌘ shortcuts go through the view's hotkey scope (hotkeys.ts)
+    if (e.key === 'Enter' && board.tool === 'pen') { board.setTool('select'); e.preventDefault(); return; }
     if (e.key === 'Escape') {
       if (board.tool !== 'select') board.setTool('select');
       else board.clearSelection();

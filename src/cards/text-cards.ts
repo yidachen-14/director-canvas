@@ -1,11 +1,12 @@
 import { Menu, setIcon, type MenuItem } from 'obsidian';
 import type { RawNode } from '../model/canvas-file';
-import type { CardContext, CardHandle, CardType } from './types';
+import type { BarItem, CardContext, CardHandle, CardType } from './types';
+import { barRow } from './bar';
 import { applyCardColor, vcGet } from './util';
 import { commitNode } from './basic';
 import { RichText } from '../richtext/editor';
 import { attachBlockHandles } from '../richtext/block-drag';
-import { alignDoc } from '../richtext/commands';
+import { alignDoc, allFromTasks, allToTasks } from '../richtext/commands';
 import type { Align } from '../richtext/schema';
 import type { TextCardKind, VisualCanvasSettings } from '../settings';
 import { t } from '../i18n';
@@ -220,6 +221,73 @@ class RichCard implements CardHandle {
   stopEditing(): void { this.rich.stopEditing(); }
 
   searchText(): string { return this.rich.plainText(); }
+
+  barItems(): BarItem[] {
+    const { ctx, f } = this;
+    const items: BarItem[] = [];
+    const kinds: [TextCardKind, string, string][] = [
+      ['text', 'Text', 'type'], ['note', 'Note', 'notebook-text'], ['sticky', 'Sticky note', 'sticky-note'], ['callout', 'Callout', 'message-square-warning'],
+    ];
+    const cur = kinds.find(k => k[0] === f.id) ?? kinds[1];
+    items.push({
+      id: 'kind', icon: cur[2], label: t('Turn into'), text: t(cur[1]),
+      dropdown: (pop, close) => {
+        pop.addClass('is-list');
+        for (const [kind, label, icon] of kinds) {
+          barRow(pop, icon, t(label), kind === f.id, () => { close(); if (kind !== f.id) convertTextCard(ctx, this.node.id, kind, this.rich.markdown()); });
+        }
+      },
+    });
+    if (f.id === 'callout') {
+      const c = splitCallout(this.node.text ?? '');
+      const type = vcGet(this.node, 'calloutType', c.type);
+      const def = CALLOUT_TYPES.find(x => x.id === type) ?? CALLOUT_TYPES[0];
+      items.push({
+        id: 'callout', icon: def.icon, label: t('Callout type'),
+        dropdown: (pop, close) => {
+          pop.addClass('is-list');
+          for (const d of CALLOUT_TYPES) {
+            barRow(pop, d.icon, t(d.label), d.id === type, () => {
+              close();
+              commitNode(ctx, this.node.id, (n) => {
+                const cc = splitCallout(n.text ?? '');
+                n.vc = { ...(n.vc ?? {}), calloutType: d.id };
+                n.text = joinCallout(d.id, cc.title, cc.body);
+              });
+            });
+          }
+        },
+      });
+    }
+    if (f.id === 'text') {
+      const size = vcGet(this.node, 'fontSize', ctx.board.settings.defaultTextSize);
+      items.push({
+        id: 'size', icon: 'a-large-small', label: t('Font size'), text: String(size),
+        dropdown: (pop, close) => {
+          pop.addClass('is-list', 'is-short');
+          for (const v of [12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 80, 96, 128]) {
+            barRow(pop, null, `${v}`, v === size, () => { close(); commitNode(ctx, this.node.id, (n) => { n.vc = { ...(n.vc ?? {}), fontSize: v }; }); });
+          }
+        },
+      });
+    }
+    const align = this.rich.alignment();
+    const alignIcon = align === 'center' ? 'align-center' : align === 'right' ? 'align-right' : 'align-left';
+    items.push({
+      id: 'align', icon: alignIcon, label: t('Align'),
+      dropdown: (pop, close) => {
+        pop.addClass('is-list');
+        for (const [a, label, icon] of [['left', 'Align left', 'align-left'], ['center', 'Align centre', 'align-center'], ['right', 'Align right', 'align-right']] as [Align, string, string][]) {
+          barRow(pop, icon, t(label), a === align, () => { close(); this.rich.applyAndCommit(st => alignDoc(st, a)); });
+        }
+      },
+    });
+    items.push({
+      id: 'todo', icon: 'list-checks', label: t('To-do list'), active: this.rich.allTasks(),
+      run: () => this.rich.runOnAll(this.rich.allTasks() ? allFromTasks : allToTasks),
+    });
+    return items;
+  }
 
   menu(menu: Menu): void {
     const { ctx, f } = this;

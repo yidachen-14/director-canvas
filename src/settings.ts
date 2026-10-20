@@ -21,6 +21,14 @@ export interface VisualCanvasSettings {
   defaultTextSize: number;
   defaultStickyColor: string;
 
+  /** Corner radius of pictures (0 = square corners). */
+  imageRadius: number;
+  /** Soft shadow under pictures. */
+  imageShadow: boolean;
+
+  /** perfect-freehand shape of pen ink. */
+  penShape: { thinning: number; streamline: number; smoothing: number; taperStart: number; taperEnd: number };
+
   /** Line shape of new connections. */
   defaultRoute: 'straight' | 'curve' | 'elbow';
 
@@ -56,6 +64,11 @@ export const DEFAULT_SETTINGS: VisualCanvasSettings = {
   dragOutKind: 'text',
   defaultTextSize: 16,
   defaultStickyColor: '#D2BA23',
+
+  imageRadius: 4,
+  imageShadow: true,
+
+  penShape: { thinning: 0.5, streamline: 0.5, smoothing: 0.5, taperStart: 0, taperEnd: 0 },
 
   defaultRoute: 'straight',
 
@@ -93,5 +106,9 @@ export function normalizeSettings(raw: unknown): VisualCanvasSettings {
   if (!['straight', 'curve', 'elbow'].includes(s.defaultRoute)) s.defaultRoute = 'straight';
   s.defaultTextSize = Math.min(96, Math.max(8, s.defaultTextSize));
   s.gridSize = Math.min(200, Math.max(4, s.gridSize));
+  s.imageRadius = Math.min(40, Math.max(0, s.imageRadius));
+  const ps = s.penShape as unknown as Record<string, unknown>;
+  const dp = DEFAULT_SETTINGS.penShape as unknown as Record<string, number>;
+  s.penShape = Object.fromEntries(Object.keys(dp).map(k => [k, typeof ps?.[k] === 'number' ? ps[k] : dp[k]])) as VisualCanvasSettings['penShape'];
   return s;
 }

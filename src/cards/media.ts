@@ -1,6 +1,6 @@
 import { Menu, Notice, requestUrl, setIcon } from 'obsidian';
 import type { RawNode } from '../model/canvas-file';
-import type { CardContext, CardHandle, CardType } from './types';
+import type { BarItem, CardContext, CardHandle, CardType } from './types';
 import { applyCardColor, resolveFile, vcGet } from './util';
 import { commitNode, missingFile } from './basic';
 import { t } from '../i18n';
@@ -44,8 +44,13 @@ class MediaCard implements CardHandle {
       if (!file) missingFile(this.frame, n.file);
       else {
         const src = this.ctx.app.vault.getResourcePath(file);
-        if (this.kind === 'image') this.frame.createEl('img', { attr: { src, draggable: 'false', alt: file.basename } });
-        else if (this.kind === 'video') this.frame.createEl('video', { attr: { src, controls: '', preload: 'metadata' } });
+        if (this.kind === 'image') {
+          const img = this.frame.createEl('img', { attr: { src, draggable: 'false', alt: file.basename } });
+          img.addEventListener('load', () => this.fitToMedia(img.naturalWidth, img.naturalHeight));
+        } else if (this.kind === 'video') {
+          const v = this.frame.createEl('video', { attr: { src, controls: '', preload: 'metadata' } });
+          v.addEventListener('loadedmetadata', () => this.fitToMedia(v.videoWidth, v.videoHeight));
+        }
         else {
           const wrap = this.frame.createDiv('vc-audio-wrap');
           wrap.createDiv({ cls: 'vc-audio-name', text: file.name });
@@ -79,7 +84,37 @@ class MediaCard implements CardHandle {
     this.ctx.board.renderEdges();
   }
 
-  update(n: RawNode): void { this.node = n; this.render(); }
+  /**
+   * A picture card always has the picture's own proportions (plus its
+   * description), so nothing is letterboxed and the rounded corners sit on
+   * the picture itself.
+   */
+  private fitToMedia(w: number, h: number): void {
+    if (!w || !h) return;
+    const m = this.ctx.board.model;
+    const n = m.node(this.node.id);
+    if (!n) return;
+    const descH = Number(n.vc?.descH) || 0;
+    const want = Math.round(n.width * h / w + descH);
+    if (Math.abs(want - n.height) <= 1) return;
+    m.quiet(() => { n.height = want; m.touch(n.id); });
+  }
+
+  update(n: RawNode): void {
+    this.node = n;
+    this.render();
+    this.refit();
+  }
+
+  resized(n: RawNode): void { this.node = n; }
+
+  /** Fit again to an already loaded picture (after an undo, a reload from disk, a width change). */
+  private refit(): void {
+    const img = this.frame.querySelector('img');
+    if (img?.naturalWidth) { window.setTimeout(() => this.fitToMedia(img.naturalWidth, img.naturalHeight), 0); return; }
+    const v = this.frame.querySelector('video');
+    if (v?.videoWidth) window.setTimeout(() => this.fitToMedia(v.videoWidth, v.videoHeight), 0);
+  }
 
   destroy(): void {
     this.ro.disconnect();
@@ -130,6 +165,16 @@ class MediaCard implements CardHandle {
   }
 
   searchText(): string { return `${this.node.file ?? ''} ${this.descText()}`; }
+
+  barItems(): BarItem[] {
+    const items: BarItem[] = [];
+    if (this.kind !== 'audio') {
+      items.push({ id: 'desc', icon: 'text', label: t(this.descText() ? 'Edit description' : 'Add description'), active: !!this.descText(), run: () => this.ctx.board.startEditing(this.node.id) });
+    }
+    const file = resolveFile(this.ctx.app, this.node);
+    if (file) items.push({ id: 'open', icon: 'external-link', label: t('Open file'), run: () => void this.ctx.app.workspace.getLeaf('tab').openFile(file) });
+    return items;
+  }
 
   menu(menu: Menu): void {
     if (this.kind === 'audio') return;
@@ -299,6 +344,19 @@ class BookmarkCard implements CardHandle {
     return false;
   }
   searchText(): string { const m = this.meta(); return `${this.node.url ?? ''} ${m.title ?? ''} ${m.description ?? ''}`; }
+
+  barItems(): BarItem[] {
+    const url = this.node.url;
+    if (!url) return [];
+    return [
+      { id: 'open', icon: 'external-link', label: t('Open in browser'), run: () => window.open(url) },
+      { id: 'copy', icon: 'link', label: t('Copy address'), run: () => { void navigator.clipboard.writeText(url); new Notice(t('Copied.')); } },
+      {
+        id: 'refresh', icon: 'refresh-cw', label: t('Refresh preview'),
+        run: () => this.ctx.board.model.quiet(() => { const n = this.ctx.board.model.node(this.node.id); if (n) { n.vc = { ...(n.vc ?? {}) }; delete n.vc.meta; this.ctx.board.model.touch(n.id); } }),
+      },
+    ];
+  }
 
   menu(menu: Menu): void {
     const url = this.node.url;

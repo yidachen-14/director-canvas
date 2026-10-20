@@ -103,6 +103,17 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
         await this.save(false);
       }));
 
+    // ── Pictures ──
+    new Setting(el).setName(t('Pictures')).setHeading();
+    new Setting(el)
+      .setName(t('Corner radius'))
+      .setDesc(t('Rounding of image and video corners. 0 turns rounding off.'))
+      .addSlider(sl => sl.setLimits(0, 24, 1).setValue(s.imageRadius).setDynamicTooltip().onChange(async (v) => { s.imageRadius = v; await this.save(); }));
+    new Setting(el)
+      .setName(t('Shadow'))
+      .setDesc(t('A soft shadow under images and videos.'))
+      .addToggle(tg => tg.setValue(s.imageShadow).onChange(async (v) => { s.imageShadow = v; await this.save(); }));
+
     // ── Connections ──
     new Setting(el).setName(t('Connections')).setHeading();
     new Setting(el)

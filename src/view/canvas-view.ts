@@ -9,6 +9,7 @@ import { installColumns } from '../board/columns';
 import { attachClipboard } from '../board/clipboard';
 import { attachContextMenu } from '../board/menus';
 import { attachCorner, attachToolbar } from '../board/ui';
+import { ContextBar } from '../board/context-bar';
 import { t } from '../i18n';
 import { installHotkeys } from '../board/hotkeys';
 
@@ -39,6 +40,7 @@ export class CanvasView extends TextFileView {
     attachContextMenu(board);
     attachToolbar(board);
     attachCorner(board);
+    new ContextBar(board);
     this.savedPill = this.contentEl.createDiv({ cls: 'vc-saved-pill', text: t('Saved') });
     this.addAction('layout-grid', t('Open in core Canvas'), () => { void switchCanvasView(this.leaf, 'native'); });
     this.setupTitleRename();

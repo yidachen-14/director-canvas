@@ -54,7 +54,6 @@ export const TOOLS: Tool[] = [
   cardTool('note'),
   cardTool('sticky'),
   cardTool('callout'),
-  cardTool('checklist'),
   cardTool('kanban'),
   cardTool('column'),
   cardTool('group'),

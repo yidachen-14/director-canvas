@@ -31,6 +31,8 @@ export interface CardHandle {
    * Return true when handled (the board then ignores it).
    */
   onKey?(e: KeyboardEvent): boolean;
+  /** Card-specific buttons for the floating context bar (only when it is the sole selection). */
+  barItems?(): BarItem[];
   /** Card-specific entries for its right-click menu (only when it is the sole selection). */
   menu?(menu: import('obsidian').Menu): void;
 }
@@ -46,4 +48,17 @@ export interface CardType {
   /** Data for a new card of this kind, before id and position. */
   create?(ctx: { settings: import('../settings').VisualCanvasSettings }): Partial<RawNode>;
   mount(node: RawNode, el: HTMLElement, ctx: CardContext): CardHandle;
+}
+
+/** A button on the floating context bar. */
+export interface BarItem {
+  id: string;
+  icon: string;
+  label: string;
+  /** Shown next to the icon (a size, a short word). */
+  text?: string;
+  active?: boolean;
+  run?: () => void;
+  /** Opens a small panel under the button; build its content into `pop`. */
+  dropdown?: (pop: HTMLElement, close: () => void) => void;
 }

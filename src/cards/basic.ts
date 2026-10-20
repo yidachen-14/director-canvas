@@ -83,6 +83,7 @@ export const groupCard: CardType = {
       isEditing: () => !!input,
       stopEditing: () => finish(true),
       searchText: () => current.label ?? '',
+      barItems: () => [{ id: 'rename', icon: 'pencil', label: t('Rename'), text: current.label || '', run: () => ctx.board.startEditing(current.id) }],
     };
   },
 };

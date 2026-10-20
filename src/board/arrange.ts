@@ -163,3 +163,22 @@ export function shuffle<T>(arr: T[], seed = Date.now()): T[] {
   }
   return out;
 }
+
+/** Keep the outermost boxes where they are and make the gaps between all of them equal. */
+export function spaceEvenly(items: Box[], axis: 'h' | 'v'): Placement {
+  const placement: Placement = new Map();
+  if (items.length < 3) return placement;
+  const pos = (b: Box) => (axis === 'h' ? b.x : b.y);
+  const size = (b: Box) => (axis === 'h' ? b.w : b.h);
+  const sorted = [...items].sort((a, b) => pos(a) - pos(b));
+  const start = pos(sorted[0]);
+  const end = Math.max(...sorted.map(b => pos(b) + size(b)));
+  const total = sorted.reduce((s, b) => s + size(b), 0);
+  const gap = (end - start - total) / (sorted.length - 1);
+  let cur = start;
+  for (const b of sorted) {
+    placement.set(b.id, axis === 'h' ? { x: cur, y: b.y } : { x: b.x, y: cur });
+    cur += size(b) + gap;
+  }
+  return placement;
+}

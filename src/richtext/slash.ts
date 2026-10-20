@@ -2,7 +2,7 @@ import { setIcon } from 'obsidian';
 import { Plugin, PluginKey, type EditorState } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import type { Command } from 'prosemirror-state';
-import { insertRule, setAlign, setTextBlock, toggleList, toggleQuote } from './commands';
+import { insertRule, setAlign, setTextBlock, toggleList, toggleQuote, toggleTaskLines } from './commands';
 import { t } from '../i18n';
 
 interface SlashItem { id: string; label: () => string; keywords: string; icon: string; run: Command; }
@@ -14,7 +14,7 @@ const ITEMS: SlashItem[] = [
   { id: 'h3', label: () => t('Heading 3'), keywords: 'h3 heading 標題 bt', icon: 'heading-3', run: setTextBlock('h3') },
   { id: 'ul', label: () => t('Bulleted list'), keywords: 'bullet list ul 項目 清單 qd', icon: 'list', run: toggleList('bullet') },
   { id: 'ol', label: () => t('Numbered list'), keywords: 'number ordered list ol 編號 清單 bh', icon: 'list-ordered', run: toggleList('ordered') },
-  { id: 'todo', label: () => t('To-do list'), keywords: 'todo task check 待辦 dd', icon: 'list-checks', run: toggleList('task') },
+  { id: 'todo', label: () => t('To-do list'), keywords: 'todo task check 待辦 dd', icon: 'list-checks', run: toggleTaskLines },
   { id: 'quote', label: () => t('Quote'), keywords: 'quote blockquote 引用 yy', icon: 'quote', run: toggleQuote() },
   { id: 'code', label: () => t('Code block'), keywords: 'code 程式碼 cx', icon: 'code-2', run: setTextBlock('code') },
   { id: 'hr', label: () => t('Divider'), keywords: 'divider hr line 分隔線 fgx', icon: 'minus', run: insertRule() },
