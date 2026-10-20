@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { parseCanvas, serializeCanvas } from '../src/model/canvas-file';
+import { parseCanvas, serializeCanvas, type RawEdge, type RawNode } from '../src/model/canvas-file';
 import { BoardModel } from '../src/model/board-model';
 import { gridLayers } from '../src/board/viewport';
-import { autoSides, edgeShape } from '../src/board/edge-geometry';
+import { edgeGeometry, pinTs, settleSidesForSave } from '../src/board/connections';
 
 describe('canvas file', () => {
   it('keeps unknown keys on file, nodes and edges', () => {
@@ -89,14 +89,78 @@ describe('dot grid', () => {
   });
 });
 
-describe('edges', () => {
-  it('auto sides face each other', () => {
-    expect(autoSides({ x: 0, y: 0, width: 10, height: 10 }, { x: 100, y: 0, width: 10, height: 10 })).toEqual(['right', 'left']);
-    expect(autoSides({ x: 0, y: 0, width: 10, height: 10 }, { x: 0, y: 100, width: 10, height: 10 })).toEqual(['bottom', 'top']);
+describe('connections', () => {
+  const nodes: RawNode[] = [
+    { id: 'a', type: 'text', x: 0, y: 0, width: 100, height: 50 },
+    { id: 'b', type: 'text', x: 300, y: 0, width: 100, height: 50 },
+  ];
+  const node = (id: string) => nodes.find(n => n.id === id);
+
+  it('floating ends face each other', () => {
+    const e: RawEdge = { id: 'e', fromNode: 'a', toNode: 'b', vc: { route: 'straight', fromFloat: true, toFloat: true } };
+    const g = edgeGeometry(e, node)!;
+    expect(g.start).toEqual({ x: 100, y: 25 });
+    expect(g.end).toEqual({ x: 300, y: 25 });
+    expect(g.s1).toBe('right');
+    expect(g.s2).toBe('left');
   });
-  it('curve starts and ends on the sides', () => {
-    const s = edgeShape({ x: 0, y: 0, width: 100, height: 50 }, 'right', { x: 300, y: 0, width: 100, height: 50 }, 'left');
-    expect(s.start).toEqual({ x: 100, y: 25 });
-    expect(s.end).toEqual({ x: 300, y: 25 });
+
+  it('pinned ends sit at their t along the side', () => {
+    const e: RawEdge = { id: 'e', fromNode: 'a', fromSide: 'bottom', toNode: 'b', toSide: 'top', vc: { fromT: 0.25 } };
+    const g = edgeGeometry(e, node)!;
+    expect(g.start).toEqual({ x: 25, y: 50 });
+    expect(g.end).toEqual({ x: 350, y: 0 });
+  });
+
+  it('core Canvas edges keep their sides and curve', () => {
+    const e: RawEdge = { id: 'e', fromNode: 'a', fromSide: 'right', toNode: 'b', toSide: 'left' };
+    const g = edgeGeometry(e, node)!;
+    expect(g.d.startsWith('M100,25 C')).toBe(true);
+  });
+
+  it('bend moves the middle sideways', () => {
+    const e: RawEdge = { id: 'e', fromNode: 'a', toNode: 'b', vc: { route: 'straight', fromFloat: true, toFloat: true, bend: 40 } };
+    const g = edgeGeometry(e, node)!;
+    expect(g.mid.x).toBeCloseTo(200);
+    expect(Math.abs(g.mid.y - 25)).toBeCloseTo(40);
+  });
+
+  it('free lines round-trip through vc.lines', () => {
+    const file = { nodes, edges: [{ id: 'f', fromNode: '', toNode: 'b', vc: { from: { x: -50, y: -50 } } } as RawEdge] };
+    const text = serializeCanvas(file);
+    const raw = JSON.parse(text);
+    expect(raw.edges).toEqual([]);
+    expect(raw.vc.lines[0].id).toBe('f');
+    const back = parseCanvas(text);
+    expect(back.edges[0].fromNode).toBe('');
+    expect(back.vc).toBeUndefined();
+  });
+
+  it('floating ends get a side when saved', () => {
+    const e: RawEdge = { id: 'e', fromNode: 'a', toNode: 'b', vc: { fromFloat: true, toFloat: true } };
+    const [out] = settleSidesForSave([e], nodes);
+    expect(out.fromSide).toBe('right');
+    expect(out.toSide).toBe('left');
+  });
+
+  it('pins include the middle of each side', () => {
+    expect(pinTs(100, 1)).toContain(0.5);
+    expect(pinTs(400, 1).length).toBeGreaterThan(1);
+  });
+});
+
+describe('elbow routes', () => {
+  const nodes: RawNode[] = [
+    { id: 'a', type: 'text', x: 0, y: 0, width: 100, height: 50 },
+    { id: 'b', type: 'text', x: 300, y: 200, width: 100, height: 50 },
+  ];
+  const node = (id: string) => nodes.find(n => n.id === id);
+  it('Z shape between facing sides', () => {
+    const g = edgeGeometry({ id: 'e', fromNode: 'a', fromSide: 'right', toNode: 'b', toSide: 'left', vc: { route: 'elbow' } } as RawEdge, node)!;
+    expect(g.mid.x).toBeCloseTo(200);
+  });
+  it('L shape into a top side', () => {
+    const g = edgeGeometry({ id: 'e', fromNode: 'a', fromSide: 'right', toNode: 'b', toSide: 'top', vc: { route: 'elbow' } } as RawEdge, node)!;
+    expect(g.mid).toEqual({ x: 350, y: 25 });
   });
 });

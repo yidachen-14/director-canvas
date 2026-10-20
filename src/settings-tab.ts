@@ -103,6 +103,16 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
         await this.save(false);
       }));
 
+    // ── Connections ──
+    new Setting(el).setName(t('Connections')).setHeading();
+    new Setting(el)
+      .setName(t('Shape of new connections'))
+      .setDesc(t('Each connection can be changed afterwards in its properties bar.'))
+      .addDropdown(d => d
+        .addOption('straight', t('Straight')).addOption('curve', t('Curved')).addOption('elbow', t('Elbow'))
+        .setValue(s.defaultRoute)
+        .onChange(async (v) => { s.defaultRoute = v as typeof s.defaultRoute; await this.save(false); }));
+
     // ── Canvas ──
     new Setting(el).setName(t('Board')).setHeading();
     new Setting(el)

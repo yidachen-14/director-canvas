@@ -5,7 +5,10 @@ import { nodeRect, unionRect } from '../model/board-model';
 import type { Point } from './viewport';
 import { fileKindOf } from '../cards/util';
 import { t } from '../i18n';
-import { htmlToMarkdown } from '../richtext/markdown';
+import { htmlToMarkdown, serializeMarkdown } from '../richtext/markdown';
+import { schema } from '../richtext/schema';
+import { richRegistry, type RichText } from '../richtext/editor';
+import { DRAG_OUT_DISTANCE, distanceToRect } from '../richtext/block-drag';
 import { textCardData, textCardSize } from '../cards/text-cards';
 
 const MARK = 'visual-canvas';
@@ -192,15 +195,60 @@ export function attachClipboard(board: Board): void {
     doc.removeEventListener('paste', onPaste);
   });
 
+  // Text selected in a card and dragged: it becomes a card only once it is
+  // clearly away from its card, and never when dropped on another card.
+  let textDrag: { card: HTMLElement; rich: RichText; from: number; to: number } | null = null;
+  board.root.addEventListener('dragstart', (e) => {
+    textDrag = null;
+    const target = e.target instanceof Element ? e.target : (e.target as Node | null)?.parentElement;
+    const richEl = target?.closest<HTMLElement>('.vc-rich');
+    const rich = richEl ? richRegistry.get(richEl) : undefined;
+    const card = richEl?.closest<HTMLElement>('.vc-node');
+    if (!rich || !card || board.editingId) return;
+    const sel = doc.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    try {
+      const from = rich.view.posAtDOM(range.startContainer, range.startOffset);
+      const to = rich.view.posAtDOM(range.endContainer, range.endOffset);
+      if (to > from) textDrag = { card, rich, from, to };
+    } catch { /* selection outside the document */ }
+  });
+  board.root.addEventListener('dragend', () => { window.setTimeout(() => { textDrag = null; }, 0); });
+  const textDropOk = (e: DragEvent): boolean => {
+    if (!textDrag) return true;
+    if (distanceToRect(textDrag.card.getBoundingClientRect(), e.clientX, e.clientY) < DRAG_OUT_DISTANCE) return false;
+    return !(e.target as HTMLElement | null)?.closest?.('.vc-node');
+  };
+
   // Drag and drop: Finder files, Obsidian's file explorer, links.
   board.root.addEventListener('dragover', (e) => {
     if (board.editingId) return;
     e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    if (e.dataTransfer) e.dataTransfer.dropEffect = textDropOk(e) ? (textDrag ? 'move' : 'copy') : 'none';
   });
   board.root.addEventListener('drop', (e) => {
     if (board.editingId) return;
     e.preventDefault();
+    if (textDrag) {
+      const drag = textDrag;
+      textDrag = null;
+      if (!textDropOk(e)) return;
+      const at = board.clientToWorld(e.clientX, e.clientY);
+      const state = drag.rich.view.state;
+      const slice = state.doc.slice(drag.from, drag.to);
+      let md = '';
+      try { md = serializeMarkdown(schema.topNodeType.createAndFill(null, slice.content) ?? schema.node('doc', null, [schema.node('paragraph', null, slice.content)])); } catch { md = ''; }
+      if (!md.trim()) md = e.dataTransfer?.getData('text/plain') ?? '';
+      if (!md.trim()) return;
+      const kind = board.settings.dragOutKind;
+      const size = textCardSize(kind, md);
+      board.model.transact(() => {
+        board.createCard(kind, { x: at.x + size.width / 2 - 12, y: at.y + size.height / 2 - 12 }, { data: textCardData(kind, md, board.settings), size });
+        drag.rich.applyAndCommit(s => s.tr.delete(drag.from, drag.to));
+      });
+      return;
+    }
     const at = board.clientToWorld(e.clientX, e.clientY);
     const dm = (board.app as unknown as { dragManager?: { draggable?: { type: string; file?: TFile; files?: TFile[] } | null } }).dragManager;
     const drag = dm?.draggable;

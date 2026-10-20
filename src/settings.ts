@@ -21,6 +21,9 @@ export interface VisualCanvasSettings {
   defaultTextSize: number;
   defaultStickyColor: string;
 
+  /** Line shape of new connections. */
+  defaultRoute: 'straight' | 'curve' | 'elbow';
+
   /** Pan with: the space bar + drag always works; this adds a mouse button. */
   panButton: 'middle' | 'right' | 'none';
   dotColor: string;
@@ -54,6 +57,8 @@ export const DEFAULT_SETTINGS: VisualCanvasSettings = {
   defaultTextSize: 16,
   defaultStickyColor: '#D2BA23',
 
+  defaultRoute: 'straight',
+
   panButton: 'middle',
   dotColor: '',
   dotSize: 1.5,
@@ -85,6 +90,7 @@ export function normalizeSettings(raw: unknown): VisualCanvasSettings {
   if (!['zh-TW', 'en'].includes(s.language)) s.language = 'zh-TW';
   if (!['L', 'M', 'S'].includes(s.toolbarSize)) s.toolbarSize = 'M';
   if (![1, 2, 3].includes(s.pngScale)) s.pngScale = 2;
+  if (!['straight', 'curve', 'elbow'].includes(s.defaultRoute)) s.defaultRoute = 'straight';
   s.defaultTextSize = Math.min(96, Math.max(8, s.defaultTextSize));
   s.gridSize = Math.min(200, Math.max(4, s.gridSize));
   return s;

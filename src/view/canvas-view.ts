@@ -2,6 +2,7 @@ import { Notice, Scope, TextFileView, type ViewStateResult, type WorkspaceLeaf }
 import type VisualCanvasPlugin from '../main';
 import { VIEW_TYPE, switchCanvasView } from '../takeover';
 import { parseCanvas, serializeCanvas, emptyCanvas } from '../model/canvas-file';
+import { settleSidesForSave } from '../board/connections';
 import { Board } from '../board/board';
 import { attachInteractions } from '../board/interactions';
 import { attachClipboard } from '../board/clipboard';
@@ -55,7 +56,7 @@ export class CanvasView extends TextFileView {
   // ── data ──────────────────────────────────────────────────
 
   getViewData(): string {
-    return this.board ? serializeCanvas(this.board.model.toFile()) : this.data;
+    return this.board ? serializeCanvas(this.board.model.toFile(), settleSidesForSave) : this.data;
   }
 
   setViewData(data: string, clear: boolean): void {

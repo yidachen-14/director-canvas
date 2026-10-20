@@ -1,6 +1,8 @@
 import { Menu, type MenuItem } from 'obsidian';
 import type { Board } from './board';
 import { duplicateSelection, editEdgeLabel } from './interactions';
+import { reverseEdge } from './connect-ui';
+import { routeOf, type Route } from './connections';
 import { pasteInto } from './clipboard';
 import { allCardTypes } from '../cards/registry';
 import { presetColor } from '../cards/util';
@@ -133,11 +135,16 @@ function edgeMenu(menu: Menu, board: Board, id: string): void {
     m.addItem(i => i.setTitle(t('Arrow at end')).setChecked(cur === 'none-arrow').onClick(() => set('none', 'arrow')));
     m.addItem(i => i.setTitle(t('Arrows at both ends')).setChecked(cur === 'arrow-arrow').onClick(() => set('arrow', 'arrow')));
     m.addItem(i => i.setTitle(t('No arrows')).setChecked(cur === 'none-none').onClick(() => set('none', 'none')));
-    m.addItem(i => i.setTitle(t('Reverse direction')).onClick(() => board.model.transact(() => {
-      const { fromNode, fromSide, toNode, toSide } = edge;
-      edge.fromNode = toNode; edge.fromSide = toSide; edge.toNode = fromNode; edge.toSide = fromSide;
-      board.model.touchEdges();
-    })));
+    m.addItem(i => i.setTitle(t('Reverse direction')).onClick(() => board.model.transact(() => { reverseEdge(edge); board.model.touchEdges(); })));
+  });
+  submenu(menu, t('Line shape'), 'spline', 'style', (m) => {
+    const cur = routeOf(edge);
+    for (const [r, label] of [['straight', 'Straight'], ['curve', 'Curved'], ['elbow', 'Elbow']] as [Route, string][]) {
+      m.addItem(i => i.setTitle(t(label)).setChecked(cur === r).onClick(() => board.model.transact(() => {
+        const vc = { ...(edge.vc ?? {}) } as Record<string, unknown>;
+        vc.route = r; delete vc.bend; edge.vc = vc; board.model.touchEdges();
+      })));
+    }
   });
   menu.addItem(i => i.setTitle(t('Delete')).setIcon('trash-2').setSection('danger').setWarning(true).onClick(() => board.deleteSelection()));
 }

@@ -2,10 +2,12 @@ import { Platform } from 'obsidian';
 import type { Board } from './board';
 import { snap } from './board';
 import { nodeRect, rectsIntersect, type Rect } from '../model/board-model';
-import type { RawNode, Side } from '../model/canvas-file';
-import { autoSides, edgeShape, facingSide, sidePoint } from './edge-geometry';
-import { cardKindOf } from '../cards/util';
+import type { RawNode } from '../model/canvas-file';
+import { cardKindOf, vcGet } from '../cards/util';
 import { getCardType } from '../cards/registry';
+import { ConnectController } from './connect-ui';
+import { DropLine, findBlockDrop, insertMarkdownAt, richAt, type Drop } from '../richtext/block-drag';
+import { t as tr } from '../i18n';
 
 type Zone = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 
@@ -16,7 +18,9 @@ const ZONE_CURSOR: Record<Zone, string> = {
 
 const DRAG_THRESHOLD = 3;
 const MIN_W = 40, MIN_H = 24;
-const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/** Card kinds a Text card can be dropped into. */
+const MERGE_INTO = ['note', 'sticky', 'callout', 'checklist'];
 
 /** Card kinds that keep their aspect ratio when resized from a corner. */
 const KEEP_ASPECT = new Set(['image', 'video']);
@@ -28,9 +32,9 @@ export function attachInteractions(board: Board): void {
   const root = board.root;
   let spaceDown = false;
   let hoverZone: { id: string; zone: Zone } | null = null;
-  let hoverNodeId: string | null = null;
   let active: { kind: string; cleanup: () => void } | null = null;
-  const dots = board.overlayEl.createDiv('vc-connect-dots');
+  const connect = new ConnectController(board);
+  board.connections = connect;
 
   const editingTarget = (target: EventTarget | null): boolean => {
     if (!board.editingId) return false;
@@ -38,21 +42,7 @@ export function attachInteractions(board: Board): void {
     return !!el && target instanceof Node && el.contains(target);
   };
 
-  /** Topmost node under a world point (cards above groups). */
-  const nodeAt = (wx: number, wy: number): RawNode | null => {
-    const nodes = board.model.nodes;
-    for (let i = nodes.length - 1; i >= 0; i--) {
-      const n = nodes[i];
-      if (n.type === 'group') continue;
-      if (wx >= n.x && wx <= n.x + n.width && wy >= n.y && wy <= n.y + n.height) return n;
-    }
-    for (let i = nodes.length - 1; i >= 0; i--) {
-      const n = nodes[i];
-      if (n.type !== 'group') continue;
-      if (wx >= n.x && wx <= n.x + n.width && wy >= n.y && wy <= n.y + n.height) return n;
-    }
-    return null;
-  };
+  const nodeAt = (wx: number, wy: number): RawNode | null => board.nodeAt(wx, wy);
 
   /** Resize zone under a world point: a band just inside and outside each edge. */
   const zoneAt = (wx: number, wy: number): { id: string; zone: Zone } | null => {
@@ -85,25 +75,11 @@ export function attachInteractions(board: Board): void {
 
   const baseCursor = () => {
     if (spaceDown || board.tool === 'hand') return 'grab';
-    if (board.tool === 'select' || board.tool === 'connect') return '';
+    if (board.tool === 'select') return '';
     return 'crosshair';
   };
 
-  // ── connection dots (connect tool only) ─────────────────
-
-  const showDots = (n: RawNode | null) => {
-    dots.empty();
-    if (!n || board.tool !== 'connect') return;
-    const r = nodeRect(n);
-    for (const side of ['top', 'right', 'bottom', 'left'] as Side[]) {
-      const p = sidePoint(r, side);
-      const s = board.vp.toScreen(p.x, p.y);
-      const d = dots.createDiv({ cls: 'vc-connect-dot', attr: { 'data-side': side } });
-      d.style.transform = `translate(${s.x}px, ${s.y}px)`;
-    }
-  };
-  board.on('viewport', () => showDots(hoverNodeId && board.tool === 'connect' ? board.model.node(hoverNodeId) ?? null : null));
-  board.on('tool', () => { showDots(null); setCursor(baseCursor()); });
+  board.on('tool', () => setCursor(baseCursor()));
 
   // ── hover ───────────────────────────────────────────────
 
@@ -113,9 +89,8 @@ export function attachInteractions(board: Board): void {
     if (!(e.target instanceof Node) || !board.root.contains(e.target) || board.uiEl.contains(e.target)) return;
     const w = board.clientToWorld(e.clientX, e.clientY);
     if (board.tool === 'connect') {
-      const n = nodeAt(w.x, w.y);
-      if ((n?.id ?? null) !== hoverNodeId) { hoverNodeId = n?.id ?? null; showDots(n); }
-      setCursor(n ? 'crosshair' : '');
+      connect.hover(w);
+      setCursor((e.target as HTMLElement).closest('[data-edge-id]') ? 'pointer' : 'crosshair');
       return;
     }
     if (board.tool !== 'select' || spaceDown) { setCursor(baseCursor()); hoverZone = null; return; }
@@ -150,16 +125,19 @@ export function attachInteractions(board: Board): void {
     const w = board.clientToWorld(e.clientX, e.clientY);
 
     const edgeEl = t.closest('[data-edge-id]');
-    if (edgeEl && board.tool === 'select') {
-      const id = edgeEl.getAttribute('data-edge-id')!;
-      board.selectEdges([id], e.shiftKey ? 'toggle' : 'replace');
+    if (edgeEl && (board.tool === 'select' || board.tool === 'connect') && (t.closest('.vc-edge-label') || !nodeAt(w.x, w.y))) {
+      connect.pressEdge(e, edgeEl.getAttribute('data-edge-id')!);
       return;
     }
 
     if (board.tool === 'connect') {
-      const n = nodeAt(w.x, w.y);
-      if (n) startConnect(e, n);
-      else board.clearSelection();
+      board.clearSelection();
+      connect.startConnect(e);
+      return;
+    }
+
+    if (board.tool === 'group') {
+      startGroupDraw(e);
       return;
     }
 
@@ -291,6 +269,11 @@ export function attachInteractions(board: Board): void {
     const duplicate = e.altKey;
     let gesture: ReturnType<typeof board.model.beginGesture> | null = null;
     let moving = nodes;
+    // A lone Text card dragged onto a Note (or other text card) goes into it as blocks.
+    const mergeable = !duplicate && nodes.length === 1 && cardKindOf(nodes[0]) === 'text' ? nodes[0] : null;
+    const mergeEl = mergeable ? board.cards.get(mergeable.id)?.el ?? null : null;
+    let mergeDrop: Drop | null = null;
+    let dropLine: DropLine | null = null;
     track(e, 'move', (ev) => {
       if (!gesture) {
         gesture = board.model.beginGesture();
@@ -325,15 +308,114 @@ export function attachInteractions(board: Board): void {
         n.y = o.y + dy;
       }
       gesture.preview(moving.map(n => n.id));
+      if (mergeable && mergeEl) {
+        const target = richAt(ev.clientX, ev.clientY, mergeEl);
+        const targetCard = target?.view.dom.closest<HTMLElement>('.vc-node');
+        const ok = target && targetCard && MERGE_INTO.some(k => targetCard.hasClass(`vc-kind-${k}`));
+        mergeDrop = ok ? findBlockDrop(target, ev.clientX, ev.clientY, { movingItem: false }) : null;
+        if (mergeDrop) { dropLine ??= new DropLine(); dropLine.show(mergeDrop.line); } else dropLine?.hide();
+        mergeEl.toggleClass('is-merging', !!mergeDrop);
+      }
     }, () => {
       root.removeClass('is-dragging');
+      dropLine?.remove();
+      mergeEl?.removeClass('is-merging');
+      if (mergeable && mergeDrop && gesture) {
+        gesture.cancel();
+        const drop = mergeDrop;
+        const md = mergeable.text ?? '';
+        board.model.transact(() => {
+          if (md.trim()) insertMarkdownAt(drop.rich, drop.pos, md);
+          board.model.removeNodes([mergeable.id]);
+        });
+        const host = drop.rich.view.dom.closest<HTMLElement>('.vc-node')?.dataset.id;
+        if (host) board.select([host]);
+        return;
+      }
       gesture?.end();
+    });
+  }
+
+  /** Group tool: drag out a rectangle; it becomes the group. */
+  function startGroupDraw(e: PointerEvent): void {
+    const start = board.clientToWorld(e.clientX, e.clientY);
+    const box = board.overlayEl.createDiv('vc-marquee vc-group-draft');
+    box.hide();
+    let rect: Rect | null = null;
+    track(e, 'group', (ev) => {
+      const cur = board.clientToWorld(ev.clientX, ev.clientY);
+      let x0 = Math.min(start.x, cur.x), y0 = Math.min(start.y, cur.y);
+      let x1 = Math.max(start.x, cur.x), y1 = Math.max(start.y, cur.y);
+      if (board.settings.snapToGrid) {
+        const g = board.settings.gridSize;
+        x0 = snap(x0, g); y0 = snap(y0, g); x1 = snap(x1, g); y1 = snap(y1, g);
+      }
+      rect = { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+      const a = board.vp.toScreen(rect.x, rect.y);
+      box.show();
+      box.style.transform = `translate(${a.x}px, ${a.y}px)`;
+      box.style.width = `${rect.width * board.vp.zoom}px`;
+      box.style.height = `${rect.height * board.vp.zoom}px`;
+    }, (_ev, moved) => {
+      box.remove();
+      board.setTool('select');
+      lastPlaceAt = Date.now();
+      if (!moved || !rect || rect.width < 24 || rect.height < 24) {
+        // A plain click: a group of the default size there.
+        board.createCard('group', start);
+        return;
+      }
+      const r = rect;
+      const g = board.model.transact(() => board.model.addNode({ type: 'group', label: tr('Group'), x: r.x, y: r.y, width: r.width, height: r.height } as RawNode));
+      board.select([g.id]);
+    });
+  }
+
+  /** Text cards: dragging a size handle scales the font; the box follows the text. */
+  function startFontResize(e: PointerEvent, n: RawNode, zone: Zone): void {
+    const id = n.id;
+    if (!board.selection.has(id)) board.select([id]);
+    const o = { x: n.x, y: n.y, w: n.width, h: n.height };
+    const f0 = vcGet(n, 'fontSize', board.settings.defaultTextSize);
+    const start = board.clientToWorld(e.clientX, e.clientY);
+    let gesture: ReturnType<typeof board.model.beginGesture> | null = null;
+    const tip = board.overlayEl.createDiv('vc-size-tip');
+    tip.hide();
+    setCursor(ZONE_CURSOR[zone]);
+    root.addClass('is-resizing');
+    track(e, 'resize', (ev) => {
+      gesture ??= board.model.beginGesture();
+      const cur = board.clientToWorld(ev.clientX, ev.clientY);
+      const dx = cur.x - start.x, dy = cur.y - start.y;
+      const sx = zone.includes('e') ? (o.w + dx) / o.w : zone.includes('w') ? (o.w - dx) / o.w : 1;
+      const sy = zone.includes('s') ? (o.h + dy) / o.h : zone.includes('n') ? (o.h - dy) / o.h : 1;
+      const scale = Math.abs(sx - 1) >= Math.abs(sy - 1) ? sx : sy;
+      const size = Math.min(400, Math.max(6, Math.round(f0 * scale)));
+      const k = size / f0;
+      const w = o.w * k, h = o.h * k;
+      const node = board.model.node(id);
+      if (!node) return;
+      node.vc = { ...(node.vc ?? {}), fontSize: size };
+      node.width = w; node.height = h;
+      node.x = zone.includes('w') ? o.x + o.w - w : o.x;
+      node.y = zone.includes('n') ? o.y + o.h - h : o.y;
+      gesture.preview([id]);
+      const r = root.getBoundingClientRect();
+      tip.show();
+      tip.setText(`${size}px`);
+      tip.style.transform = `translate(${ev.clientX - r.left + 14}px, ${ev.clientY - r.top + 14}px)`;
+    }, () => {
+      tip.remove();
+      root.removeClass('is-resizing');
+      gesture?.end();
+      setCursor('');
     });
   }
 
   function startResize(e: PointerEvent, id: string, zone: Zone): void {
     const n = board.model.node(id);
     if (!n) return;
+    if (cardKindOf(n) === 'text') { startFontResize(e, n, zone); return; }
     if (!board.selection.has(id)) board.select([id]);
     const o = { x: n.x, y: n.y, w: n.width, h: n.height };
     const start = board.clientToWorld(e.clientX, e.clientY);
@@ -371,43 +453,6 @@ export function attachInteractions(board: Board): void {
       root.removeClass('is-resizing');
       gesture?.end();
       setCursor('');
-    });
-  }
-
-  function startConnect(e: PointerEvent, from: RawNode): void {
-    const fromRect = nodeRect(from);
-    // Started on a dot: that side is fixed. Otherwise the sides that face each other win.
-    const dotSide = (e.target as HTMLElement).closest('.vc-connect-dot')?.getAttribute('data-side') as Side | null;
-    const sidesFor = (to: Rect | { x: number; y: number }): [Side, Side | null] => {
-      if ('width' in to) {
-        const [a, b] = autoSides(fromRect, to);
-        return dotSide ? [dotSide, facingSide(to, sidePoint(fromRect, dotSide))] : [a, b];
-      }
-      return [dotSide ?? facingSide(fromRect, to), null];
-    };
-    const g = document.createElementNS(SVG_NS, 'g');
-    g.classList.add('vc-edge', 'is-preview');
-    const path = document.createElementNS(SVG_NS, 'path');
-    path.classList.add('vc-edge-line');
-    g.appendChild(path);
-    board.edgeLayer.appendChild(g);
-    let target: RawNode | null = null;
-    track(e, 'connect', (ev) => {
-      const w = board.clientToWorld(ev.clientX, ev.clientY);
-      const over = nodeAt(w.x, w.y);
-      target = over && over.id !== from.id ? over : null;
-      showDots(target ?? from);
-      const to = target ? nodeRect(target) : w;
-      const [fs, ts] = sidesFor(to);
-      path.setAttribute('d', edgeShape(fromRect, fs, to, ts).d);
-    }, () => {
-      g.remove();
-      showDots(null);
-      if (!target) return;
-      const to = target;
-      const [fromSide, toSide] = sidesFor(nodeRect(to));
-      const edge = board.model.transact(() => board.model.addEdge({ fromNode: from.id, fromSide, toNode: to.id, toSide: toSide ?? undefined, toEnd: 'arrow' }));
-      board.selectEdges([edge.id]);
     });
   }
 

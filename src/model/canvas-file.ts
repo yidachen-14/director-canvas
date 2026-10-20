@@ -96,15 +96,38 @@ export function parseCanvas(text: string): CanvasFile {
     if (!seen.has(r.fromNode) || !seen.has(r.toNode)) continue;
     edges.push({ ...r } as RawEdge);
   }
-  return { ...obj, nodes, edges };
+  // Connections with a free end live in vc.lines (JSON Canvas cannot hold them).
+  let vc = obj.vc && typeof obj.vc === 'object' && !Array.isArray(obj.vc) ? { ...(obj.vc as Record<string, unknown>) } : undefined;
+  if (vc && Array.isArray(vc.lines)) {
+    for (const l of vc.lines as unknown[]) {
+      if (!l || typeof l !== 'object') continue;
+      const r = l as Record<string, unknown>;
+      if (typeof r.id !== 'string') continue;
+      const from = typeof r.fromNode === 'string' ? r.fromNode : '';
+      const to = typeof r.toNode === 'string' ? r.toNode : '';
+      if ((from && !seen.has(from)) || (to && !seen.has(to))) continue;
+      edges.push({ ...r, fromNode: from, toNode: to } as RawEdge);
+    }
+    delete vc.lines;
+    if (Object.keys(vc).length === 0) vc = undefined;
+  }
+  const out: CanvasFile = { ...obj, nodes, edges };
+  if (vc) out.vc = vc; else delete out.vc;
+  return out;
 }
 
 /**
  * Serialize in the same layout Obsidian writes (tab indent, one node or edge
  * per line) so files stay diff-friendly and look untouched to the core view.
  */
-export function serializeCanvas(data: CanvasFile): string {
-  const { nodes, edges, ...rest } = data;
+export function serializeCanvas(data: CanvasFile, prepareEdges?: (edges: RawEdge[], nodes: RawNode[]) => RawEdge[]): string {
+  const { nodes, edges: allEdges, ...rest } = data;
+  const prepared = prepareEdges ? prepareEdges(allEdges, nodes) : allEdges;
+  const edges = prepared.filter(e => e.fromNode && e.toNode);
+  const freeLines = prepared.filter(e => !e.fromNode || !e.toNode);
+  const vc = { ...((rest.vc as Record<string, unknown> | undefined) ?? {}) };
+  if (freeLines.length) vc.lines = freeLines.map(cleanEdge); else delete vc.lines;
+  if (Object.keys(vc).length) rest.vc = vc; else delete rest.vc;
   const lines: string[] = ['{'];
   const parts: string[] = [];
   parts.push('\t"nodes":[\n' + nodes.map(n => '\t\t' + JSON.stringify(cleanNode(n))).join(',\n') + (nodes.length ? '\n' : '') + '\t]');

@@ -48,8 +48,8 @@ interface Flavor {
   icon: string;
   defaultSize: { width: number; height: number };
   create(settings: VisualCanvasSettings): Partial<RawNode>;
-  /** Grow and shrink with the text (Text) instead of scrolling. */
-  autoHeight?: boolean;
+  /** The box always fits the text, in both directions (Text). */
+  autoSize?: boolean;
   /** Delete the card when it is left empty. */
   dropWhenEmpty?: boolean;
   placeholder: string;
@@ -94,6 +94,7 @@ class RichCard implements CardHandle {
   private host: HTMLElement;
   private calloutHead: HTMLElement | null = null;
   private detachHandles: () => void;
+  private stopObserving: (() => void) | null = null;
 
   constructor(private f: Flavor, private node: RawNode, private el: HTMLElement, private ctx: CardContext) {
     el.addClass('vc-richcard', `vc-rc-${f.id}`);
@@ -114,8 +115,13 @@ class RichCard implements CardHandle {
       bounds: () => ctx.board.root.getBoundingClientRect(),
       onCommit: (md) => this.store(md),
       onEditEnd: () => this.editEnded(),
-      onResize: () => this.fit(false),
+      onResize: () => this.fit(),
     });
+    if (f.autoSize) {
+      const ro = new ResizeObserver(() => this.fit());
+      ro.observe(this.host);
+      this.stopObserving = () => ro.disconnect();
+    }
     this.detachHandles = attachBlockHandles(this.rich, el, {
       batch: (fn) => ctx.board.model.transact(fn),
       overlay: () => ctx.board.overlayEl,
@@ -139,7 +145,7 @@ class RichCard implements CardHandle {
       } else {
         n.text = md;
       }
-      if (f.autoHeight) n.height = this.contentHeight();
+      if (f.autoSize) { const sz = this.contentSize(); n.width = sz.width; n.height = sz.height; }
     });
   }
 
@@ -152,19 +158,23 @@ class RichCard implements CardHandle {
     }
   }
 
-  private contentHeight(): number {
-    return Math.max(28, Math.ceil(this.rich.view.dom.scrollHeight + 4));
+  /** Natural size of the text (the host is laid out at max-content). */
+  private contentSize(): { width: number; height: number } {
+    return { width: Math.max(16, Math.ceil(this.host.offsetWidth)), height: Math.max(16, Math.ceil(this.host.offsetHeight)) };
   }
 
-  /** Text cards follow their content's height. */
-  private fit(final: boolean): void {
-    if (!this.f.autoHeight) return;
-    const h = this.contentHeight();
+  /** Text cards: the box follows the text in both directions. */
+  private fit(): void {
+    if (!this.f.autoSize || !this.host.isConnected) return;
+    const { width, height } = this.contentSize();
     const n = this.ctx.board.model.node(this.node.id);
-    if (!n || h === n.height) return;
-    n.height = h;
-    (this.el.parentElement as HTMLElement).style.height = `${h}px`;
-    void final;
+    if (!n || (Math.abs(width - n.width) < 1 && Math.abs(height - n.height) < 1)) return;
+    n.width = width;
+    n.height = height;
+    const card = this.el.closest<HTMLElement>('.vc-node');
+    if (card) { card.style.width = `${width}px`; card.style.height = `${height}px`; }
+    this.ctx.board.renderEdges();
+    this.ctx.board.connections?.refreshHandles();
   }
 
   private render(): void {
@@ -195,6 +205,7 @@ class RichCard implements CardHandle {
   resized(): void { /* layout follows CSS */ }
 
   destroy(): void {
+    this.stopObserving?.();
     this.detachHandles();
     this.rich.destroy();
   }
@@ -228,8 +239,7 @@ class RichCard implements CardHandle {
         for (const size of [12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 80]) {
           m.addItem(i => i.setTitle(`${size}`).setChecked(size === cur).onClick(() => commitNode(ctx, this.node.id, (n) => {
             n.vc = { ...(n.vc ?? {}), fontSize: size };
-            window.setTimeout(() => { const h = this.contentHeight(); commitNode(ctx, this.node.id, x => { x.height = h; }, `!fit:${this.node.id}`); }, 30);
-          }, `!fit:${this.node.id}`)));
+          })));
         }
       });
     }
@@ -288,9 +298,9 @@ export function convertTextCard(ctx: CardContext, id: string, kind: TextCardKind
 
 export const textCard = richCard({
   id: 'text', label: 'Text', icon: 'type', placeholder: 'Type something…',
-  defaultSize: { width: 260, height: 36 },
+  defaultSize: { width: 140, height: 32 },
   create: (s) => ({ type: 'text', text: '', vc: { kind: 'text', fontSize: s.defaultTextSize } }),
-  autoHeight: true, dropWhenEmpty: true,
+  autoSize: true, dropWhenEmpty: true,
 });
 
 export const noteCard = richCard({

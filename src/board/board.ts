@@ -2,9 +2,10 @@ import { Component, Notice, setIcon, type App } from 'obsidian';
 import type VisualCanvasPlugin from '../main';
 import type { CanvasView } from '../view/canvas-view';
 import { BoardModel, nodeRect, unionRect, type ChangeEvent, type Rect } from '../model/board-model';
-import { newId, type CanvasFile, type RawEdge, type RawNode, type Side } from '../model/canvas-file';
+import { newId, type CanvasFile, type RawEdge, type RawNode } from '../model/canvas-file';
 import { Viewport, gridLayers, type Point } from './viewport';
-import { arrowPath, autoSides, edgeShape } from './edge-geometry';
+import { edgeGeometry, edgeWidth, vcOf } from './connections';
+import type { ConnectController } from './connect-ui';
 import { cardKindOf, cssColor } from '../cards/util';
 import { getCardType, fallbackCard } from '../cards/registry';
 import type { CardHandle } from '../cards/types';
@@ -70,11 +71,13 @@ export class Board {
 
   /** Set by the corner UI. */
   openSearch: (() => void) | null = null;
+  /** Set by interactions: the connection tools. */
+  connections: ConnectController | null = null;
 
   private edgeEls = new Map<string, SVGGElement>();
   private edgeLabelEls = new Map<string, HTMLElement>();
-  private listeners: { selection: Set<() => void>; viewport: Set<() => void>; tool: Set<() => void>; change: Set<(e: ChangeEvent) => void> } = {
-    selection: new Set(), viewport: new Set(), tool: new Set(), change: new Set(),
+  private listeners: { selection: Set<() => void>; viewport: Set<() => void>; tool: Set<() => void>; edges: Set<() => void>; change: Set<(e: ChangeEvent) => void> } = {
+    selection: new Set(), viewport: new Set(), tool: new Set(), edges: new Set(), change: new Set(),
   };
   private disposers: (() => void)[] = [];
   private destroyed = false;
@@ -133,7 +136,7 @@ export class Board {
     for (const fn of this.refreshers) fn();
   }
 
-  on(kind: 'selection' | 'viewport' | 'tool', fn: () => void): () => void {
+  on(kind: 'selection' | 'viewport' | 'tool' | 'edges', fn: () => void): () => void {
     this.listeners[kind].add(fn);
     return () => this.listeners[kind].delete(fn);
   }
@@ -143,7 +146,7 @@ export class Board {
     return () => this.listeners.change.delete(fn);
   }
 
-  private fire(kind: 'selection' | 'viewport' | 'tool'): void {
+  private fire(kind: 'selection' | 'viewport' | 'tool' | 'edges'): void {
     for (const fn of this.listeners[kind]) fn();
   }
 
@@ -232,6 +235,15 @@ export class Board {
     this.applyViewport();
   }
 
+  /** Topmost node under a world point (cards above groups); `margin` widens each card's hit area. */
+  nodeAt(wx: number, wy: number, margin = 0): RawNode | null {
+    const nodes = this.model.nodes;
+    const hit = (n: RawNode) => wx >= n.x - margin && wx <= n.x + n.width + margin && wy >= n.y - margin && wy <= n.y + n.height + margin;
+    for (let i = nodes.length - 1; i >= 0; i--) if (nodes[i].type !== 'group' && hit(nodes[i])) return nodes[i];
+    for (let i = nodes.length - 1; i >= 0; i--) if (nodes[i].type === 'group' && hit(nodes[i])) return nodes[i];
+    return null;
+  }
+
   // ── tools ─────────────────────────────────────────────────
 
   setTool(tool: string): void {
@@ -282,6 +294,7 @@ export class Board {
     for (const id of [...this.edgeSelection]) if (!this.model.edge(id)) this.edgeSelection.delete(id);
     for (const c of this.cards.values()) c.el.toggleClass('is-selected', this.selection.has(c.id));
     for (const [id, g] of this.edgeEls) g.classList.toggle('is-selected', this.edgeSelection.has(id));
+    for (const [id, l] of this.edgeLabelEls) l.toggleClass('is-selected', this.edgeSelection.has(id));
     this.root.toggleClass('has-multi-selection', this.selection.size > 1);
     this.fire('selection');
   }
@@ -413,31 +426,24 @@ export class Board {
 
   // ── edges ─────────────────────────────────────────────────
 
-  edgeEndpoints(e: RawEdge): { from: Rect; to: Rect; fromSide: Side; toSide: Side } | null {
-    const a = this.model.node(e.fromNode), b = this.model.node(e.toNode);
-    if (!a || !b) return null;
-    const ra = nodeRect(a), rb = nodeRect(b);
-    const [sa, sb] = autoSides(ra, rb);
-    return { from: ra, to: rb, fromSide: e.fromSide ?? sa, toSide: e.toSide ?? sb };
+  /** Geometry of an edge as currently drawn (null when an end is missing). */
+  edgeGeometry(id: string): ReturnType<typeof edgeGeometry> {
+    const e = this.model.edge(id);
+    return e ? edgeGeometry(e, nid => this.model.node(nid)) : null;
   }
 
   renderEdges(): void {
     const seen = new Set<string>();
     for (const e of this.model.edges) {
-      const ends = this.edgeEndpoints(e);
-      if (!ends) continue;
+      const shape = edgeGeometry(e, nid => this.model.node(nid));
+      if (!shape) continue;
       seen.add(e.id);
       let g = this.edgeEls.get(e.id);
       if (!g) {
         g = document.createElementNS(SVG_NS, 'g');
         g.classList.add('vc-edge');
         g.setAttribute('data-edge-id', e.id);
-        for (const cls of ['vc-edge-hit', 'vc-edge-line']) {
-          const p = document.createElementNS(SVG_NS, 'path');
-          p.classList.add(cls);
-          g.appendChild(p);
-        }
-        for (const cls of ['vc-edge-arrow-end', 'vc-edge-arrow-start']) {
+        for (const cls of ['vc-edge-halo', 'vc-edge-hit', 'vc-edge-line', 'vc-edge-arrow', 'vc-edge-arrow']) {
           const p = document.createElementNS(SVG_NS, 'path');
           p.classList.add(cls);
           g.appendChild(p);
@@ -445,15 +451,19 @@ export class Board {
         this.edgeLayer.appendChild(g);
         this.edgeEls.set(e.id, g);
       }
-      const shape = edgeShape(ends.from, ends.fromSide, ends.to, ends.toSide);
-      const [hit, line, arrowEnd, arrowStart] = Array.from(g.children) as SVGPathElement[];
-      hit.setAttribute('d', shape.d);
+      const [halo, hit, line, arrowStart, arrowEnd] = Array.from(g.children) as SVGPathElement[];
+      halo.setAttribute('d', shape.full);
+      hit.setAttribute('d', shape.full);
       line.setAttribute('d', shape.d);
+      arrowStart.setAttribute('d', shape.startArrow);
+      arrowEnd.setAttribute('d', shape.endArrow);
+      const vc = vcOf(e);
+      const width = edgeWidth(e);
+      g.style.setProperty('--vc-edge-w', String(width));
+      if (vc.dash) line.setAttribute('stroke-dasharray', `${width * 4} ${width * 3}`);
+      else line.removeAttribute('stroke-dasharray');
       const color = cssColor(e.color);
       if (color) g.style.setProperty('--vc-edge-color', color); else g.style.removeProperty('--vc-edge-color');
-      const toEnd = e.toEnd ?? 'arrow', fromEnd = e.fromEnd ?? 'none';
-      arrowEnd.setAttribute('d', toEnd === 'arrow' ? arrowPath(shape.end, shape.endAngle, 12) : '');
-      arrowStart.setAttribute('d', fromEnd === 'arrow' ? arrowPath(shape.start, shape.startAngle, 12) : '');
       g.classList.toggle('is-selected', this.edgeSelection.has(e.id));
       // Label
       let label = this.edgeLabelEls.get(e.id);
@@ -464,7 +474,9 @@ export class Board {
         }
         if (label.textContent !== e.label) label.setText(e.label);
         label.style.transform = `translate(${shape.mid.x}px, ${shape.mid.y}px) translate(-50%, -50%)`;
+        label.style.fontSize = typeof vc.labelSize === 'number' ? `${vc.labelSize}px` : '';
         if (color) label.style.setProperty('--vc-edge-color', color); else label.style.removeProperty('--vc-edge-color');
+        label.toggleClass('is-selected', this.edgeSelection.has(e.id));
       } else if (label) {
         label.remove();
         this.edgeLabelEls.delete(e.id);
@@ -472,14 +484,12 @@ export class Board {
     }
     for (const [id, g] of this.edgeEls) if (!seen.has(id)) { g.remove(); this.edgeEls.delete(id); }
     for (const [id, l] of this.edgeLabelEls) if (!seen.has(id)) { l.remove(); this.edgeLabelEls.delete(id); }
+    this.fire('edges');
   }
 
   /** Midpoint of an edge in world units, for placing its label editor. */
   edgeMid(id: string): Point | null {
-    const e = this.model.edge(id);
-    const ends = e && this.edgeEndpoints(e);
-    if (!ends) return null;
-    return edgeShape(ends.from, ends.fromSide, ends.to, ends.toSide).mid;
+    return this.edgeGeometry(id)?.mid ?? null;
   }
 
   // ── operations ────────────────────────────────────────────

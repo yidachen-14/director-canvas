@@ -3,12 +3,12 @@ import { Fragment, type Node as PMNode } from 'prosemirror-model';
 import type { EditorView } from 'prosemirror-view';
 import type { Transaction } from 'prosemirror-state';
 import { schema } from './schema';
-import { blockMarkdown } from './markdown';
+import { blockMarkdown, parseMarkdown } from './markdown';
 import { richRegistry, type RichText } from './editor';
 import { t } from '../i18n';
 
 /** A draggable unit: a top-level block, or one list item. */
-interface Block { pos: number; node: PMNode; dom: HTMLElement; listType: PMNode['type'] | null; }
+export interface Block { pos: number; node: PMNode; dom: HTMLElement; listType: PMNode['type'] | null; }
 
 function blockFromPos(view: EditorView, pos: number): Block | null {
   const doc = view.state.doc;
@@ -76,10 +76,10 @@ export function attachBlockHandles(rich: RichText, host: HTMLElement, dragHost: 
     const or = overlay.getBoundingClientRect();
     const br = b.dom.getBoundingClientRect();
     const cr = host.getBoundingClientRect();
-    // Beside the block's first line, never left of the card's own edge minus the handle.
+    // In a column just left of the card, level with the block's first line.
     const lineH = Math.min(br.height, 26);
     handle.style.top = `${br.top - or.top + lineH / 2 - 11}px`;
-    handle.style.left = `${Math.max(br.left - 24, cr.left - 22) - or.left}px`;
+    handle.style.left = `${cr.left - 18 - or.left}px`;
     handle.show();
   };
 
@@ -119,7 +119,79 @@ export function attachBlockHandles(rich: RichText, host: HTMLElement, dragHost: 
   };
 }
 
-interface Drop { rich: RichText; pos: number; asItem: boolean; line: DOMRect; }
+export interface Drop { rich: RichText; pos: number; asItem: boolean; line: DOMRect; }
+
+/** How far (screen px) outside its card a block must be dragged before it becomes a card of its own. */
+export const DRAG_OUT_DISTANCE = 56;
+
+/** Distance from a point to a rect (0 inside). */
+export function distanceToRect(r: DOMRect, x: number, y: number): number {
+  const dx = Math.max(r.left - x, 0, x - r.right);
+  const dy = Math.max(r.top - y, 0, y - r.bottom);
+  return Math.hypot(dx, dy);
+}
+
+/**
+ * Where in `rich` something dropped at (x, y) lands: before or after the
+ * block under the pointer. Only a list item being moved goes between items;
+ * anything else goes before/after the whole list.
+ */
+export function findBlockDrop(rich: RichText, x: number, y: number, o: { movingItem: boolean; src?: RichText; block?: Block }): Drop | null {
+  const view = rich.view;
+  let b = blockAtPoint(view, x, y);
+  const docRect = view.dom.getBoundingClientRect();
+  if (!b) {
+    // Below the last block: append at the end.
+    const last = view.state.doc.lastChild;
+    if (!last) return null;
+    const dom = view.nodeDOM(view.state.doc.content.size - last.nodeSize) as HTMLElement | null;
+    if (!dom) return null;
+    const r = dom.getBoundingClientRect();
+    return { rich, pos: view.state.doc.content.size, asItem: false, line: new DOMRect(docRect.left, r.bottom, docRect.width, 0) };
+  }
+  if (b.listType && !o.movingItem) {
+    const $p = view.state.doc.resolve(b.pos);
+    const top = $p.before(1);
+    const node = view.state.doc.nodeAt(top)!;
+    const dom = view.nodeDOM(top) as HTMLElement;
+    b = { pos: top, node, dom, listType: null };
+  }
+  const r = b.dom.getBoundingClientRect();
+  const after = y > r.top + r.height / 2;
+  const pos = after ? b.pos + b.node.nodeSize : b.pos;
+  // Not into itself.
+  if (o.src && o.block && rich === o.src && pos >= o.block.pos && pos <= o.block.pos + o.block.node.nodeSize) {
+    if (b.pos === o.block.pos) return null;
+  }
+  return { rich, pos, asItem: !!b.listType && o.movingItem, line: new DOMRect(r.left, after ? r.bottom : r.top, r.width, 0) };
+}
+
+/** The rich text under a screen point (ignoring `skip` and drag decorations). */
+export function richAt(x: number, y: number, skip?: Element | null): RichText | null {
+  const under = document.elementsFromPoint(x, y).find(el => !el.closest('.vc-block-ghost, .vc-drop-line, .vc-tool-ghost') && !(skip && skip.contains(el))) as HTMLElement | undefined;
+  const richEl = under?.closest<HTMLElement>('.vc-rich');
+  return (richEl && richRegistry.get(richEl)) || null;
+}
+
+/** Insert Markdown as blocks at a top-level position of `rich`, and store it. */
+export function insertMarkdownAt(rich: RichText, pos: number, markdown: string): void {
+  const doc = parseMarkdown(markdown);
+  rich.applyAndCommit(s => s.tr.insert(Math.min(pos, s.doc.content.size), doc.content));
+}
+
+/** The blue line showing where a drop lands. */
+export class DropLine {
+  private el: HTMLElement;
+  constructor() { this.el = document.body.createDiv('vc-drop-line'); this.el.hide(); }
+  show(l: DOMRect): void {
+    this.el.style.left = `${l.left}px`;
+    this.el.style.top = `${l.top - 1}px`;
+    this.el.style.width = `${l.width}px`;
+    this.el.show();
+  }
+  hide(): void { this.el.hide(); }
+  remove(): void { this.el.remove(); }
+}
 
 class BlockDrag {
   private ghost: HTMLElement;
@@ -165,7 +237,10 @@ class BlockDrag {
     const richEl = under?.closest<HTMLElement>('.vc-rich');
     const target = richEl ? richRegistry.get(richEl) : undefined;
     this.drop = target ? this.findDrop(target, e.clientX, e.clientY) : null;
-    this.overBoard = !target && !!under?.closest('.vc-board') && !under.closest('.vc-ui');
+    // Becoming a card of its own needs a clear move away from the source card.
+    const srcCard = this.src.view.dom.closest('.vc-node') ?? this.src.view.dom;
+    const away = distanceToRect(srcCard.getBoundingClientRect(), e.clientX, e.clientY) >= DRAG_OUT_DISTANCE;
+    this.overBoard = !target && away && !!under?.closest('.vc-board') && !under.closest('.vc-ui');
     this.ghost.toggleClass('is-new-card', this.overBoard);
     if (this.drop) {
       const l = this.drop.line;
@@ -178,37 +253,8 @@ class BlockDrag {
     }
   }
 
-  /** Where in `rich` the block would land for a pointer at (x, y). */
   private findDrop(rich: RichText, x: number, y: number): Drop | null {
-    const view = rich.view;
-    let b = blockAtPoint(view, x, y);
-    const docRect = view.dom.getBoundingClientRect();
-    if (!b) {
-      // Below the last block: append at the end.
-      const last = view.state.doc.lastChild;
-      if (!last) return null;
-      const dom = view.nodeDOM(view.state.doc.content.size - last.nodeSize) as HTMLElement | null;
-      if (!dom) return null;
-      const r = dom.getBoundingClientRect();
-      return { rich, pos: view.state.doc.content.size, asItem: false, line: new DOMRect(docRect.left, r.bottom, docRect.width, 0) };
-    }
-    const movingItem = this.block.listType !== null;
-    // A paragraph dropped among list items goes before/after the whole list.
-    if (b.listType && !movingItem) {
-      const $p = view.state.doc.resolve(b.pos);
-      const top = $p.before(1);
-      const node = view.state.doc.nodeAt(top)!;
-      const dom = view.nodeDOM(top) as HTMLElement;
-      b = { pos: top, node, dom, listType: null };
-    }
-    const r = b.dom.getBoundingClientRect();
-    const after = y > r.top + r.height / 2;
-    const pos = after ? b.pos + b.node.nodeSize : b.pos;
-    // Not into itself.
-    if (rich === this.src && pos >= this.block.pos && pos <= this.block.pos + this.block.node.nodeSize) {
-      if (b.pos === this.block.pos) return null;
-    }
-    return { rich, pos, asItem: !!b.listType && movingItem, line: new DOMRect(r.left, after ? r.bottom : r.top, r.width, 0) };
+    return findBlockDrop(rich, x, y, { movingItem: this.block.listType !== null, src: this.src, block: this.block });
   }
 
   private finish(e: PointerEvent, copy: boolean): void {
