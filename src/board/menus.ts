@@ -4,6 +4,7 @@ import { duplicateSelection, editEdgeLabel } from './interactions';
 import { reverseEdge } from './connect-ui';
 import { routeOf, type Route } from './connections';
 import { pasteInto } from './clipboard';
+import { addArrangeMenu } from './arrange-commands';
 import { allCardTypes } from '../cards/registry';
 import { presetColor } from '../cards/util';
 import type { Point } from './viewport';
@@ -97,6 +98,7 @@ function boardMenu(menu: Menu, board: Board, at: Point): void {
       }));
     }
   });
+  addArrangeMenu(menu, board, (title, icon, section, build) => submenu(menu, title, icon, section, build), false);
   for (const c of contributions) if (c.where === 'board') c.add(menu, board, at);
   menu.addItem(i => i.setTitle(t('Zoom to fit')).setIcon('maximize').setSection('view').onClick(() => board.zoomToFit()));
   menu.addItem(i => i.setTitle(t('Zoom to 100%')).setIcon('scan').setSection('view').onClick(() => board.setZoom(1)));
@@ -119,6 +121,7 @@ function cardMenu(menu: Menu, board: Board, at: Point): void {
   menu.addItem(i => i.setTitle(t('Bring to front')).setIcon('bring-to-front').setSection('order').onClick(() => board.reorderSelection('front')));
   menu.addItem(i => i.setTitle(t('Send to back')).setIcon('send-to-back').setSection('order').onClick(() => board.reorderSelection('back')));
   menu.addItem(i => i.setTitle(t('Create group from selection')).setIcon('box-select').setSection('order').onClick(() => board.groupSelection()));
+  if (multi) addArrangeMenu(menu, board, (title, icon, section, build) => submenu(menu, title, icon, section, build), true);
   for (const c of contributions) if (c.where === 'card' || (multi && c.where === 'multi')) c.add(menu, board, at);
   menu.addItem(i => i.setTitle(t('Zoom to selection')).setIcon('scan-search').setSection('view').onClick(() => board.zoomToFit([...board.selection])));
   menu.addItem(i => i.setTitle(t('Delete')).setIcon('trash-2').setSection('danger').setWarning(true).onClick(() => board.deleteSelection()));

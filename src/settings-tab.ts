@@ -113,6 +113,13 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
         .setValue(s.defaultRoute)
         .onChange(async (v) => { s.defaultRoute = v as typeof s.defaultRoute; await this.save(false); }));
 
+    // ── Attachments ──
+    new Setting(el).setName(t('Attachments')).setHeading();
+    new Setting(el)
+      .setName(t('Update boards when files are renamed or moved'))
+      .setDesc(t('Paths of cards and [[links]] in every board follow the file, including boards that are not open.'))
+      .addToggle(tg => tg.setValue(s.autoRelink).onChange(async (v) => { s.autoRelink = v; await this.save(false); }));
+
     // ── Canvas ──
     new Setting(el).setName(t('Board')).setHeading();
     new Setting(el)

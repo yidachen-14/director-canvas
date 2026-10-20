@@ -6,6 +6,9 @@ import type { RawNode } from '../model/canvas-file';
 import { cardKindOf, vcGet } from '../cards/util';
 import { getCardType } from '../cards/registry';
 import { ConnectController } from './connect-ui';
+import { PenController } from './pen';
+import { runArrange, type ArrangeCommand } from './arrange-commands';
+import { descriptionHeight } from '../cards/media';
 import { DropLine, findBlockDrop, insertMarkdownAt, richAt, type Drop } from '../richtext/block-drag';
 import { t as tr } from '../i18n';
 
@@ -18,6 +21,10 @@ const ZONE_CURSOR: Record<Zone, string> = {
 
 const DRAG_THRESHOLD = 3;
 const MIN_W = 40, MIN_H = 24;
+
+const ARRANGE_KEYS: Record<string, ArrangeCommand> = {
+  KeyP: 'optimal', KeyN: 'by-name', KeyA: 'by-added', KeyD: 'by-path', KeyR: 'random', KeyS: 'stack',
+};
 
 /** Card kinds a Text card can be dropped into. */
 const MERGE_INTO = ['note', 'sticky', 'callout', 'checklist'];
@@ -34,6 +41,7 @@ export function attachInteractions(board: Board): void {
   let hoverZone: { id: string; zone: Zone } | null = null;
   let active: { kind: string; cleanup: () => void } | null = null;
   const connect = new ConnectController(board);
+  const pen = new PenController(board);
   board.connections = connect;
 
   const editingTarget = (target: EventTarget | null): boolean => {
@@ -113,6 +121,9 @@ export function attachInteractions(board: Board): void {
     if (t.closest('a, input, button, select, textarea, [contenteditable="true"], [contenteditable="plaintext-only"], .vc-interactive')) return;
     const mediaHost = t.closest('video, audio')?.closest<HTMLElement>('.vc-node');
     if (mediaHost && board.selection.has(mediaHost.dataset.id ?? '') && board.selection.size === 1) return;
+    // Buttons inside cards (kanban, swatch, calendar) work once their card is the selection.
+    const clickHost = t.closest('.vc-click')?.closest<HTMLElement>('.vc-node');
+    if (clickHost && board.selection.has(clickHost.dataset.id ?? '') && board.selection.size === 1 && board.tool === 'select') return;
     if (board.editingId) board.stopEditing();
     root.focus({ preventScroll: true });
 
@@ -121,6 +132,7 @@ export function attachInteractions(board: Board): void {
     if (e.button === 2 && panBtn === 'right') { startPan(e, true); return; }
     if (e.button !== 0) return;
     if (spaceDown || board.tool === 'hand') { startPan(e); return; }
+    if (board.tool === 'pen') { pen.pointerDown(e); return; }
 
     const w = board.clientToWorld(e.clientX, e.clientY);
 
@@ -420,6 +432,7 @@ export function attachInteractions(board: Board): void {
     const o = { x: n.x, y: n.y, w: n.width, h: n.height };
     const start = board.clientToWorld(e.clientX, e.clientY);
     const keepAspectKind = KEEP_ASPECT.has(cardKindOf(n));
+    const extra = keepAspectKind ? descriptionHeight(board.cards.get(id)?.el) : 0;
     let gesture: ReturnType<typeof board.model.beginGesture> | null = null;
     setCursor(ZONE_CURSOR[zone]);
     root.addClass('is-resizing');
@@ -435,8 +448,9 @@ export function attachInteractions(board: Board): void {
       const corner = zone.length === 2;
       const aspect = corner && (keepAspectKind !== ev.shiftKey);
       if (aspect) {
-        const ratio = o.w / o.h;
-        if (Math.abs(w - o.w) / o.w > Math.abs(h - o.h) / o.h) h = w / ratio; else w = h * ratio;
+        // A picture's description is not part of its proportions.
+        const ratio = o.w / Math.max(1, o.h - extra);
+        if (Math.abs(w - o.w) / o.w > Math.abs(h - o.h) / o.h) h = w / ratio + extra; else w = (h - extra) * ratio;
         if (zone.includes('w')) x = o.x + o.w - w;
         if (zone.includes('n')) y = o.y + o.h - h;
       }
@@ -523,6 +537,11 @@ export function attachInteractions(board: Board): void {
     }
 
     if (e.key === ' ' && !spaceDown) { spaceDown = true; setCursor('grab'); e.preventDefault(); return; }
+    // ⌥⌘ + letter: arranging (by physical key, see hotkeys.ts).
+    if (mod && e.altKey && !e.shiftKey) {
+      const cmd = ARRANGE_KEYS[e.code];
+      if (cmd) { runArrange(board, cmd); e.preventDefault(); return; }
+    }
     if (mod) return; // ⌘ shortcuts go through the view's hotkey scope (hotkeys.ts)
     if (e.key === 'Escape') {
       if (board.tool !== 'select') board.setTool('select');

@@ -2,6 +2,7 @@ import { Menu, setIcon, setTooltip } from 'obsidian';
 import type { Board } from './board';
 import { availableTools, toolById, type Tool } from './tools';
 import { getCardType } from '../cards/registry';
+import { ARRANGE, runArrange } from './arrange-commands';
 import type { Point } from './viewport';
 import { nodeRect, unionRect } from '../model/board-model';
 import { cssColor } from '../cards/util';
@@ -172,6 +173,17 @@ class OverflowPanel {
         tile.toggleClass('is-active', board.tool === tool.id);
         bindToolPress(board, tile, tool, () => activate(tool), () => this.close());
       }
+    }
+
+    // Arranging, as tiles: the same commands as the right-click menu.
+    el.createDiv({ cls: 'vc-more-title', text: t('Arrange') });
+    const agrid = el.createDiv('vc-more-grid');
+    for (const d of ARRANGE.filter(x => x.group === 'arrange' || x.group === 'distribute')) {
+      const tile = agrid.createDiv({ cls: 'vc-more-tile is-action', attr: { role: 'button', 'aria-label': t(d.label) } });
+      setIcon(tile.createDiv('vc-more-tile-icon'), d.icon);
+      tile.createDiv({ cls: 'vc-more-tile-label', text: t(d.label) });
+      if (d.keys) setTooltip(tile, `${t(d.label)}  ${d.keys}`, { placement: 'top' });
+      tile.addEventListener('click', () => { this.close(); runArrange(board, d.id); });
     }
 
     const sections = new Map<string, OverflowAction[]>();

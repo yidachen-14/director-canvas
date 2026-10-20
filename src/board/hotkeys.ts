@@ -1,6 +1,7 @@
 import { Scope, type Modifier } from 'obsidian';
 import type { Board } from './board';
 import { duplicateSelection } from './interactions';
+import { runArrange } from './arrange-commands';
 
 /**
  * ⌘ shortcuts go through an Obsidian Scope on the view, so they win over
@@ -33,4 +34,16 @@ export function installHotkeys(scope: Scope, board: () => Board | null): void {
   bind(['Mod'], '-', b => b.zoomBy(0.8));
   bind(['Mod'], '0', b => b.setZoom(1));
   bind(['Mod'], 'f', b => b.openSearch?.());
+
+  // Arranging, PureRef's keys. ⌥⌘+letter is matched by physical key in interactions.ts
+  // (on a Mac, Option turns P into π, which Obsidian's matcher never sees).
+  bind(['Mod'], 'ArrowLeft', b => runArrange(b, 'push-left'));
+  bind(['Mod'], 'ArrowRight', b => runArrange(b, 'push-right'));
+  bind(['Mod'], 'ArrowUp', b => runArrange(b, 'push-up'));
+  bind(['Mod'], 'ArrowDown', b => runArrange(b, 'push-down'));
+  bind(['Mod', 'Alt'], 'ArrowLeft', b => runArrange(b, 'same-height'));
+  bind(['Mod', 'Alt'], 'ArrowRight', b => runArrange(b, 'same-width'));
+  bind(['Mod', 'Alt'], 'ArrowUp', b => runArrange(b, 'same-size'));
+  bind(['Mod', 'Alt', 'Shift'], 'ArrowRight', b => runArrange(b, 'row'));
+  bind(['Mod', 'Alt', 'Shift'], 'ArrowDown', b => runArrange(b, 'column'));
 }

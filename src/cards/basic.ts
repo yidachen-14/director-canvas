@@ -1,7 +1,7 @@
 import { Component, MarkdownRenderer, TFile, setIcon } from 'obsidian';
 import type { RawNode } from '../model/canvas-file';
 import type { CardContext, CardHandle, CardType } from './types';
-import { applyCardColor, fileKindOf, resolveFile, vcGet } from './util';
+import { applyCardColor, fileKindOf, resolveFile } from './util';
 import { t } from '../i18n';
 
 // ── shared helpers ──────────────────────────────────────────
@@ -89,48 +89,13 @@ export const groupCard: CardType = {
 
 // ── Files ───────────────────────────────────────────────────
 
-function missingFile(el: HTMLElement, path: string | undefined): void {
+export function missingFile(el: HTMLElement, path: string | undefined): void {
   el.empty();
   const box = el.createDiv('vc-missing');
   setIcon(box.createDiv('vc-missing-icon'), 'file-x');
   box.createDiv({ cls: 'vc-missing-text', text: t('File not found') });
   if (path) box.createDiv({ cls: 'vc-missing-path', text: path });
 }
-
-function mediaCard(id: 'image' | 'video' | 'audio', icon: string, size: { width: number; height: number }): CardType {
-  return {
-    id, label: id === 'image' ? 'Image' : id === 'video' ? 'Video' : 'Audio', icon, defaultSize: size,
-    mount(node, el, ctx) {
-      let current = node;
-      el.addClass('vc-media', `vc-${id}`);
-      const render = () => {
-        el.empty();
-        const file = resolveFile(ctx.app, current);
-        if (!file) { missingFile(el, current.file); return; }
-        const src = ctx.app.vault.getResourcePath(file);
-        if (id === 'image') {
-          el.createEl('img', { attr: { src, draggable: 'false', alt: file.basename } });
-        } else if (id === 'video') {
-          el.createEl('video', { attr: { src, controls: '', preload: 'metadata' } });
-        } else {
-          const wrap = el.createDiv('vc-audio-wrap');
-          wrap.createDiv({ cls: 'vc-audio-name', text: file.name });
-          wrap.createEl('audio', { attr: { src, controls: '', preload: 'metadata' } });
-        }
-      };
-      render();
-      return {
-        update(n) { const changed = n.file !== current.file; current = n; if (changed) render(); },
-        destroy() { el.querySelectorAll('video,audio').forEach(m => (m as HTMLMediaElement).pause()); },
-        searchText: () => current.file ?? '',
-      };
-    },
-  };
-}
-
-export const imageCard = mediaCard('image', 'image', { width: 400, height: 300 });
-export const videoCard = mediaCard('video', 'film', { width: 480, height: 270 });
-export const audioCard = mediaCard('audio', 'music', { width: 360, height: 96 });
 
 interface EmbedLike extends Component { loadFile?: (file: TFile, subpath?: string) => unknown; }
 
@@ -190,37 +155,6 @@ export const fileCard: CardType = {
   },
 };
 
-// ── Link (web page) ─────────────────────────────────────────
-
-export const linkCard: CardType = {
-  id: 'link',
-  label: 'Link',
-  icon: 'link',
-  defaultSize: { width: 400, height: 120 },
-  mount(node, el) {
-    let current = node;
-    el.addClass('vc-link');
-    const render = () => {
-      el.empty();
-      const url = current.url ?? '';
-      let host = url;
-      try { host = new URL(url).host; } catch { /* keep raw */ }
-      const box = el.createDiv('vc-link-box');
-      setIcon(box.createDiv('vc-link-icon'), 'globe');
-      const text = box.createDiv('vc-link-text');
-      text.createDiv({ cls: 'vc-link-host', text: host });
-      const a = text.createEl('a', { cls: 'vc-link-url', text: url, href: url });
-      a.addEventListener('click', (e) => { e.stopPropagation(); });
-    };
-    render();
-    return {
-      update(n) { current = n; render(); },
-      destroy() { /* nothing */ },
-      searchText: () => current.url ?? '',
-    };
-  },
-};
-
 // ── Anything not understood (yet): show its text so nothing looks lost ──
 
 export const fallbackCardType: CardType = {
@@ -245,4 +179,18 @@ export const fallbackCardType: CardType = {
   },
 };
 
-export const BASIC_CARDS: CardType[] = [groupCard, imageCard, videoCard, audioCard, fileCard, linkCard];
+/** A column: a group that stacks the cards dropped into it (layout in board/columns.ts). */
+export const columnCard: CardType = {
+  id: 'column',
+  label: 'Column',
+  icon: 'rows-3',
+  defaultSize: { width: 300, height: 360 },
+  create: () => ({ type: 'group', label: t('Column'), vc: { kind: 'column' } }),
+  mount(node, el, ctx) {
+    const handle = groupCard.mount(node, el, ctx);
+    el.addClass('vc-column');
+    return handle;
+  },
+};
+
+export const BASIC_CARDS: CardType[] = [groupCard, columnCard, fileCard];

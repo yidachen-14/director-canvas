@@ -41,6 +41,9 @@ export async function switchCanvasView(leaf: WorkspaceLeaf, to: 'native' | 'visu
   const current = leaf.getViewState();
   const file = (current.state as Record<string, unknown> | undefined)?.file;
   if (typeof file !== 'string') return;
+  // Write what the open view still holds before another view reads the file.
+  const view = leaf.view as { save?: () => Promise<void>; getViewType(): string };
+  if (typeof view.save === 'function' && (view.getViewType() === VIEW_TYPE || view.getViewType() === NATIVE_TYPE)) await view.save();
   if (to === 'native') {
     await leaf.setViewState({ type: NATIVE_TYPE, state: { file, [NATIVE_FLAG]: true } });
   } else {

@@ -1,4 +1,6 @@
 import { Notice, Plugin, TFile, TFolder, normalizePath } from 'obsidian';
+import { installRenameSync } from './rename-sync';
+import { ARRANGE, runArrange } from './board/arrange-commands';
 import { CanvasView } from './view/canvas-view';
 import { VIEW_TYPE, installCanvasTakeover, switchCanvasView } from './takeover';
 import { normalizeSettings, type VisualCanvasSettings } from './settings';
@@ -42,6 +44,23 @@ export default class VisualCanvasPlugin extends Plugin {
         return true;
       },
     });
+
+    installRenameSync(this);
+
+    // Arranging (PureRef-style): every command can get its own keys in Settings → Hotkeys.
+    for (const d of ARRANGE) {
+      this.addCommand({
+        id: `arrange-${d.id}`,
+        name: t(d.label),
+        icon: d.icon,
+        checkCallback: (checking) => {
+          const board = this.app.workspace.getActiveViewOfType(CanvasView)?.board;
+          if (!board) return false;
+          if (!checking) runArrange(board, d.id);
+          return true;
+        },
+      });
+    }
 
     // Right-click a .canvas file: open it with the other view.
     this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {

@@ -38,6 +38,18 @@ export class BoardModel {
   private txEdges = false;
   private txBefore: Snapshot | null = null;
   private txMerge: string | null = null;
+  private txQuiet = false;
+  private normalizers: ((changed: Set<string>) => void)[] = [];
+  private normalizing = false;
+
+  /**
+   * Run after every change, inside the same undo step: layouts that follow
+   * from other changes (a column stacking the cards dropped into it).
+   */
+  addNormalizer(fn: (changed: Set<string>) => void): () => void {
+    this.normalizers.push(fn);
+    return () => { this.normalizers = this.normalizers.filter(f => f !== fn); };
+  }
   private lastMergeKey: string | null = null;
   private lastMergeAt = 0;
 
@@ -81,6 +93,16 @@ export class BoardModel {
       this.txDepth--;
       if (this.txDepth === 0) this.commit();
     }
+  }
+
+  /**
+   * A change made by the plugin itself (a fetched link preview): saved, but
+   * not an undo step of its own.
+   */
+  quiet<T>(fn: () => T): T {
+    if (this.txDepth > 0) return fn();
+    this.txQuiet = true;
+    try { return this.transact(fn); } finally { this.txQuiet = false; }
   }
 
   /**
@@ -226,16 +248,26 @@ export class BoardModel {
     this.txBefore = null;
     if (!before) return;
     if (!this.txChanged.size && !this.txEdges) return;
+    if (this.normalizers.length && !this.normalizing) {
+      this.normalizing = true;
+      this.txDepth++;
+      try { for (const fn of this.normalizers) fn(new Set(this.txChanged)); }
+      catch (err) { console.error('Visual Canvas: layout failed', err); }
+      finally { this.txDepth--; this.normalizing = false; }
+    }
     const now = Date.now();
     // Keys starting with '!' merge regardless of time (a new card and its first edit).
-    const merge = !!this.txMerge && this.txMerge === this.lastMergeKey && (this.txMerge.startsWith('!') || now - this.lastMergeAt < 1500);
+    const merge = this.txQuiet || (!!this.txMerge && this.txMerge === this.lastMergeKey && (this.txMerge.startsWith('!') || now - this.lastMergeAt < 1500));
     if (!merge) {
       this.undoStack.push(before);
       if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift();
     }
-    this.redoStack = [];
-    this.lastMergeKey = this.txMerge;
-    this.lastMergeAt = now;
+    // A quiet change is not an undo step of its own and leaves merging and redo alone.
+    if (!this.txQuiet) {
+      this.redoStack = [];
+      this.lastMergeKey = this.txMerge;
+      this.lastMergeAt = now;
+    }
     const ids = [...this.txChanged].filter(id => id !== '__order__');
     if (this.txChanged.has('__order__')) this.emit({ kind: 'all', ids: [] });
     else {

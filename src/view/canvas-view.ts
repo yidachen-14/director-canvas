@@ -1,10 +1,11 @@
-import { Notice, Scope, TextFileView, type ViewStateResult, type WorkspaceLeaf } from 'obsidian';
+import { Notice, Scope, TextFileView, type TFile, type ViewStateResult, type WorkspaceLeaf } from 'obsidian';
 import type VisualCanvasPlugin from '../main';
 import { VIEW_TYPE, switchCanvasView } from '../takeover';
 import { parseCanvas, serializeCanvas, emptyCanvas } from '../model/canvas-file';
 import { settleSidesForSave } from '../board/connections';
 import { Board } from '../board/board';
 import { attachInteractions } from '../board/interactions';
+import { installColumns } from '../board/columns';
 import { attachClipboard } from '../board/clipboard';
 import { attachContextMenu } from '../board/menus';
 import { attachCorner, attachToolbar } from '../board/ui';
@@ -32,6 +33,7 @@ export class CanvasView extends TextFileView {
     this.contentEl.addClass('vc-view');
     const board = new Board(this, this.plugin, this.contentEl);
     this.board = board;
+    installColumns(board);
     attachInteractions(board);
     attachClipboard(board);
     attachContextMenu(board);
@@ -48,7 +50,20 @@ export class CanvasView extends TextFileView {
     this.register(() => ro.disconnect());
   }
 
+  /** Leaving the file (closing, switching to the core Canvas): write pending changes first. */
+  async onUnloadFile(file: TFile): Promise<void> {
+    if (this.board && this.file === file) {
+      this.board.stopEditing();
+      await this.save();
+    }
+    await super.onUnloadFile(file);
+  }
+
   async onClose(): Promise<void> {
+    if (this.board && this.file) {
+      this.board.stopEditing();
+      try { await this.save(); } catch (err) { console.error('Visual Canvas: save on close failed', err); }
+    }
     this.board?.destroy();
     this.board = null;
   }
