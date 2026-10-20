@@ -8,6 +8,8 @@ import { VisualCanvasSettingTab } from './settings-tab';
 import { setLanguage, t } from './i18n';
 import { registerAllCards } from './cards';
 import { serializeCanvas, emptyCanvas } from './model/canvas-file';
+import { installExport } from './export';
+import type { Board } from './board/board';
 
 export default class VisualCanvasPlugin extends Plugin {
   settings!: VisualCanvasSettings;
@@ -46,6 +48,7 @@ export default class VisualCanvasPlugin extends Plugin {
     });
 
     installRenameSync(this);
+    installExport(this);
 
     // Arranging (PureRef-style): every command can get its own keys in Settings → Hotkeys.
     for (const d of ARRANGE) {
@@ -94,6 +97,11 @@ export default class VisualCanvasPlugin extends Plugin {
   }
 
   /** Whether a board at `path` opens with Visual Canvas. */
+  /** The board in the active view, if any. */
+  activeBoard(): Board | null {
+    return this.app.workspace.getActiveViewOfType(CanvasView)?.board ?? null;
+  }
+
   takesOver(path: string | undefined): boolean {
     if (!this.settings.openCanvasByDefault) return false;
     const folders = this.settings.takeoverFolders.map(f => f.replace(/^\/+|\/+$/g, '')).filter(Boolean);

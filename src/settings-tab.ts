@@ -48,7 +48,7 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
       .setDesc(t('One folder per line. Leave empty to open every board with Visual Canvas.'))
       .addTextArea(ta => {
         ta.inputEl.rows = 3;
-        ta.setPlaceholder('_VC測試').setValue(s.takeoverFolders.join('\n')).onChange(async (v) => {
+        ta.setPlaceholder(t('One folder per line')).setValue(s.takeoverFolders.join('\n')).onChange(async (v) => {
           s.takeoverFolders = v.split('\n').map(x => x.trim()).filter(Boolean);
           await this.save(false);
         });
@@ -151,6 +151,34 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
     new Setting(el)
       .setName(t('Grid size'))
       .addSlider(sl => sl.setLimits(10, 80, 5).setValue(s.gridSize).setDynamicTooltip().onChange(async (v) => { s.gridSize = v; await this.save(); }));
+
+    // ── Arranging ──
+    new Setting(el).setName(t('Arranging')).setHeading();
+    new Setting(el)
+      .setName(t('Gap between arranged cards'))
+      .setDesc(t('Used by pushing, rows, columns and the automatic arrangements (px).'))
+      .addSlider(sl => sl.setLimits(0, 80, 2).setValue(s.arrangeGap).setDynamicTooltip().onChange(async (v) => { s.arrangeGap = v; await this.save(false); }));
+    new Setting(el)
+      .setName(t('Same size: measure from'))
+      .addDropdown(d => d
+        .addOption('first', t('The first selected')).addOption('average', t('The average'))
+        .setValue(s.normalizeBase)
+        .onChange(async (v) => { s.normalizeBase = v as typeof s.normalizeBase; await this.save(false); }));
+
+    // ── Export ──
+    new Setting(el).setName(t('Export')).setHeading();
+    new Setting(el)
+      .setName(t('Export folder'))
+      .setDesc(t('Empty: ask every time. A folder in the vault (Exports) or a full path on this computer (~/Desktop).'))
+      .addText(tx => tx.setPlaceholder(t('Ask every time')).setValue(s.exportFolder).onChange(async (v) => { s.exportFolder = v.trim(); await this.save(false); }));
+    new Setting(el)
+      .setName(t('PNG resolution'))
+      .addDropdown(d => d.addOptions({ 1: '1x', 2: '2x', 3: '3x' }).setValue(String(s.pngScale))
+        .onChange(async (v) => { s.pngScale = Number(v) as 1 | 2 | 3; await this.save(false); }));
+    new Setting(el)
+      .setName(t('HTML export'))
+      .addDropdown(d => d.addOptions({ folder: t('Folder (index.html + files)'), single: t('Single file') }).setValue(s.htmlMode)
+        .onChange(async (v) => { s.htmlMode = v as typeof s.htmlMode; await this.save(false); }));
   }
 
   /** An optional colour: a picker plus a button back to the theme's colour. */

@@ -1519,3 +1519,10 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-mm-topic[data-vc-armed] { user-select: text; -webkit-user-select: text; caret-color: transparent; cursor: default; }
 .vc-mm-topic[data-vc-armed]::selection, .vc-mm-topic[data-vc-armed] *::selection { background: transparent; color: inherit; }
 .vc-mm-topic[data-vc-armed]:focus { outline: calc(2px / var(--vc-zoom, 1)) solid var(--vc-select); outline-offset: calc(2px / var(--vc-zoom, 1)); }
+
+/* Export dialog */
+.vc-export-formats { display: flex; gap: 8px; margin-bottom: 12px; }
+.vc-export-format { flex: 1; padding: 10px 0; text-align: center; border-radius: 8px; border: 1.5px solid var(--background-modifier-border); cursor: pointer; font-weight: 600; color: var(--text-muted); }
+.vc-export-format:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+.vc-export-format.is-active { border-color: var(--interactive-accent); color: var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 10%, transparent); }
+.vc-export-note { font-size: var(--font-ui-smaller); color: var(--text-muted); margin: 6px 0 4px; line-height: 1.5; }
