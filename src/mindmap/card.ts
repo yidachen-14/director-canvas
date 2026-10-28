@@ -919,11 +919,14 @@ export class MindMapCard implements CardHandle, MindMapControl {
     let ghost: HTMLElement | null = null;
     let hint: HTMLElement | null = null;
     let drop: { target: string; mode: DropMode; side?: 'left' | 'right' } | null = null;
+    let detach = false;
+    let lastClient = { x: sx, y: sy };
     const dragged = findTopic(this.data.root, id)?.topic;
     const srcEl = this.topicEls.get(id);
     const clearMarks = () => { for (const el of this.topicEls.values()) el.removeClass('is-drop-target'); };
 
     const move = (ev: PointerEvent) => {
+      lastClient = { x: ev.clientX, y: ev.clientY };
       if (!dragging) {
         if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return;
         dragging = true;
@@ -936,6 +939,9 @@ export class MindMapCard implements CardHandle, MindMapControl {
       ghost!.style.transform = `translate(${Math.round(l.x + this.shift.x + 8)}px, ${Math.round(l.y + this.shift.y + 8)}px)`;
       drop = this.dropAt(l.x, l.y, id);
       clearMarks();
+      // Away from the map: let go to make it a topic of its own on the board.
+      detach = !drop && this.outsideMap(l.x, l.y);
+      ghost!.toggleClass('is-detaching', detach);
       if (!drop) { hint!.hide(); return; }
       const p = this.placed.get(drop.target)!;
       const x = p.x + this.shift.x, y = p.y + this.shift.y;
@@ -977,6 +983,8 @@ export class MindMapCard implements CardHandle, MindMapControl {
         const dd = drop;
         this.apply(d => { moveTopic(d, id, dd.target, dd.mode, dd.side); });
         this.setSel([id]);
+      } else if (commit && dragging && detach) {
+        this.detachTopic(id, lastClient);
       }
     };
     const up = () => finish(true);
@@ -985,6 +993,34 @@ export class MindMapCard implements CardHandle, MindMapControl {
     win.addEventListener('pointerup', up, true);
     win.addEventListener('keydown', key, true);
     this.dragCleanup = () => finish(false);
+  }
+
+  /** Whether a local point is clearly away from every topic of the map. */
+  private outsideMap(x: number, y: number): boolean {
+    const margin = 36;
+    for (const p of this.placed.values()) {
+      if (x > p.x - margin && x < p.x + p.w + margin && y > p.y - margin && y < p.y + p.h + margin) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Take a topic (and everything under it) out of this map and put it on the board where it was
+   * dropped, as a mind map of its own with the same look, like a floating topic in Boardmix.
+   */
+  private detachTopic(id: string, at: { x: number; y: number }): void {
+    const f = findTopic(this.data.root, id);
+    if (!f || !f.parent) return;
+    const sub = cloneData(this.data);
+    const topic = findTopic(sub.root, id)!.topic;
+    delete topic.side;
+    const b = this.ctx.board;
+    b.model.transact(() => {
+      this.apply(d => { removeTopics(d, [id]); });
+      const mm: MMData = { root: topic, layout: this.data.layout, theme: this.data.theme, size: this.data.size, align: this.data.align, line: this.data.line, branchColor: this.data.branchColor };
+      const w = b.clientToWorld(at.x, at.y);
+      b.createCard('mindmap', w, { data: { type: 'text', text: toMarkdown(topic), vc: { kind: 'mindmap', mm } } });
+    });
   }
 
   /** What dropping a dragged topic at a local point would do. */

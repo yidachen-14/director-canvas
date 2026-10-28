@@ -41,6 +41,8 @@ export interface CardHandle {
   barAvoid?(): { x: number; y: number; width: number; height: number }[];
   /** Board rectangle the bar sits above, instead of the whole card. */
   barAnchor?(): { x: number; y: number; width: number; height: number } | null;
+  /** The content's own size right now (text cards: the box hugs the text). */
+  measure?(): { width: number; height: number } | undefined;
   /** Card-specific entries for its right-click menu (only when it is the sole selection). */
   menu?(menu: import('obsidian').Menu): void;
 }

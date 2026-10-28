@@ -23,11 +23,12 @@ export function columnMembers(col: RawNode, nodes: RawNode[]): RawNode[] {
   }).sort((a, b) => (a.y + a.height / 2) - (b.y + b.height / 2) || a.x - b.x);
 }
 
-/** Stack a column's cards under its header and fit its height to them. */
-export function layoutColumn(col: RawNode, nodes: RawNode[]): RawNode[] {
+/** Stack a column's cards under its header and fit its height to them. Cards being dragged are left out. */
+export function layoutColumn(col: RawNode, nodes: RawNode[], skip?: ReadonlySet<string>): RawNode[] {
   const changed: RawNode[] = [];
   let y = col.y + COLUMN_HEADER;
   for (const n of columnMembers(col, nodes)) {
+    if (skip?.has(n.id)) continue;
     const own = OWN_WIDTH.has(cardKindOf(n));
     const x = col.x + COLUMN_PAD;
     const w = own ? n.width : Math.max(40, col.width - COLUMN_PAD * 2);
@@ -46,8 +47,25 @@ export function layoutColumn(col: RawNode, nodes: RawNode[]): RawNode[] {
 export function installColumns(board: Board): void {
   board.addDisposer(board.model.addNormalizer(() => {
     const nodes = board.model.nodes;
+    const dragging = board.draggingIds;
     for (const col of nodes.filter(isColumn)) {
-      for (const n of layoutColumn(col, nodes)) board.model.touch(n.id);
+      if (dragging.has(col.id)) continue; // a column on the move keeps its cards as they are
+      for (const n of layoutColumn(col, nodes, dragging)) board.model.touch(n.id);
     }
   }));
+}
+
+/**
+ * Where a card dragged to `centre` would land in a column: the column and the y of the gap
+ * it would take (between the cards there, which are already closed up without it).
+ */
+export function columnDropAt(nodes: RawNode[], centre: { x: number; y: number }, skip: ReadonlySet<string>): { col: RawNode; y: number } | null {
+  const col = [...nodes].reverse().find(n => isColumn(n) && !skip.has(n.id)
+    && centre.x >= n.x && centre.x <= n.x + n.width && centre.y >= n.y && centre.y <= n.y + n.height);
+  if (!col) return null;
+  const members = columnMembers(col, nodes).filter(n => !skip.has(n.id));
+  const next = members.find(n => n.y + n.height / 2 > centre.y);
+  if (next) return { col, y: next.y - COLUMN_GAP / 2 };
+  const last = members[members.length - 1];
+  return { col, y: last ? last.y + last.height + COLUMN_GAP / 2 : col.y + COLUMN_HEADER - COLUMN_GAP / 2 + 4 };
 }

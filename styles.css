@@ -317,7 +317,7 @@
   padding: 0 4px 0 10px;
   box-sizing: border-box;
   background: var(--background-primary);
-  border: 1px dashed var(--background-modifier-border-hover, var(--background-modifier-border));
+  border: 1px solid var(--background-modifier-border);
   border-radius: 10px;
 }
 .vc-bookmark-ask-icon { display: flex; color: var(--text-faint); }
@@ -762,7 +762,10 @@ body.vc-tool-dragging, body.vc-tool-dragging * { cursor: grabbing !important; }
 .vc-rich > :last-child { margin-bottom: 0; }
 .vc-rich p { margin: 0 0 0.45em; }
 .vc-rich h1, .vc-rich h2, .vc-rich h3, .vc-rich h4 { margin: 0.6em 0 0.35em; line-height: 1.25; }
-.vc-rich ul, .vc-rich ol { margin: 0.2em 0 0.45em; padding-inline-start: 1.4em; }
+.vc-rich ul, .vc-rich ol { margin: 0.2em 0 0.45em; padding-inline-start: 1.05em; }
+.vc-rich ol { padding-inline-start: 1.45em; }
+/* Nested lists (Tab) step in by one marker's width. */
+.vc-rich li > ul, .vc-rich li > ol { padding-inline-start: 1.2em; }
 .vc-rich ul ul, .vc-rich ol ol, .vc-rich ul ol, .vc-rich ol ul { margin: 0; }
 .vc-rich li > p { margin: 0; }
 .vc-rich blockquote { margin: 0.4em 0; padding-left: 0.9em; border-left: 3px solid var(--blockquote-border-color, var(--interactive-accent)); color: var(--text-muted); }
@@ -782,9 +785,12 @@ body.vc-tool-dragging, body.vc-tool-dragging * { cursor: grabbing !important; }
 
 /* tasks */
 .vc-rich li.vc-task { list-style: none; position: relative; margin-inline-start: 0; }
-.vc-rich li.vc-task > input.task-list-item-checkbox { position: absolute; left: -1.6em; top: 0.25em; width: 1em; height: 1em; margin: 0; cursor: pointer; }
+.vc-rich li.vc-task > input.task-list-item-checkbox {
+  position: absolute; left: -1.5em; top: 0.5lh; transform: translateY(-50%);
+  width: 1.1em; height: 1.1em; margin: 0; cursor: pointer;
+}
 .vc-rich li.vc-task.is-checked > .vc-task-body { color: var(--text-faint); text-decoration: line-through; }
-.vc-rich ul:has(> li.vc-task) { padding-inline-start: 1.6em; }
+.vc-rich ul:has(> li.vc-task) { padding-inline-start: 1.5em; }
 
 /* links and kept-as-is pieces */
 .vc-rich .vc-wikilink { color: var(--link-color, var(--text-accent)); cursor: pointer; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
@@ -1432,6 +1438,9 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-kind-mindmap > .vc-node-body { overflow: visible; border-radius: 0; }
 .vc-node.vc-kind-mindmap.has-topic-sel::after { display: none; }
 .vc-node.vc-kind-mindmap.is-selected:not(.has-topic-sel)::after { border-style: dashed; border-radius: 6px; }
+/* Like Boardmix: no frame around a whole mind map when it alone is selected (only in a multi-selection). */
+.vc-board:not(.has-multi-selection) .vc-node.vc-kind-mindmap.is-selected::after { display: none; }
+.vc-mm-ghost.is-detaching { outline: 2px dashed var(--vc-select); outline-offset: 3px; }
 .vc-mm-svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .vc-mm-layer, .vc-mm-overlay { position: absolute; left: 0; top: 0; width: 0; height: 0; }
 .vc-mm-topic {
@@ -1649,7 +1658,6 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-size-inputs { display: flex; align-items: center; gap: 6px; }
 .vc-size-inputs input { width: 72px; }
 .vc-size-x { color: var(--text-muted); }
-.vc-callout-title-input { flex: 1; min-width: 0; height: 24px; font: inherit; font-weight: 600; padding: 0 4px; }
 
 /* Panels that sit next to the toolbar (pen, connection): just clear of it, on its side.
    One rule per position, so a top and a bottom offset never apply together (that stretched them). */
@@ -1662,3 +1670,24 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-board[data-toolbar-pos='right'] :is(.vc-pen-picker, .vc-pen-options, .vc-edge-panel) { top: auto; bottom: 16px; }
 /* The "Drawing" banner goes to the edge away from the toolbar. */
 .vc-board[data-toolbar-pos='top'] .vc-pen-banner { top: auto; bottom: 16px; }
+
+/* picture / video description: rich text, compact */
+.vc-media-desc { white-space: normal; }
+.vc-media-desc .vc-rich-host { height: auto; overflow: visible; }
+.vc-media-desc .vc-rich { padding: 0; min-height: 1.45em; font-size: var(--font-ui-small); line-height: 1.45; color: var(--text-muted); }
+.vc-media-desc .vc-rich > :first-child { margin-top: 0; }
+.vc-media-desc .vc-rich > :last-child { margin-bottom: 0; }
+.vc-media-desc .is-editing .vc-rich { color: var(--text-normal); }
+
+/* Callout colours by type: Info takes the soft green Tip used to have; Tip is a light yellow. */
+.vc-callout[data-callout='info'] { --callout-color: var(--callout-tip, 83, 223, 221); }
+.vc-callout[data-callout='tip'] { --callout-color: 236, 196, 52; }
+
+/* Column: a distinct title row, and where a dragged card will land */
+.vc-group.vc-column { position: relative; background-image: linear-gradient(to bottom, color-mix(in srgb, var(--background-modifier-hover) 70%, transparent) 0 44px, transparent 44px); }
+.vc-group.vc-column::after { content: ''; position: absolute; left: 0; right: 0; top: 44px; border-top: 1px solid var(--background-modifier-border); pointer-events: none; }
+.vc-node.has-color .vc-group.vc-column { background-image: linear-gradient(to bottom, color-mix(in srgb, var(--vc-card-color) 16%, transparent) 0 44px, transparent 44px); }
+.vc-node.has-color .vc-group.vc-column::after { border-top-color: color-mix(in srgb, var(--vc-card-color) 45%, transparent); }
+.vc-column .vc-group-label { font-weight: 600; }
+.vc-kind-column.is-drop-target .vc-group.vc-column { border-color: var(--interactive-accent); }
+.vc-column-drop { position: absolute; left: 0; top: 0; height: 3px; border-radius: 2px; background: var(--interactive-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 25%, transparent); pointer-events: none; z-index: 20; }

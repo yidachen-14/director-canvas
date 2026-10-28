@@ -59,6 +59,8 @@ export class Board {
   readonly edgeSelection = new Set<string>();
   readonly cards = new Map<string, MountedCard>();
   tool = 'select';
+  /** Cards being dragged right now (columns leave them out of their stacking until dropped). */
+  draggingIds: Set<string> = new Set();
   editingId: string | null = null;
   /** A card just created to be typed into: its first edit joins the creation's undo step. */
   private freshCardId: string | null = null;

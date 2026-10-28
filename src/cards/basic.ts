@@ -45,8 +45,6 @@ export const groupCard: CardType = {
     let current = node;
     el.addClass('vc-group');
     const label = el.createDiv('vc-group-label');
-    // Double-click the name to rename the group right there.
-    label.addEventListener('dblclick', (e) => { e.stopPropagation(); e.preventDefault(); ctx.board.select([current.id]); ctx.board.startEditing(current.id); });
     let input: HTMLInputElement | null = null;
     const render = () => {
       applyCardColor(el.parentElement ?? el, current.color);
@@ -97,8 +95,8 @@ export const groupCard: CardType = {
 };
 
 export type BorderStyle = 'none' | 'solid' | 'dashed';
-// A dashed square with a line across: no border.
-addIcon('vc-border-none', '<rect x="14" y="14" width="72" height="72" rx="10" fill="none" stroke="currentColor" stroke-width="8" stroke-dasharray="14 12"/><line x1="8" y1="50" x2="92" y2="50" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>');
+// A dashed square struck through corner to corner: no border.
+addIcon('vc-border-none', '<rect x="14" y="14" width="72" height="72" rx="10" fill="none" stroke="currentColor" stroke-width="8" stroke-dasharray="14 12"/><line x1="88" y1="12" x2="12" y2="88" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>');
 const BORDER_ICON: Record<BorderStyle, string> = { solid: 'square', dashed: 'square-dashed', none: 'vc-border-none' };
 
 /**

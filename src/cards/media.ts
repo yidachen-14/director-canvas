@@ -4,6 +4,7 @@ import type { BarItem, CardContext, CardHandle, CardType } from './types';
 import { applyCardColor, resolveFile, vcGet } from './util';
 import { commitNode, missingFile } from './basic';
 import { t } from '../i18n';
+import { RichText } from '../richtext/editor';
 
 // ── image, video, audio ─────────────────────────────────────
 
@@ -63,7 +64,8 @@ class MediaCard implements CardHandle {
   private frame: HTMLElement;
   private desc: HTMLElement;
   private linkBar: HTMLElement;
-  private editor: HTMLTextAreaElement | null = null;
+  /** The description: rich text like the text cards, with the same formatting bar while editing. */
+  private descRich: RichText | null = null;
   private ro: ResizeObserver;
   private shownFile = '';
 
@@ -73,6 +75,25 @@ class MediaCard implements CardHandle {
     this.linkBar = el.createDiv('vc-media-link');
     this.frame = el.createDiv('vc-media-frame');
     this.desc = el.createDiv('vc-media-desc');
+    if (kind !== 'audio') {
+      this.descRich = new RichText(this.desc, {
+        app: ctx.app,
+        sourcePath: ctx.sourcePath,
+        component: ctx.component,
+        markdown: this.descText(node),
+        placeholder: t('Add a description…'),
+        bounds: () => ctx.board.root.getBoundingClientRect(),
+        onCommit: (md) => {
+          const value = md.replace(/\s+$/, '');
+          commitNode(this.ctx, this.node.id, (n) => {
+            n.vc = { ...(n.vc ?? {}) };
+            if (value) n.vc.desc = value; else delete n.vc.desc;
+          });
+        },
+        onEditEnd: () => { this.render(); this.ctx.board.editingEnded(this.node.id); },
+        onResize: () => this.fitDescription(),
+      });
+    }
     this.ro = new ResizeObserver(() => this.fitDescription());
     this.ro.observe(this.desc);
     this.ro.observe(this.linkBar);
@@ -105,15 +126,16 @@ class MediaCard implements CardHandle {
         }
       }
     }
-    if (!this.editor) {
+    const editing = !!this.descRich?.editing;
+    if (!editing) {
       const text = this.descText();
-      this.desc.setText(text);
+      this.descRich?.setMarkdown(text);
       this.desc.toggle(!!text);
     }
     this.renderLink();
     const card = this.el.closest<HTMLElement>('.vc-node');
     card?.toggleClass('has-media-frame', this.hasFrame());
-    card?.toggleClass('has-media-extras', !!this.linkText() || !!this.descText() || !!this.editor);
+    card?.toggleClass('has-media-extras', !!this.linkText() || !!this.descText() || editing);
   }
 
   private linkText(n = this.node): string { return vcGet(n, 'link', '') as string; }
@@ -215,52 +237,25 @@ class MediaCard implements CardHandle {
 
   destroy(): void {
     this.ro.disconnect();
+    this.descRich?.destroy();
     this.el.querySelectorAll('video,audio').forEach(m => (m as HTMLMediaElement).pause());
   }
 
-  /** Editing a picture means writing its description. */
-  edit(): boolean {
-    if (this.kind === 'audio') return false;
-    if (this.editor) return true;
-    this.desc.empty();
+  /** Editing a picture means writing its description (rich text, with the formatting bar). */
+  edit(at?: { clientX: number; clientY: number }): boolean {
+    if (!this.descRich) return false;
+    if (this.descRich.editing) return true;
     this.desc.show();
     this.el.closest<HTMLElement>('.vc-node')?.addClass('has-media-extras');
-    const ta = this.desc.createEl('textarea', { cls: 'vc-media-desc-input', attr: { rows: '1', placeholder: t('Add a description…') } });
-    ta.value = this.descText();
-    this.editor = ta;
-    const grow = () => { ta.style.height = 'auto'; ta.style.height = `${ta.scrollHeight}px`; };
-    ta.addEventListener('input', grow);
-    ta.addEventListener('keydown', (e) => {
-      e.stopPropagation();
-      if (e.key === 'Escape' || (e.key === 'Enter' && (e.metaKey || e.ctrlKey))) { e.preventDefault(); this.stopEditing(); }
-    });
-    ta.addEventListener('pointerdown', e => e.stopPropagation());
-    ta.addEventListener('blur', () => this.stopEditing());
-    grow();
-    ta.focus();
-    ta.setSelectionRange(ta.value.length, ta.value.length);
+    // A click on the picture itself puts the caret at the end of the description.
+    const inDesc = at && this.desc.getBoundingClientRect().top <= at.clientY;
+    this.descRich.startEditing(inDesc ? at : undefined);
     return true;
   }
 
-  isEditing(): boolean { return !!this.editor; }
+  isEditing(): boolean { return !!this.descRich?.editing; }
 
-  stopEditing(): void {
-    const ta = this.editor;
-    if (!ta) return;
-    this.editor = null;
-    const value = ta.value.replace(/\s+$/, '');
-    ta.remove();
-    const before = this.descText();
-    if (value !== before) {
-      commitNode(this.ctx, this.node.id, (n) => {
-        n.vc = { ...(n.vc ?? {}) };
-        if (value) n.vc.desc = value; else delete n.vc.desc;
-      });
-    } else {
-      this.render();
-    }
-    this.ctx.board.editingEnded(this.node.id);
-  }
+  stopEditing(): void { this.descRich?.stopEditing(); }
 
   searchText(): string { return `${this.node.file ?? ''} ${this.descText()}`; }
 

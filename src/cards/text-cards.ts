@@ -6,7 +6,7 @@ import { applyCardColor, vcGet } from './util';
 import { commitNode } from './basic';
 import { RichText } from '../richtext/editor';
 import { attachBlockHandles } from '../richtext/block-drag';
-import { alignDoc, allFromTasks, allToTasks } from '../richtext/commands';
+import { alignDoc } from '../richtext/commands';
 import type { Align } from '../richtext/schema';
 import type { TextCardKind, VisualCanvasSettings } from '../settings';
 import { t } from '../i18n';
@@ -55,6 +55,8 @@ interface Flavor {
   autoSize?: boolean;
   /** Delete the card when it is left empty. */
   dropWhenEmpty?: boolean;
+  /** No card colour (callouts take their colour from their type). */
+  noColor?: boolean;
   placeholder: string;
 }
 
@@ -86,6 +88,7 @@ function richCard(f: Flavor): CardType {
     icon: f.icon,
     defaultSize: f.defaultSize,
     sizeFor: f.sizeFor,
+    noColor: f.noColor,
     create: ({ settings }) => f.create(settings),
     mount(node, el, ctx) {
       return new RichCard(f, node, el, ctx);
@@ -107,8 +110,6 @@ class RichCard implements CardHandle {
       // Obsidian's own callout styling: .callout[data-callout=type]
       const box = el.createDiv('callout vc-callout');
       this.calloutHead = box.createDiv('callout-title');
-      // Double-click the title to rename it right on the board.
-      this.calloutHead.addEventListener('dblclick', (e) => { e.stopPropagation(); e.preventDefault(); this.editTitle(); });
       body = box.createDiv('callout-content');
     }
     this.host = body.createDiv('vc-rich-host');
@@ -188,7 +189,7 @@ class RichCard implements CardHandle {
     const card = this.el.parentElement ?? this.el;
     applyCardColor(card, n.color);
     if (this.f.id === 'text') this.host.style.fontSize = `${vcGet(n, 'fontSize', this.ctx.board.settings.defaultTextSize)}px`;
-    if (this.f.id === 'callout' && this.calloutHead && !this.titleInput) {
+    if (this.f.id === 'callout' && this.calloutHead) {
       const c = splitCallout(n.text ?? '');
       const type = vcGet(n, 'calloutType', c.type);
       const def = CALLOUT_TYPES.find(x => x.id === type) ?? CALLOUT_TYPES[0];
@@ -200,44 +201,6 @@ class RichCard implements CardHandle {
     }
   }
 
-  private titleInput: HTMLInputElement | null = null;
-
-  /** Rename a callout in place: its title becomes an input until Enter / Escape / clicking away. */
-  private editTitle(): void {
-    const head = this.calloutHead;
-    if (!head || this.titleInput) return;
-    if (this.rich.editing) this.rich.stopEditing();
-    const inner = head.querySelector<HTMLElement>('.callout-title-inner');
-    const c = splitCallout(this.node.text ?? '');
-    const input = createEl('input', { type: 'text', cls: 'vc-callout-title-input' });
-    input.value = c.title;
-    input.placeholder = inner?.textContent ?? '';
-    if (inner) inner.replaceWith(input); else head.appendChild(input);
-    this.titleInput = input;
-    let done = false;
-    const finish = (save: boolean) => {
-      if (done) return;
-      done = true;
-      this.titleInput = null;
-      const v = input.value.trim();
-      if (save && v !== c.title) {
-        commitNode(this.ctx, this.node.id, (n) => {
-          const cur = splitCallout(n.text ?? '');
-          n.text = joinCallout(vcGet(n, 'calloutType', cur.type), v, cur.body);
-        });
-      } else this.render();
-    };
-    input.addEventListener('keydown', (e) => {
-      e.stopPropagation();
-      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); finish(true); }
-      if (e.key === 'Escape') { e.preventDefault(); finish(false); }
-    });
-    input.addEventListener('blur', () => finish(true));
-    input.addEventListener('pointerdown', e => e.stopPropagation());
-    input.addEventListener('dblclick', e => e.stopPropagation());
-    window.setTimeout(() => { input.focus(); input.select(); }, 0);
-  }
-
   // ── CardHandle ────────────────────────────────────────────
 
   update(n: RawNode): void {
@@ -247,6 +210,13 @@ class RichCard implements CardHandle {
   }
 
   resized(): void { /* layout follows CSS */ }
+
+  measure(): { width: number; height: number } | undefined {
+    if (!this.f.autoSize) return undefined;
+    // The host carries the font size; make sure it has the latest one before measuring.
+    this.host.style.fontSize = `${vcGet(this.node, 'fontSize', this.ctx.board.settings.defaultTextSize)}px`;
+    return this.contentSize();
+  }
 
   destroy(): void {
     this.stopObserving?.();
@@ -305,7 +275,7 @@ class RichCard implements CardHandle {
     if (f.id === 'text') {
       const size = vcGet(this.node, 'fontSize', ctx.board.settings.defaultTextSize);
       items.push({
-        id: 'size', icon: 'a-large-small', label: t('Font size'), text: String(size),
+        id: 'size', icon: 'a-large-small', label: t('Font size'), text: String(Math.round(size)),
         dropdown: (pop, close) => {
           pop.addClass('is-list', 'is-short');
           for (const v of [12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 80, 96, 128]) {
@@ -325,10 +295,7 @@ class RichCard implements CardHandle {
         }
       },
     });
-    items.push({
-      id: 'todo', icon: 'list-checks', label: t('To-do list'), active: this.rich.allTasks(),
-      run: () => this.rich.runOnAll(this.rich.allTasks() ? allFromTasks : allToTasks),
-    });
+    // To-dos are in the text formatting bar (select some text), not here.
     return items;
   }
 
@@ -432,6 +399,7 @@ export const calloutCard = richCard({
   id: 'callout', label: 'Callout', icon: 'lightbulb', placeholder: 'Write…',
   defaultSize: { width: 340, height: 140 },
   sizeFor: s => s.calloutSize,
+  noColor: true,
   create: () => ({ type: 'text', text: '> [!tip]', vc: { kind: 'callout' } }),
 });
 

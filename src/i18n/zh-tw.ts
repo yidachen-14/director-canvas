@@ -473,7 +473,7 @@ export const ZH_TW: Record<string, string> = {
   'Add': '新增',
   'Save': '儲存',
   'Edit…': '編輯…',
-  'No border': '不顯示邊框',
+  'No border': '無邊框',
   'Insert link': '插入連結',
   'Edit link': '編輯連結',
   'Remove link': '移除連結',

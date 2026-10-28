@@ -11,6 +11,7 @@ import { descriptionHeight } from '../cards/media';
 import { DropLine, findBlockDrop, insertMarkdownAt, richAt, type Drop } from '../richtext/block-drag';
 import { t as tr } from '../i18n';
 import { placeCursor } from '../ui/cursor';
+import { COLUMN_PAD, columnDropAt } from './columns';
 
 type Zone = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 
@@ -80,6 +81,19 @@ export function attachInteractions(board: Board): void {
   };
 
   const setCursor = (c: string) => { root.style.cursor = c; };
+
+  /** The insertion line in a column while a card is dragged over it. */
+  let colLine: HTMLElement | null = null;
+  let colHot: HTMLElement | null = null;
+  const showColumnDrop = (spot: { col: RawNode; y: number } | null) => {
+    const el = spot ? board.cards.get(spot.col.id)?.el ?? null : null;
+    if (colHot !== el) { colHot?.removeClass('is-drop-target'); el?.addClass('is-drop-target'); colHot = el; }
+    if (!spot) { colLine?.remove(); colLine = null; return; }
+    colLine ??= board.overlayEl.createDiv('vc-column-drop');
+    const a = board.vp.toScreen(spot.col.x + COLUMN_PAD - 4, spot.y), b = board.vp.toScreen(spot.col.x + spot.col.width - COLUMN_PAD + 4, spot.y);
+    colLine.style.transform = `translate(${a.x}px, ${a.y - 1.5}px)`;
+    colLine.style.width = `${b.x - a.x}px`;
+  };
 
   const baseCursor = () => {
     if (spaceDown || board.tool === 'hand') return 'grab';
@@ -308,6 +322,7 @@ export function attachInteractions(board: Board): void {
           board.select(nodes.filter(n => board.selection.has(n.id)).map(n => map.get(n.id)!));
         }
         root.addClass('is-dragging');
+        board.draggingIds = new Set(moving.map(n => n.id));
       }
       const cur = board.clientToWorld(ev.clientX, ev.clientY);
       let dx = cur.x - start.x, dy = cur.y - start.y;
@@ -323,6 +338,12 @@ export function attachInteractions(board: Board): void {
         n.y = o.y + dy;
       }
       gesture.preview(moving.map(n => n.id));
+      // Over a column: show where the card will go.
+      const leadNode = moving[duplicate ? 0 : Math.max(0, nodes.indexOf(lead))] ?? moving[0];
+      const spot = leadNode && leadNode.type !== 'group'
+        ? columnDropAt(board.model.nodes, { x: leadNode.x + leadNode.width / 2, y: leadNode.y + leadNode.height / 2 }, board.draggingIds)
+        : null;
+      showColumnDrop(spot);
       if (mergeable && mergeEl) {
         const target = richAt(ev.clientX, ev.clientY, mergeEl);
         const targetCard = target?.view.dom.closest<HTMLElement>('.vc-node');
@@ -333,6 +354,9 @@ export function attachInteractions(board: Board): void {
       }
     }, () => {
       root.removeClass('is-dragging');
+      // Columns take the dropped cards in again (before the move becomes an undo step).
+      board.draggingIds = new Set();
+      showColumnDrop(null);
       dropLine?.remove();
       mergeEl?.removeClass('is-merging');
       if (mergeable && mergeDrop && gesture) {
@@ -386,7 +410,11 @@ export function attachInteractions(board: Board): void {
     });
   }
 
-  /** Text cards: dragging a size handle scales the font; the box follows the text. */
+  /**
+   * Text cards: dragging a size handle scales the font, like Visual Notes. The size follows the
+   * pointer smoothly (not rounded to whole pixels), at most once a frame, and the box is always
+   * the text's own measured size, so the frame never jumps or disagrees with the text.
+   */
   function startFontResize(e: PointerEvent, n: RawNode, zone: Zone): void {
     const id = n.id;
     if (!board.selection.has(id)) board.select([id]);
@@ -398,28 +426,41 @@ export function attachInteractions(board: Board): void {
     tip.hide();
     setCursor(ZONE_CURSOR[zone]);
     root.addClass('is-resizing');
-    track(e, 'resize', (ev) => {
+    let frame = 0;
+    let last: PointerEvent | null = null;
+    const apply = () => {
+      frame = 0;
+      const ev = last;
+      if (!ev) return;
       gesture ??= board.model.beginGesture();
       const cur = board.clientToWorld(ev.clientX, ev.clientY);
       const dx = cur.x - start.x, dy = cur.y - start.y;
-      const sx = zone.includes('e') ? (o.w + dx) / o.w : zone.includes('w') ? (o.w - dx) / o.w : 1;
-      const sy = zone.includes('s') ? (o.h + dy) / o.h : zone.includes('n') ? (o.h - dy) / o.h : 1;
-      const scale = Math.abs(sx - 1) >= Math.abs(sy - 1) ? sx : sy;
-      const size = Math.min(400, Math.max(6, Math.round(f0 * scale)));
-      const k = size / f0;
-      const w = o.w * k, h = o.h * k;
+      // Corners and side handles follow the width; top and bottom handles the height.
+      const byWidth = zone.includes('e') || zone.includes('w');
+      const ratio = byWidth
+        ? (zone.includes('e') ? o.w + dx : o.w - dx) / o.w
+        : (zone.includes('s') ? o.h + dy : o.h - dy) / o.h;
+      const size = Math.min(400, Math.max(6, Math.round(f0 * ratio * 10) / 10));
       const node = board.model.node(id);
       if (!node) return;
       node.vc = { ...(node.vc ?? {}), fontSize: size };
-      node.width = w; node.height = h;
-      node.x = zone.includes('w') ? o.x + o.w - w : o.x;
-      node.y = zone.includes('n') ? o.y + o.h - h : o.y;
+      gesture.preview([id]);
+      // The text at its new size decides the box; the opposite corner stays put.
+      const m = board.cards.get(id)?.handle.measure?.() ?? { width: o.w * size / f0, height: o.h * size / f0 };
+      node.width = m.width; node.height = m.height;
+      node.x = zone.includes('w') ? o.x + o.w - m.width : o.x;
+      node.y = zone.includes('n') ? o.y + o.h - m.height : o.y;
       gesture.preview([id]);
       const r = root.getBoundingClientRect();
       tip.show();
-      tip.setText(`${size}px`);
+      tip.setText(`${Math.round(size)}px`);
       tip.style.transform = `translate(${ev.clientX - r.left + 14}px, ${ev.clientY - r.top + 14}px)`;
+    };
+    track(e, 'resize', (ev) => {
+      last = ev;
+      if (!frame) frame = requestAnimationFrame(apply);
     }, () => {
+      if (frame) { cancelAnimationFrame(frame); apply(); }
       tip.remove();
       root.removeClass('is-resizing');
       gesture?.end();
@@ -491,7 +532,7 @@ export function attachInteractions(board: Board): void {
     if (edgeEl) { editEdgeLabel(board, edgeEl.getAttribute('data-edge-id')!); return; }
     const w = board.clientToWorld(e.clientX, e.clientY);
     const labelOf = t.closest('.vc-group-label')?.closest<HTMLElement>('.vc-node')?.dataset.id;
-    if (labelOf) { board.startEditing(labelOf); return; }
+    if (labelOf) return; // groups are renamed from their bar, not by double-clicking
     if (zoneAt(w.x, w.y)) return;
     const n = nodeAt(w.x, w.y);
     if (n) {
