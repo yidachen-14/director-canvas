@@ -1,4 +1,5 @@
 import { TFile, TFolder, type TAbstractFile } from 'obsidian';
+import { VIEW_TYPE } from './takeover';
 import type VisualCanvasPlugin from './main';
 import { parseCanvas, serializeCanvas, type CanvasFile } from './model/canvas-file';
 import { base, relinkCanvas, type Move } from './model/relink';
@@ -19,7 +20,7 @@ export function installRenameSync(plugin: VisualCanvasPlugin): void {
     if (!moves.length) return;
     const open = new Set<string>();
     // Open boards: change their model, so undo and saving work as usual.
-    for (const leaf of plugin.app.workspace.getLeavesOfType('visual-canvas')) {
+    for (const leaf of plugin.app.workspace.getLeavesOfType(VIEW_TYPE)) {
       const view = leaf.view;
       if (!(view instanceof CanvasView) || !view.board || !view.file) continue;
       open.add(view.file.path);
@@ -46,7 +47,7 @@ export function installRenameSync(plugin: VisualCanvasPlugin): void {
           return relinkCanvas(data, moves) ? serializeCanvas(data, settleSidesForSave) : current;
         });
       } catch (err) {
-        console.error('Direct Canvas: could not update links in', f.path, err);
+        console.error('Director Canvas: could not update links in', f.path, err);
       }
     }
   };

@@ -1,4 +1,5 @@
 import { setIcon, setTooltip } from 'obsidian';
+import { VIEW_TYPE } from '../takeover';
 import type { Board } from './board';
 import {
   DEFAULT_PEN_SHAPE, distanceToStroke, drawingHit, penShape, rerenderDrawings, strokeOutline, strokesOnBoard, writeDrawing,
@@ -124,7 +125,7 @@ export class PenController {
     const save = () => {
       this.board.settings.penShape = { ...penShape };
       void this.board.plugin.saveSettings();
-      for (const v of this.board.plugin.app.workspace.getLeavesOfType('visual-canvas')) {
+      for (const v of this.board.plugin.app.workspace.getLeavesOfType(VIEW_TYPE)) {
         const b = (v.view as unknown as { board?: Board }).board;
         if (b) rerenderDrawings(b.cards.values());
       }

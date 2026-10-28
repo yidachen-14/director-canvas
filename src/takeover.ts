@@ -1,7 +1,7 @@
 import { WorkspaceLeaf, type ViewState } from 'obsidian';
 
 /** View type registered by this plugin for .canvas files. */
-export const VIEW_TYPE = 'visual-canvas';
+export const VIEW_TYPE = 'director-canvas';
 /** Obsidian's own canvas view type. */
 export const NATIVE_TYPE = 'canvas';
 /** Marker in a view state asking to keep Obsidian's own canvas view. */

@@ -1,4 +1,4 @@
-# Direct Canvas
+# Director Canvas
 
 [繁體中文](#繁體中文) · [English](#english)
 
@@ -6,11 +6,11 @@
 
 ## 繁體中文
 
-Direct Canvas 是 Obsidian 的無限白板插件，直接開啟並編輯你現有的 `.canvas` 檔。內建 Canvas 隨時可以打開同一個檔案，不會損壞內容。
+Director Canvas 是 Obsidian 的無限白板插件，直接開啟並編輯你現有的 `.canvas` 檔。內建 Canvas 隨時可以打開同一個檔案，不會損壞內容。
 
 ### 特色
 
-- **原生檔案**：讀寫 Obsidian 的 JSON Canvas。Direct Canvas 額外的資料（文字格式、心智圖、媒體描述等）存在節點的 `vc` 欄位，內建 Canvas 照樣顯示基本內容。白板標題列可一鍵切換「用內建 Canvas 開啟」。
+- **原生檔案**：讀寫 Obsidian 的 JSON Canvas。Director Canvas 額外的資料（文字格式、心智圖、媒體描述等）存在節點的 `vc` 欄位，內建 Canvas 照樣顯示基本內容。白板標題列可一鍵切換「用內建 Canvas 開啟」。
 - **文字卡片**：Text、Note（完整多格式編輯：標題、清單、待辦、引用、程式碼、顏色、螢光筆、字級、對齊）、便利貼、Callout。輸入 `/` 叫出段落選單，支援 Markdown 快捷輸入；段落可以拖曳排序、拖到別張卡片或拖出白板成為新卡片。任何一行文字都能加上待辦框。
 - **媒體與其他卡片**：圖片、影片（審片播放器：封面格、標記與入出點區段加註記、逐格、倍速、循環）、音訊、筆記連結與檔案、書籤（網址預覽）、看板、欄、畫筆（壓感筆跡、螢光筆、橡皮擦）、色票、行事曆（規劃表，會顯示各卡片中帶 📅 日期的待辦）。
 - **心智圖**：仿 Boardmix。5 種佈局（向右、左右展開、組織圖、時間軸、大綱）、12 組配色、緊湊／正常／較大，以及主題的填充、邊框、外形、分支線樣式與分支顏色。Tab／Enter／Delete／方向鍵操作，可以直接打字（支援中文輸入法），拖曳改掛，可收合。
@@ -28,8 +28,8 @@ Direct Canvas 是 Obsidian 的無限白板插件，直接開啟並編輯你現�
 ### 安裝
 
 1. 從 Releases 下載 `main.js`、`manifest.json`、`styles.css`。
-2. 放進保險庫的 `.obsidian/plugins/visual-canvas/`。
-3. 在「設定 → 第三方外掛程式」啟用 Direct Canvas。
+2. 放進保險庫的 `.obsidian/plugins/director-canvas/`。
+3. 在「設定 → 第三方外掛程式」啟用 Director Canvas。
 
 只支援桌面版（匯出、附件處理需要桌面環境）。
 
@@ -56,7 +56,7 @@ Direct Canvas 是 Obsidian 的無限白板插件，直接開啟並編輯你現�
 
 ## English
 
-Direct Canvas is an infinite whiteboard for Obsidian that opens and edits your existing `.canvas` files. The core Canvas can open the same files at any time without damage.
+Director Canvas is an infinite whiteboard for Obsidian that opens and edits your existing `.canvas` files. The core Canvas can open the same files at any time without damage.
 
 ### Features
 
@@ -81,8 +81,8 @@ Direct Canvas is an infinite whiteboard for Obsidian that opens and edits your e
 ### Install
 
 1. Download `main.js`, `manifest.json` and `styles.css` from Releases.
-2. Put them in `.obsidian/plugins/visual-canvas/` in your vault.
-3. Enable Direct Canvas in Settings → Community plugins.
+2. Put them in `.obsidian/plugins/director-canvas/` in your vault.
+3. Enable Director Canvas in Settings → Community plugins.
 
 Desktop only (export and attachment handling need the desktop app).
 

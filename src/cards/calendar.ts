@@ -313,12 +313,12 @@ class CalendarCard implements CardHandle {
 
   private monthLabel(iso: string): string {
     const d = new Date(toUTC(iso));
-    return d.toLocaleDateString(getLanguage() === 'en' ? 'en' : 'zh-TW', { year: 'numeric', month: 'long', timeZone: 'UTC' });
+    return d.toLocaleDateString(getLanguage(), { year: 'numeric', month: 'long', timeZone: 'UTC' });
   }
 
   private weekLabel(iso: string): string {
     const s = weekStart(iso), e = addDays(s, 6);
-    const f = (x: string) => new Date(toUTC(x)).toLocaleDateString(getLanguage() === 'en' ? 'en' : 'zh-TW', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+    const f = (x: string) => new Date(toUTC(x)).toLocaleDateString(getLanguage(), { month: 'short', day: 'numeric', timeZone: 'UTC' });
     return `${f(s)} – ${f(e)}`;
   }
 

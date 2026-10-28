@@ -20,7 +20,7 @@ function linksIn(app: App, text: string, from: string): TFile[] {
   return out;
 }
 
-/** Every string inside a value (to find file paths in Direct Canvas data such as calendar pictures). */
+/** Every string inside a value (to find file paths in Director Canvas data such as calendar pictures). */
 function strings(v: unknown, out: string[] = []): string[] {
   if (typeof v === 'string') out.push(v);
   else if (Array.isArray(v)) for (const x of v) strings(x, out);

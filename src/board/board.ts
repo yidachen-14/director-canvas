@@ -481,7 +481,7 @@ export class Board {
 
   private unmount(c: MountedCard): void {
     if (this.editingId === c.id) this.editingId = null;
-    try { c.handle.destroy(); } catch (err) { console.error('Direct Canvas: card destroy failed', err); }
+    try { c.handle.destroy(); } catch (err) { console.error('Director Canvas: card destroy failed', err); }
     c.component.unload();
     c.el.remove();
   }

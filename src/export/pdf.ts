@@ -18,7 +18,7 @@ export async function exportPdf(board: Board, scope: Scope, opts: { page: PageSi
   const remote = electronRemote();
   const wc = remote?.getCurrentWebContents?.();
   if (wc?.printToPDF) {
-    try { return await printPdf(board, scope, opts, wc); } catch (e) { console.warn('Direct Canvas: vector PDF failed, using a picture', e); }
+    try { return await printPdf(board, scope, opts, wc); } catch (e) { console.warn('Director Canvas: vector PDF failed, using a picture', e); }
   }
   return rasterPdf(board, scope, opts);
 }

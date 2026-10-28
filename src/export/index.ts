@@ -74,7 +74,7 @@ export async function runExport(board: Board, scope: Scope, format: Format, o: O
     if (where) new Notice(t('Exported: {path}', { path: where }), 6000);
   } catch (e) {
     working.hide();
-    console.error('Direct Canvas: export failed', e);
+    console.error('Director Canvas: export failed', e);
     new Notice(t('Export failed: {msg}', { msg: e instanceof Error ? e.message : String(e) }), 8000);
   }
 }

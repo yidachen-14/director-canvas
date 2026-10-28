@@ -39,6 +39,8 @@ export class VideoPlayer {
   private lastSlow = 0;
   /** Holding J: playing backwards by seeking (browsers can't play in reverse). */
   private reverse: { from: number; t0: number; rate: number; stop: (e: KeyboardEvent) => void } | null = null;
+  /** When J was last seen held down (a missed key-up must not leave it going backwards). */
+  private lastJ = 0;
   private timeEl: HTMLElement;
   private playBtn: HTMLElement;
   private rateBtn: HTMLElement;
@@ -163,7 +165,9 @@ export class VideoPlayer {
 
     // Clicking the controls keeps the keys (Space, ←, →, I, O, M, J, K, L) with the board.
     this.ctrl.addEventListener('pointerdown', (e) => {
-      if (!(e.target as HTMLElement).closest('input, textarea')) window.setTimeout(() => this.ctx.board.root.focus({ preventScroll: true }), 0);
+      if ((e.target as HTMLElement).closest('input, textarea')) return;
+      const card = this.ctrl.parentElement;
+      window.setTimeout(() => (document.fullscreenElement === card ? card : this.ctx.board.root)?.focus({ preventScroll: true }), 0);
     });
     this.ctrl.addEventListener('dblclick', e => e.stopPropagation());
     this.renderRate();
@@ -255,13 +259,17 @@ export class VideoPlayer {
 
   /**
    * J: while playing faster than normal, each press (or a held key) slows down a step: 2×, 1.5×, 1×.
-   * Then, or when paused, it goes backwards for as long as it is held (⇧: half speed), seeking again
+   * Then, or when paused, it goes backwards at double speed for as long as it is held (⇧: normal speed), seeking again
    * as soon as each frame is shown; a tap moves back only a tenth of a second.
    */
   private pressJ(e: KeyboardEvent): void {
     const v = this.video;
     const now = performance.now();
-    if (this.reverse) return;
+    this.lastJ = now;
+    if (this.reverse) {
+      if (e.repeat) return;
+      this.stopReverse(); // a fresh press after a lost key-up starts over
+    }
     if (!v.paused && v.playbackRate > 1) {
       if (e.repeat && now - this.lastSlow < 350) return;
       this.lastSlow = now;
@@ -269,7 +277,7 @@ export class VideoPlayer {
       return;
     }
     if (e.repeat && now - this.lastSlow < 350) return;
-    this.startReverse(e.shiftKey ? 0.5 : 1);
+    this.startReverse(e.shiftKey ? 1 : 2);
   }
 
   private startReverse(rate: number): void {
@@ -286,6 +294,8 @@ export class VideoPlayer {
       const r = this.reverse;
       if (!r || !v.isConnected) return;
       const now = performance.now();
+      // Key repeats keep arriving while J is held; when they stop, so does going backwards.
+      if (now - this.lastJ > 600) { this.stopReverse(); return; }
       if (now > r.t0 && !v.seeking) {
         const target = r.from - ((now - r.t0) / 1000) * r.rate;
         if (target <= 0) { this.seek(0); this.stopReverse(); return; }
@@ -319,7 +329,10 @@ export class VideoPlayer {
     const on = !!card && document.fullscreenElement === card;
     setIcon(this.fsBtn, on ? 'minimize' : 'maximize');
     setTooltip(this.fsBtn, on ? t('Exit full screen') : t('Full screen'), { placement: 'top' });
-    if (on) this.ctx.board.root.focus({ preventScroll: true });
+    if (on && card) {
+      if (!card.hasAttribute('tabindex')) card.setAttribute('tabindex', '-1');
+      card.focus({ preventScroll: true });
+    }
     this.placeOpenPop();
   };
 
@@ -360,6 +373,12 @@ export class VideoPlayer {
     if (card) {
       if (this.ctrl.parentElement === card) return;
       card.appendChild(this.ctrl);
+      // In full screen the board (outside it) no longer gets the keys: the card takes them itself.
+      card.addEventListener('keydown', (e) => {
+        if (document.fullscreenElement !== card) return;
+        if ((e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return;
+        if (this.onKey(e)) { e.preventDefault(); e.stopPropagation(); }
+      });
       // In full screen the board must not move, zoom or edit the card underneath.
       for (const ev of ['pointerdown', 'wheel', 'dblclick'] as const) {
         card.addEventListener(ev, (e) => { if (document.fullscreenElement === card) e.stopPropagation(); });
@@ -459,7 +478,9 @@ export class VideoPlayer {
   private renderCover(): void {
     const c = this.data.cover;
     const adapter = this.ctx.app.vault.adapter;
-    const poster = c?.image ? adapter.getResourcePath(c.image) : '';
+    // A still saved by an earlier install (another plugin folder) is not used: the frame is shown instead.
+    const own = !!c?.image && c.image.startsWith(`${this.ctx.board.plugin.manifest.dir}/`);
+    const poster = own && c?.image ? adapter.getResourcePath(c.image) : '';
     if (poster) this.video.poster = poster; else this.video.removeAttribute('poster');
   }
 
@@ -586,13 +607,19 @@ export class VideoPlayer {
     area.addEventListener('blur', () => { if (this.pop === pop) save(); });
     area.addEventListener('keydown', (e) => {
       e.stopPropagation();
-      if (e.key === 'Escape' || (e.key === 'Enter' && (e.metaKey || e.ctrlKey))) { e.preventDefault(); this.closePop(); this.ctx.board.root.focus({ preventScroll: true }); }
+      if (e.key === 'Escape' || (e.key === 'Enter' && (e.metaKey || e.ctrlKey))) { e.preventDefault(); this.closePop(); this.focusKeys(); }
     });
     for (const ev of ['pointerdown', 'dblclick', 'wheel'] as const) pop.addEventListener(ev, e => e.stopPropagation());
     this.placePop(m);
     this.renderMarks();
     this.renderTime();
     window.setTimeout(() => area.focus({ preventScroll: true }), 0);
+  }
+
+  /** Give the keys back to the player: the card in full screen, else the board. */
+  private focusKeys(): void {
+    const card = this.ctrl.parentElement;
+    (document.fullscreenElement === card ? card : this.ctx.board.root)?.focus({ preventScroll: true });
   }
 
   private placeOpenPop(): void {
@@ -606,7 +633,8 @@ export class VideoPlayer {
     const pw = Math.min(280, w);
     this.pop.style.width = `${pw}px`;
     const x = (this.pct(m.in) / 100) * this.track.clientWidth + this.track.offsetLeft;
-    this.pop.style.left = `${Math.max(0, Math.min(w - pw, x - pw / 2))}px`;
+    // The note's left edge lines up with where the mark starts.
+    this.pop.style.left = `${Math.max(0, Math.min(w - pw, x))}px`;
   }
 
   private closePop(save = true): void {

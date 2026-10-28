@@ -23,7 +23,7 @@ export default class VisualCanvasPlugin extends Plugin {
     this.register(installCanvasTakeover(path => this.takesOver(path)));
     this.addSettingTab(new VisualCanvasSettingTab(this.app, this));
 
-    this.addRibbonIcon('layout-dashboard', t('New Direct Canvas board'), () => { void this.createBoard(); });
+    this.addRibbonIcon('layout-dashboard', t('New Director Canvas board'), () => { void this.createBoard(); });
 
     this.addCommand({ id: 'new-board', name: t('New board'), callback: () => { void this.createBoard(); } });
     this.addCommand({
@@ -68,7 +68,7 @@ export default class VisualCanvasPlugin extends Plugin {
     // Right-click a .canvas file: open it with the other view.
     this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
       if (!(file instanceof TFile) || file.extension !== 'canvas') return;
-      menu.addItem(i => i.setTitle(t('Open in Direct Canvas')).setIcon('layout-dashboard').setSection('open').onClick(async () => {
+      menu.addItem(i => i.setTitle(t('Open in Director Canvas')).setIcon('layout-dashboard').setSection('open').onClick(async () => {
         const leaf = this.app.workspace.getLeaf('tab');
         await leaf.setViewState({ type: VIEW_TYPE, state: { file: file.path }, active: true });
       }));
@@ -79,7 +79,7 @@ export default class VisualCanvasPlugin extends Plugin {
     }));
     this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
       if (!(file instanceof TFolder)) return;
-      menu.addItem(i => i.setTitle(t('New Direct Canvas board')).setIcon('layout-dashboard').setSection('action-primary').onClick(() => { void this.createBoard(file); }));
+      menu.addItem(i => i.setTitle(t('New Director Canvas board')).setIcon('layout-dashboard').setSection('action-primary').onClick(() => { void this.createBoard(file); }));
     }));
 
     // Boards already open in the core view switch over when the plugin loads.
@@ -96,7 +96,7 @@ export default class VisualCanvasPlugin extends Plugin {
     this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach(leaf => { void switchCanvasView(leaf, 'native'); });
   }
 
-  /** Whether a board at `path` opens with Direct Canvas. */
+  /** Whether a board at `path` opens with Director Canvas. */
   /** The board in the active view, if any. */
   activeBoard(): Board | null {
     return this.app.workspace.getActiveViewOfType(CanvasView)?.board ?? null;

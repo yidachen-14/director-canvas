@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { alignEdges, distribute, normalize, optimalArrange, pushTogether, shelfPack, stack, shuffle, type Box } from '../src/board/arrange';
+import { alignEdges, distribute, normalize, optimalArrange, pushTogether, shelfPack, stack, shuffle, tidyGrid, type Box } from '../src/board/arrange';
 
 const boxes = (): Box[] => [
   { id: 'a', x: 0, y: 0, w: 100, h: 100 },
@@ -52,9 +52,26 @@ describe('arrange', () => {
     expect(p.get('a')!.x).toBe(390);
   });
 
-  it('stack puts everything on one spot', () => {
+  it('stack fans the cards out like a hand of cards', () => {
     const p = stack(boxes());
-    expect(new Set([...p.values()].map(v => `${v.x},${v.y}`)).size).toBe(1);
+    const pts = [...p.values()];
+    expect(new Set(pts.map(v => `${v.x},${v.y}`)).size).toBe(pts.length);
+    for (let i = 1; i < pts.length; i++) {
+      expect(pts[i].x - pts[i - 1].x).toBeGreaterThan(0);
+      expect(pts[i].x - pts[i - 1].x).toBe(pts[i].y - pts[i - 1].y);
+    }
+  });
+
+  it('tidy keeps rows and columns and snaps them to a grid', () => {
+    const items: Box[] = [
+      { id: 'a', x: 0, y: 0, w: 100, h: 80 }, { id: 'b', x: 130, y: 12, w: 100, h: 60 },
+      { id: 'c', x: 8, y: 120, w: 90, h: 80 }, { id: 'd', x: 140, y: 110, w: 120, h: 80 },
+    ];
+    const p = tidyGrid(items, 20);
+    expect(p.get('a')).toEqual({ x: 0, y: 0 });
+    expect(p.get('b')).toEqual({ x: 120, y: 0 });
+    expect(p.get('c')).toEqual({ x: 0, y: 100 });
+    expect(p.get('d')).toEqual({ x: 120, y: 100 });
   });
 
   it('same height keeps proportions', () => {

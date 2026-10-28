@@ -6,6 +6,7 @@ import { commitNode, missingFile } from './basic';
 import { t } from '../i18n';
 import { RichText } from '../richtext/editor';
 import { VideoPlayer } from './video-player';
+import { MediaInfoModal } from './media-info';
 
 // ── image, video, audio ─────────────────────────────────────
 
@@ -222,6 +223,29 @@ class MediaCard implements CardHandle {
     m.quiet(() => { n.height = want; m.touch(n.id); });
   }
 
+  /** The picture's or video's own pixel size (null until it has loaded). */
+  private natural(): { width: number; height: number; duration?: number } | null {
+    const img = this.frame.querySelector('img');
+    if (img?.naturalWidth) return { width: img.naturalWidth, height: img.naturalHeight };
+    const v = this.frame.querySelector('video');
+    if (v?.videoWidth) return { width: v.videoWidth, height: v.videoHeight, duration: Number.isFinite(v.duration) ? v.duration : undefined };
+    return null;
+  }
+
+  /** The card at the media's own size (plus its link bar and description). */
+  originalSize(): { width: number; height: number } | null {
+    const nat = this.natural();
+    if (!nat) return null;
+    const extra = Number(this.ctx.board.model.node(this.node.id)?.vc?.descH) || 0;
+    return { width: nat.width, height: nat.height + extra };
+  }
+
+  private showInfo(): void {
+    const file = resolveFile(this.ctx.app, this.node);
+    if (!file || this.kind === 'audio') return;
+    new MediaInfoModal(this.ctx.app, file, this.kind, this.natural()).open();
+  }
+
   update(n: RawNode): void {
     this.node = n;
     this.render();
@@ -278,7 +302,9 @@ class MediaCard implements CardHandle {
     items.push({ id: '@sep', icon: '', label: '' });
     const on = this.hasFrame();
     items.push({ id: 'frame', icon: 'square', label: t(on ? 'Hide the frame' : 'Show a frame'), active: on, run: () => this.setFrame(!on) });
-    items.push({ id: '@color', icon: '', label: '' }, { id: '@size', icon: '', label: '' }, { id: '@layer', icon: '', label: '' }, { id: '@sep', icon: '', label: '' });
+    items.push({ id: '@color', icon: '', label: '' }, { id: '@size', icon: '', label: '' }, { id: '@layer', icon: '', label: '' });
+    if (file) items.push({ id: 'info', icon: 'info', label: t('Information'), run: () => this.showInfo() });
+    items.push({ id: '@sep', icon: '', label: '' });
     return items;
   }
 
@@ -297,6 +323,7 @@ class MediaCard implements CardHandle {
       if (player.hasCover()) menu.addItem(i => i.setTitle(t('Remove cover')).setIcon('image-off').setSection('edit').onClick(() => player.removeCover()));
     }
     const file = resolveFile(this.ctx.app, this.node);
+    if (file) menu.addItem(i => i.setTitle(t('Information')).setIcon('info').setSection('edit').onClick(() => this.showInfo()));
     if (file) {
       menu.addItem(i => i.setTitle(t('Open file')).setIcon('external-link').setSection('open')
         .onClick(() => void this.ctx.app.workspace.getLeaf('tab').openFile(file)));

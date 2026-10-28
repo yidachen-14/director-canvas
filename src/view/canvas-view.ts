@@ -9,6 +9,7 @@ import { installColumns } from '../board/columns';
 import { attachClipboard } from '../board/clipboard';
 import { attachContextMenu } from '../board/menus';
 import { attachCorner, attachToolbar } from '../board/ui';
+import { SpacingHandles } from '../board/spacing';
 import { ContextBar } from '../board/context-bar';
 import { t } from '../i18n';
 import { installShortcuts } from '../board/shortcuts';
@@ -27,7 +28,7 @@ export class CanvasView extends TextFileView {
   }
 
   getViewType(): string { return VIEW_TYPE; }
-  getDisplayText(): string { return this.file?.basename ?? 'Direct Canvas'; }
+  getDisplayText(): string { return this.file?.basename ?? 'Director Canvas'; }
   getIcon(): string { return 'layout-dashboard'; }
 
   async onOpen(): Promise<void> {
@@ -41,6 +42,7 @@ export class CanvasView extends TextFileView {
     attachToolbar(board);
     attachCorner(board);
     new ContextBar(board);
+    new SpacingHandles(board);
     this.savedPill = this.contentEl.createDiv({ cls: 'vc-saved-pill', text: t('Saved') });
     this.addAction('layout-grid', t('Open in core Canvas'), () => { void switchCanvasView(this.leaf, 'native'); });
     this.setupTitleRename();
@@ -64,7 +66,7 @@ export class CanvasView extends TextFileView {
   async onClose(): Promise<void> {
     if (this.board && this.file) {
       this.board.stopEditing();
-      try { await this.save(); } catch (err) { console.error('Direct Canvas: save on close failed', err); }
+      try { await this.save(); } catch (err) { console.error('Director Canvas: save on close failed', err); }
     }
     this.board?.destroy();
     this.board = null;

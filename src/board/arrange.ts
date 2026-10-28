@@ -87,12 +87,63 @@ export function pushTogether(items: Box[], dir: Direction, gap: number): Placeme
   return placement;
 }
 
-/** All boxes on one spot (top-left of the first), in their layer order. */
+/**
+ * A pile like a hand of cards: each box a little further right and down than the one below,
+ * so every edge stays visible. Layer order is kept (the first is at the bottom).
+ */
 export function stack(items: Box[]): Placement {
   const placement: Placement = new Map();
   if (!items.length) return placement;
   const x = Math.min(...items.map(i => i.x)), y = Math.min(...items.map(i => i.y));
-  for (const it of items) placement.set(it.id, { x, y });
+  const small = Math.min(...items.map(i => Math.min(i.w, i.h)));
+  const step = Math.round(Math.max(12, Math.min(32, small * 0.08)));
+  items.forEach((it, i) => placement.set(it.id, { x: x + i * step, y: y + i * step }));
+  return placement;
+}
+
+/** Group boxes into bands along one axis: a box joins a band when its centre falls inside it. */
+function bands(items: Box[], axis: 'x' | 'y'): Box[][] {
+  const pos = (b: Box) => (axis === 'x' ? b.x : b.y);
+  const len = (b: Box) => (axis === 'x' ? b.w : b.h);
+  const sorted = [...items].sort((a, b) => pos(a) + len(a) / 2 - (pos(b) + len(b) / 2));
+  const out: Box[][] = [];
+  let end = -Infinity;
+  for (const b of sorted) {
+    const c = pos(b) + len(b) / 2;
+    if (out.length && c <= end) { out[out.length - 1].push(b); end = Math.max(end, pos(b) + len(b)); }
+    else { out.push([b]); end = pos(b) + len(b); }
+  }
+  return out;
+}
+
+/**
+ * Tidy up without changing the order: boxes keep their rows and columns as roughly placed,
+ * and snap into a neat grid (each column as wide as its widest box, each row as tall as its tallest).
+ */
+export function tidyGrid(items: Box[], gap: number): Placement {
+  const placement: Placement = new Map();
+  if (items.length < 2) return placement;
+  const rows = bands(items, 'y');
+  const colOf = new Map<string, number>();
+  bands(items, 'x').forEach((col, i) => { for (const b of col) colOf.set(b.id, i); });
+  // Within a row, a box never shares a column with the box left of it.
+  const cell = new Map<string, { r: number; c: number }>();
+  rows.forEach((row, r) => {
+    let prev = -1;
+    for (const b of [...row].sort((a, b2) => a.x - b2.x)) {
+      const c = Math.max(colOf.get(b.id) ?? 0, prev + 1);
+      cell.set(b.id, { r, c });
+      prev = c;
+    }
+  });
+  const cols = Math.max(...[...cell.values()].map(v => v.c)) + 1;
+  const colW = new Array<number>(cols).fill(0), rowH = new Array<number>(rows.length).fill(0);
+  for (const b of items) { const { r, c } = cell.get(b.id)!; colW[c] = Math.max(colW[c], b.w); rowH[r] = Math.max(rowH[r], b.h); }
+  const colX: number[] = [], rowY: number[] = [];
+  let x = Math.min(...items.map(b => b.x)), y = Math.min(...items.map(b => b.y));
+  for (let c = 0; c < cols; c++) { colX.push(x); x += colW[c] + (colW[c] ? gap : 0); }
+  for (let r = 0; r < rows.length; r++) { rowY.push(y); y += rowH[r] + gap; }
+  for (const b of items) { const { r, c } = cell.get(b.id)!; placement.set(b.id, { x: colX[c], y: rowY[r] }); }
   return placement;
 }
 

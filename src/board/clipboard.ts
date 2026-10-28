@@ -11,7 +11,7 @@ import { richRegistry, type RichText } from '../richtext/editor';
 import { DRAG_OUT_DISTANCE, distanceToRect } from '../richtext/block-drag';
 import { textCardData, textCardSize } from '../cards/text-cards';
 
-const MARK = 'visual-canvas';
+const MARK = 'director-canvas';
 
 interface ClipPayload { [MARK]?: number; nodes: RawNode[]; edges: RawEdge[]; }
 
@@ -162,7 +162,7 @@ export async function addFiles(board: Board, files: File[], at: Point): Promise<
     try {
       saved.push(await saveAttachment(board.app, await f.arrayBuffer(), f.name || 'pasted', board.sourcePath));
     } catch (err) {
-      console.error('Direct Canvas: could not save', f.name, err);
+      console.error('Director Canvas: could not save', f.name, err);
       new Notice(t('Could not add "{name}".', { name: f.name }));
     }
   }

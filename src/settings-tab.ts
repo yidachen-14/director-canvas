@@ -2,7 +2,7 @@ import { App, ColorComponent, PluginSettingTab, Setting, setIcon } from 'obsidia
 import type VisualCanvasPlugin from './main';
 import { DEFAULT_SETTINGS, type TextCardKind, type ToolbarPosition, type ToolbarSize } from './settings';
 import { availableTools, FIXED_TOOLS } from './board/tools';
-import { setLanguage, t, type Language } from './i18n';
+import { LANGUAGE_OPTIONS, setLanguage, t, type LanguageSetting } from './i18n';
 import { ShortcutsModal } from './shortcuts-modal';
 import { FolderPickModal } from './folder-picker';
 
@@ -28,11 +28,11 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
     new Setting(el)
       .setName(t('Language'))
       .addDropdown(d => d
-        .addOption('zh-TW', '繁體中文')
-        .addOption('en', 'English')
+        .addOption('auto', t('Same as Obsidian'))
+        .addOptions(LANGUAGE_OPTIONS)
         .setValue(s.language)
         .onChange(async (v) => {
-          s.language = v as Language;
+          s.language = v as LanguageSetting;
           setLanguage(s.language);
           await this.save();
           this.plugin.remountBoards();
@@ -40,12 +40,12 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
         }));
 
     new Setting(el)
-      .setName(t('Open .canvas files with Direct Canvas'))
+      .setName(t('Open .canvas files with Director Canvas'))
       .setDesc(t('Boards open here instead of the core Canvas. You can always switch a board back from its header.'))
       .addToggle(tg => tg.setValue(s.openCanvasByDefault).onChange(async (v) => { s.openCanvasByDefault = v; await this.save(false); }));
     const folders = new Setting(el)
       .setName(t('Only in these folders'))
-      .setDesc(t('Boards in these folders (and the folders inside them) open with Direct Canvas. None chosen: every board.'));
+      .setDesc(t('Boards in these folders (and the folders inside them) open with Director Canvas. None chosen: every board.'));
     const chips = folders.descEl.createDiv('vc-folder-chips');
     const paintChips = () => {
       chips.empty();

@@ -84,7 +84,7 @@ function distance(a: string, b: string): number {
 }
 
 export function colorList(lang: string): NamedColor[] {
-  return lang === 'en' ? EN_COLORS : ZH_COLORS;
+  return lang.startsWith('zh') ? ZH_COLORS : EN_COLORS;
 }
 
 export function nearestColorName(hex: string, lang: string): string {

@@ -1,8 +1,8 @@
 {
-  "name": "visual-canvas",
-  "version": "1.0.3",
+  "name": "director-canvas",
+  "version": "1.0.0",
   "private": true,
-  "description": "Direct Canvas: an infinite whiteboard for Obsidian that reads and writes native .canvas files.",
+  "description": "Director Canvas: an infinite whiteboard for Obsidian that reads and writes native .canvas files.",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc --noEmit -skipLibCheck && node esbuild.config.mjs production",

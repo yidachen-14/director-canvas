@@ -432,6 +432,17 @@ export class ContextBar {
       input.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { apply(which); input.select(); } });
       input.addEventListener('change', () => apply(which));
       input.addEventListener('pointerdown', e => e.stopPropagation());
+    }    // Pictures and videos: back to their own pixel size.
+    const handle = nodes.length === 1 ? b.cards.get(nodes[0].id)?.handle : undefined;
+    const orig = handle?.originalSize?.();
+    if (orig) {
+      const btn = pop.createEl('button', { cls: 'vc-ctx-size-orig', text: `${t('Original size')} · ${orig.width} × ${orig.height}` });
+      btn.addEventListener('click', () => {
+        const n = nodes[0];
+        b.model.transact(() => { n.width = orig.width; n.height = orig.height; b.model.touch(n.id); });
+        w.value = String(orig.width);
+        h.value = String(orig.height);
+      });
     }
   }
 

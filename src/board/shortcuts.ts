@@ -26,7 +26,7 @@ export const SHORTCUT_GROUPS: { id: Shortcut['group']; label: string }[] = [
 ];
 
 const ARRANGE_DEFAULTS: Record<string, string> = {
-  optimal: 'Mod+Alt+P', 'by-name': 'Mod+Alt+N', 'by-added': 'Mod+Alt+A', 'by-path': 'Mod+Alt+D', random: 'Mod+Alt+R', stack: 'Mod+Alt+S',
+  optimal: 'Mod+Alt+P', tidy: 'Mod+Alt+T', 'by-name': 'Mod+Alt+N', 'by-added': 'Mod+Alt+A', 'by-path': 'Mod+Alt+D', random: 'Mod+Alt+R', stack: 'Mod+Alt+S',
   'push-left': 'Mod+ArrowLeft', 'push-right': 'Mod+ArrowRight', 'push-up': 'Mod+ArrowUp', 'push-down': 'Mod+ArrowDown',
   'same-height': 'Mod+Alt+ArrowLeft', 'same-width': 'Mod+Alt+ArrowRight', 'same-size': 'Mod+Alt+ArrowUp',
   row: 'Mod+Alt+Shift+ArrowRight', column: 'Mod+Alt+Shift+ArrowDown',

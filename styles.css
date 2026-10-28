@@ -1,4 +1,4 @@
-/* ── Direct Canvas ─────────────────────────────────────────────── */
+/* ── Director Canvas ─────────────────────────────────────────────── */
 
 .vc-view {
   padding: 0 !important;
@@ -1826,3 +1826,23 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 .vc-node.vc-kind-video:fullscreen .vc-vt-head { top: 13px; width: 14px; height: 14px; margin-left: -7px; }
 .vc-node.vc-kind-video:fullscreen .vc-vc-btn svg { width: 20px; height: 20px; }
 .vc-node.vc-kind-video:fullscreen .vc-vc-time, .vc-node.vc-kind-video:fullscreen .vc-vc-rate { font-size: 14px; }
+.vc-ctx-size-orig { width: 100%; margin-top: 8px; font-size: 12px; }
+.vc-info { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: var(--font-ui-small); user-select: text; }
+.vc-info-section { grid-column: 1 / -1; margin-top: 10px; font-weight: 600; color: var(--text-normal); border-bottom: 1px solid var(--background-modifier-border); padding-bottom: 4px; }
+.vc-info-section:first-child { margin-top: 0; }
+.vc-info-label { color: var(--text-muted); }
+.vc-info-value { font-variant-numeric: tabular-nums; word-break: break-all; }
+.vc-info-note { margin-top: 12px; font-size: 12px; color: var(--text-faint); }
+/* Spacing marks between lined-up selected cards (Boardmix). */
+.vc-ui > .vc-spacing { position: absolute; inset: 0; pointer-events: none; }
+.vc-spacing-handle { position: absolute; left: 0; top: 0; width: 18px; height: 18px; margin: -9px 0 0 -9px; pointer-events: auto; display: flex; align-items: center; justify-content: center; }
+.vc-spacing-handle::before { content: ''; background: #e0407b; border-radius: 1px; }
+.vc-spacing-handle.is-h { cursor: ew-resize; }
+.vc-spacing-handle.is-v { cursor: ns-resize; }
+.vc-spacing-handle.is-h::before { width: 2px; height: 14px; }
+.vc-spacing-handle.is-v::before { width: 14px; height: 2px; }
+.vc-spacing-label {
+  position: absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%); display: none;
+  padding: 1px 6px; border-radius: 4px; background: #e0407b; color: #fff; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.vc-spacing-handle:hover .vc-spacing-label, .vc-spacing-handle.is-active .vc-spacing-label { display: block; }

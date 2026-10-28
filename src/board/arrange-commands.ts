@@ -3,13 +3,13 @@ import type { Board } from './board';
 import type { RawNode } from '../model/canvas-file';
 import { cardKindOf } from '../cards/util';
 import {
-  alignEdges, distribute, spaceEvenly, normalize, optimalArrange, packToAspect, pushTogether, shuffle, stack,
+  alignEdges, distribute, spaceEvenly, normalize, optimalArrange, packToAspect, pushTogether, shuffle, stack, tidyGrid,
   type AlignEdge, type Box, type Direction, type Normalize, type Placement,
 } from './arrange';
 import { t } from '../i18n';
 
 export type ArrangeCommand =
-  | 'optimal' | 'by-name' | 'by-added' | 'by-path' | 'random'
+  | 'optimal' | 'tidy' | 'by-name' | 'by-added' | 'by-path' | 'random'
   | 'push-left' | 'push-right' | 'push-up' | 'push-down'
   | 'stack'
   | 'same-height' | 'same-width' | 'same-size' | 'same-area'
@@ -21,6 +21,7 @@ export interface ArrangeDef { id: ArrangeCommand; label: string; icon: string; g
 /** Every command, with its label, icon and default keys (shown in menus). */
 export const ARRANGE: ArrangeDef[] = [
   { id: 'optimal', label: 'Optimal arrangement', icon: 'layout-grid', group: 'arrange', keys: '⌥⌘P' },
+  { id: 'tidy', label: 'Tidy up, keeping positions', icon: 'grid-3x3', group: 'arrange', keys: '⌥⌘T' },
   { id: 'by-name', label: 'Arrange by name', icon: 'a-large-small', group: 'arrange', keys: '⌥⌘N' },
   { id: 'by-added', label: 'Arrange by order added', icon: 'list-ordered', group: 'arrange', keys: '⌥⌘A' },
   { id: 'by-path', label: 'Arrange by folder', icon: 'folder-tree', group: 'arrange', keys: '⌥⌘D' },
@@ -108,7 +109,8 @@ export function runArrange(board: Board, cmd: ArrangeCommand): void {
     case 'by-added': placement = packToAspect(ordered((a, b) => index.get(a.id)! - index.get(b.id)!), aspect, gap, origin); break;
     case 'by-path': placement = packToAspect(ordered((a, b) => collator.compare(folderOf(a), folderOf(b)) || collator.compare(nameOf(a), nameOf(b))), aspect, gap, origin); break;
     case 'random': placement = packToAspect(shuffle(boxes), aspect, gap, origin); break;
-    case 'stack': placement = stack(boxes); break;
+    case 'tidy': placement = tidyGrid(boxes, gap); break;
+    case 'stack': placement = stack([...boxes].sort((a, b) => index.get(a.id)! - index.get(b.id)!)); break;
     case 'push-left': case 'push-right': case 'push-up': case 'push-down':
       placement = pushTogether(boxes, cmd.slice(5) as Direction, gap); break;
     case 'same-height': case 'same-width': case 'same-size': case 'same-area':

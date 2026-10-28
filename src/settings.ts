@@ -1,13 +1,13 @@
-import type { Language } from './i18n';
+import { isLanguageSetting, type LanguageSetting } from './i18n';
 
 export type ToolbarSize = 'S' | 'M' | 'L';
 export type ToolbarPosition = 'top' | 'bottom' | 'left' | 'right';
 export type TextCardKind = 'text' | 'note' | 'sticky' | 'callout';
 
 export interface VisualCanvasSettings {
-  language: Language;
+  language: LanguageSetting;
   openCanvasByDefault: boolean;
-  /** Only boards inside these folders open with Direct Canvas; empty = every board. */
+  /** Only boards inside these folders open with Director Canvas; empty = every board. */
   takeoverFolders: string[];
 
   toolbarPosition: ToolbarPosition;
@@ -63,7 +63,7 @@ export interface VisualCanvasSettings {
 export const SETTINGS_VERSION = 3;
 
 export const DEFAULT_SETTINGS: VisualCanvasSettings = {
-  language: 'zh-TW',
+  language: 'auto',
   openCanvasByDefault: true,
   takeoverFolders: [],
 
@@ -122,7 +122,7 @@ export function normalizeSettings(raw: unknown): VisualCanvasSettings {
     if (Array.isArray(def)) { if (Array.isArray(val) && val.every(v => typeof v === 'string')) (s as unknown as Record<string, unknown>)[key] = [...val]; }
     else if (typeof val === typeof def) (s as unknown as Record<string, unknown>)[key] = val;
   }
-  if (!['zh-TW', 'en'].includes(s.language)) s.language = 'zh-TW';
+  if (!isLanguageSetting(s.language)) s.language = 'auto';
   if (!['L', 'M', 'S'].includes(s.toolbarSize)) s.toolbarSize = 'S';
   if (!['top', 'bottom', 'left', 'right'].includes(s.toolbarPosition)) s.toolbarPosition = 'top';
   // Version 2: the toolbar moved to the top at size S; Select and Hand are fixed, not listed.

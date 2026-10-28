@@ -2,9 +2,9 @@
  * Reading and writing the JSON Canvas files Obsidian uses (.canvas).
  *
  * Every key this plugin does not understand is kept as-is, on the file, on
- * each node and on each edge, so a board round-trips through Direct Canvas
+ * each node and on each edge, so a board round-trips through Director Canvas
  * without losing what the core Canvas or other plugins stored there.
- * Data only Direct Canvas understands lives under one extra key per node
+ * Data only Director Canvas understands lives under one extra key per node
  * (`vc`) and one at the top level (`vc`).
  */
 
@@ -25,7 +25,7 @@ export interface RawNode {
   label?: string;
   background?: string;
   backgroundStyle?: string;
-  /** Direct Canvas data: card kind, formatting, mind map tree, etc. */
+  /** Director Canvas data: card kind, formatting, mind map tree, etc. */
   vc?: Record<string, unknown>;
   [key: string]: unknown;
 }
