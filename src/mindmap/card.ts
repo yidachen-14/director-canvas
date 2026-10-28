@@ -1,6 +1,6 @@
 import type { Menu } from 'obsidian';
 import type { RawNode } from '../model/canvas-file';
-import type { BarItem, CardContext, CardHandle, CardType } from '../cards/types';
+import type { BarItem, CardContext, CardHandle, CardType, MapDrop } from '../cards/types';
 import { commitNode } from '../cards/basic';
 import { t } from '../i18n';
 import {
@@ -223,29 +223,62 @@ export class MindMapCard implements CardHandle, MindMapControl {
 
   // ── joining maps ─────────────────────────────────────────
 
-  dropTargetAt(wx: number, wy: number): string | null {
+  dropTargetAt(wx: number, wy: number): MapDrop | null {
     const x = wx - this.node.x - this.shift.x, y = wy - this.node.y - this.shift.y;
-    const m = 14;
-    let best: string | null = null, dist = Infinity;
-    for (const [id, p] of this.placed) {
-      if (x < p.x - m || x > p.x + p.w + m || y < p.y - m || y > p.y + p.h + m) continue;
-      const dd = Math.hypot(x - (p.x + p.w / 2), y - (p.y + p.h / 2));
-      if (dd < dist) { dist = dd; best = id; }
-    }
-    return best;
+    const spot = this.dropAt(x, y, '');
+    return spot ? { topic: spot.target, mode: spot.mode, side: spot.side } : null;
   }
 
-  markDropTarget(id: string | null): void {
-    for (const [tid, el] of this.topicEls) el.toggleClass('is-drop-target', tid === id);
-    // Where the joining topic will go: the slot for a new subtopic, as inside a map.
-    const p = id ? this.placed.get(id) : undefined;
-    if (!p) { this.joinHint?.remove(); this.joinHint = null; return; }
-    if (!this.joinHint?.isConnected) this.joinHint = this.overlay.createDiv('vc-mm-drop is-child');
-    this.joinHint.show();
-    const g = this.childSlot(p);
-    this.joinHint.style.transform = `translate(${g.x}px, ${g.y}px)`;
-    this.joinHint.style.width = '60px';
-    this.joinHint.style.height = '22px';
+  markDropTarget(spot: MapDrop | null): void {
+    // Above the dragged map while it hovers, so the insertion mark shows.
+    this.body.closest<HTMLElement>('.vc-node')?.toggleClass('is-join-target', !!spot);
+    if (!spot) { this.joinHint?.remove(); this.joinHint = null; for (const el of this.topicEls.values()) el.removeClass('is-drop-target'); return; }
+    if (!this.joinHint?.isConnected) this.joinHint = this.overlay.createDiv('vc-mm-drop');
+    this.placeHint(this.joinHint, { target: spot.topic, mode: spot.mode, side: spot.side });
+  }
+
+  /**
+   * Show where a dropped topic goes: a dashed slot beside the topic it joins, or one line
+   * halfway between the two siblings it lands between.
+   */
+  private placeHint(hint: HTMLElement, drop: { target: string; mode: DropMode; side?: 'left' | 'right' }): void {
+    for (const [tid, el] of this.topicEls) el.toggleClass('is-drop-target', drop.mode === 'child' && tid === drop.target);
+    const p = this.placed.get(drop.target);
+    if (!p) { hint.hide(); return; }
+    const hs = hint.style;
+    hint.show();
+    hint.toggleClass('is-child', drop.mode === 'child');
+    if (drop.mode === 'child') {
+      const g = this.childSlot(p, drop.side);
+      hs.transform = `translate(${g.x}px, ${g.y}px)`;
+      hs.width = '60px'; hs.height = '22px';
+      return;
+    }
+    const horizontal = this.data.layout === 'down' || (this.data.layout === 'timeline' && p.depth === 1);
+    // The neighbour on the other side of the gap (same parent, same side of the root).
+    const f = findIn(this.data, drop.target);
+    let other: Placed | undefined;
+    if (f?.parent) {
+      const sibs = f.parent.children
+        .map(c => ({ c, q: this.placed.get(c.id) }))
+        .filter((o): o is { c: MMTopic; q: Placed } => !!o.q && o.q.side === p.side)
+        .sort((u, v) => (horizontal ? u.q.x - v.q.x : u.q.y - v.q.y));
+      const i = sibs.findIndex(o => o.c.id === drop.target);
+      other = sibs[drop.mode === 'before' ? i - 1 : i + 1]?.q;
+    }
+    const sx = this.shift.x, sy = this.shift.y;
+    if (horizontal) {
+      const edge = drop.mode === 'before' ? p.x : p.x + p.w;
+      const mid = other ? (drop.mode === 'before' ? (other.x + other.w + p.x) / 2 : (p.x + p.w + other.x) / 2) : edge + (drop.mode === 'before' ? -5 : 5);
+      hs.transform = `translate(${mid - 1.5 + sx}px, ${p.y + sy}px)`;
+      hs.width = '3px'; hs.height = `${p.h}px`;
+    } else {
+      const mid = other ? (drop.mode === 'before' ? (other.y + other.h + p.y) / 2 : (p.y + p.h + other.y) / 2) : (drop.mode === 'before' ? p.y - 5 : p.y + p.h + 5);
+      const x0 = other ? Math.min(p.x, other.x) : p.x;
+      const w = other ? Math.max(p.x + p.w, other.x + other.w) - x0 : p.w;
+      hs.transform = `translate(${x0 + sx}px, ${mid - 1.5 + sy}px)`;
+      hs.width = `${w}px`; hs.height = '3px';
+    }
   }
 
   /** Top-left (overlay coordinates) of the slot a new subtopic of a placed topic takes. */
@@ -261,34 +294,41 @@ export class MindMapCard implements CardHandle, MindMapControl {
   }
 
   /** Another map (a floating topic and what hangs under it) becomes a subtopic of `topicId`. */
-  adoptMap(topicId: string, mm: unknown, text: string): void {
+  adoptMap(spot: MapDrop, mm: unknown, text: string): void {
     const other = normalizeData(mm, text);
     this.markDropTarget(null);
     this.apply(d => {
-      const f = findIn(d, topicId);
+      const f = findIn(d, spot.topic);
       if (!f) return;
       const root = other.root;
       delete root.side;
-      f.topic.collapsed = false;
-      if (f.topic === d.root && d.layout === 'both') {
-        const right = d.root.children.filter(c => (c.side ?? 'right') === 'right').length;
-        root.side = right <= d.root.children.length - right ? 'right' : 'left';
+      if (spot.mode !== 'child' && f.parent) {
+        // Between siblings, like a topic moved inside the map.
+        const at = f.parent.children.indexOf(f.topic);
+        f.parent.children.splice(spot.mode === 'before' ? at : at + 1, 0, root);
+        if (f.parent === d.root) root.side = f.topic.side;
+      } else {
+        f.topic.collapsed = false;
+        if (f.topic === d.root && d.layout === 'both') {
+          const right = d.root.children.filter(c => (c.side ?? 'right') === 'right').length;
+          root.side = spot.side ?? (right <= d.root.children.length - right ? 'right' : 'left');
+        } else if (f.topic === d.root && spot.side === 'left' && d.layout !== 'right') root.side = 'left';
+        f.topic.children.push(root);
       }
-      f.topic.children.push(root);
       if (other.summaries?.length) d.summaries = [...(d.summaries ?? []), ...other.summaries];
       if (other.boundaries?.length) d.boundaries = [...(d.boundaries ?? []), ...other.boundaries];
     });
   }
 
   /** Another mind map's topic under a screen point (a topic dragged out of this map can join it). */
-  private otherMapAt(clientX: number, clientY: number): { id: string; topic: string } | null {
+  private otherMapAt(clientX: number, clientY: number): { id: string; spot: MapDrop } | null {
     const b = this.ctx.board;
     const w = b.clientToWorld(clientX, clientY);
     for (let i = b.model.nodes.length - 1; i >= 0; i--) {
       const n = b.model.nodes[i];
       if (n.id === this.node.id || n.vc?.kind !== 'mindmap') continue;
-      const topic = b.cards.get(n.id)?.handle.dropTargetAt?.(w.x, w.y);
-      if (topic) return { id: n.id, topic };
+      const spot = b.cards.get(n.id)?.handle.dropTargetAt?.(w.x, w.y);
+      if (spot) return { id: n.id, spot };
     }
     return null;
   }
@@ -445,8 +485,9 @@ export class MindMapCard implements CardHandle, MindMapControl {
   }
 
   barAvoid(): { x: number; y: number; width: number; height: number }[] {
-    // A selected topic or boundary: the bar keeps clear of every topic (and boundary title).
-    if (!this.sel.size && !this.bndSel) return [];
+    // A selected boundary: the bar keeps clear of every topic. A selected topic's bar simply
+    // sits above it (Boardmix), even over other topics.
+    if (!this.bndSel) return [];
     const out: { x: number; y: number; width: number; height: number }[] = [];
     for (const q of this.extras.boundaries) {
       if (q.label && q.id !== this.bndSel) out.push({ x: this.node.x + this.shift.x + q.x, y: this.node.y + this.shift.y + q.y - 24, width: q.w, height: 24 });
@@ -691,6 +732,8 @@ export class MindMapCard implements CardHandle, MindMapControl {
       const s = el.style;
       s.fontSize = `${st.fontSize}px`;
       s.fontWeight = st.bold ? '600' : '';
+      s.fontStyle = st.italic ? 'italic' : '';
+      s.textDecoration = [st.underline ? 'underline' : '', st.strike ? 'line-through' : ''].filter(Boolean).join(' ');
       s.color = st.text;
       const pad = st.shape === 'underline'
         ? `${Math.round(3 * scale)}px ${Math.round(6 * scale)}px ${Math.round(5 * scale + st.borderWidth)}px`
@@ -1186,7 +1229,9 @@ export class MindMapCard implements CardHandle, MindMapControl {
     let hint: HTMLElement | null = null;
     let drop: { target: string; mode: DropMode; side?: 'left' | 'right' } | null = null;
     let detach = false;
-    let joinTarget: { id: string; topic: string } | null = null;
+    let joinTarget: { id: string; spot: MapDrop } | null = null;
+    const sameJoin = (u: { id: string; spot: MapDrop } | null, v: { id: string; spot: MapDrop } | null) =>
+      !!u && !!v && u.id === v.id && u.spot.topic === v.spot.topic && u.spot.mode === v.spot.mode && u.spot.side === v.spot.side;
     let lastClient = { x: sx, y: sy };
     const dragged = findIn(this.data, id)?.topic;
     const srcEl = this.topicEls.get(id);
@@ -1209,34 +1254,12 @@ export class MindMapCard implements CardHandle, MindMapControl {
       // Away from the map: onto another map's topic (joins it), or onto the board (a topic of its own).
       detach = !drop && this.outsideMap(l.x, l.y);
       const join = detach ? this.otherMapAt(ev.clientX, ev.clientY) : null;
-      if (joinTarget && (joinTarget.id !== join?.id || joinTarget.topic !== join?.topic)) this.ctx.board.cards.get(joinTarget.id)?.handle.markDropTarget?.(null);
+      if (joinTarget && joinTarget.id !== join?.id) this.ctx.board.cards.get(joinTarget.id)?.handle.markDropTarget?.(null);
+      if (join && !sameJoin(join, joinTarget)) this.ctx.board.cards.get(join.id)?.handle.markDropTarget?.(join.spot);
       joinTarget = join;
-      if (join) this.ctx.board.cards.get(join.id)?.handle.markDropTarget?.(join.topic);
       ghost!.toggleClass('is-detaching', detach && !join);
       if (!drop) { hint!.hide(); return; }
-      const p = this.placed.get(drop.target)!;
-      const x = p.x + this.shift.x, y = p.y + this.shift.y;
-      const hs = hint!.style;
-      hint!.show();
-      if (drop.mode === 'child') {
-        this.topicEls.get(drop.target)?.addClass('is-drop-target');
-        hint!.addClass('is-child');
-        const g = this.childSlot(p, drop.side);
-        hs.transform = `translate(${g.x}px, ${g.y}px)`;
-        hs.width = '60px'; hs.height = '22px';
-      } else {
-        hint!.removeClass('is-child');
-        const horizontal = this.data.layout === 'down' || (this.data.layout === 'timeline' && p.depth === 1);
-        if (horizontal) {
-          const gx = drop.mode === 'before' ? x - 6 : x + p.w + 3;
-          hs.transform = `translate(${gx}px, ${y}px)`;
-          hs.width = '3px'; hs.height = `${p.h}px`;
-        } else {
-          const gy = drop.mode === 'before' ? y - 6 : y + p.h + 3;
-          hs.transform = `translate(${x}px, ${gy}px)`;
-          hs.width = `${p.w}px`; hs.height = '3px';
-        }
-      }
+      this.placeHint(hint!, drop);
     };
     const finish = (commit: boolean) => {
       win.removeEventListener('pointermove', move, true);
@@ -1294,7 +1317,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
   }
 
   /** Move a topic (and what is under it) out of this map, under a topic of another map. */
-  private moveToOtherMap(id: string, to: { id: string; topic: string }): void {
+  private moveToOtherMap(id: string, to: { id: string; spot: MapDrop }): void {
     const f = findIn(this.data, id);
     const target = this.ctx.board.cards.get(to.id)?.handle;
     if (!f || !f.parent || !target?.adoptMap) return;
@@ -1303,7 +1326,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
     const mm: MMData = { root: topic, layout: this.data.layout, theme: this.data.theme, size: this.data.size, align: false };
     this.ctx.board.model.transact(() => {
       this.apply(d => { removeTopics(d, [id]); });
-      target.adoptMap!(to.topic, mm, topic.text);
+      target.adoptMap!(to.spot, mm, topic.text);
     });
   }
 

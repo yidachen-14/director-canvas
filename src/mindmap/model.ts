@@ -18,6 +18,13 @@ export interface MMStyle {
   borderOpacity?: number;
   borderDash?: MMDash;
   shape?: MMShape;
+  /** Text: size in px (before the map's size scale), weight, slant, lines and colour. */
+  fontSize?: number;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strike?: boolean;
+  textColor?: string;
 }
 
 export interface MMTopic {
@@ -480,6 +487,9 @@ export interface Resolved {
   shape: MMShape;
   fontSize: number;
   bold: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strike?: boolean;
   /** Colour of the branch into this topic. */
   branchColor: string;
   /** Style of the lines leaving this topic. */
@@ -548,19 +558,30 @@ export function resolveStyles(d: MMData): Map<string, Resolved> {
       depth,
       branch,
     };
-    out.set(t.id, res);
+    out.set(t.id, withText(res, st, scale));
     t.children.forEach((c, i) => walk(c, res, depth + 1, depth === 0 ? i : branch));
   };
   walk(d.root, null, 0, 0);
   for (const sm of d.summaries ?? []) {
     const base = out.get(sm.from);
     if (!base) continue;
-    const res: Resolved = { ...base, ...summaryLook(theme, base, sm.topic, scale) };
+    const res: Resolved = withText({ ...base, ...summaryLook(theme, base, sm.topic, scale) }, sm.topic.style ?? {}, scale);
     out.set(sm.topic.id, res);
     // Its own subtopics look like the topics one level below the run.
     sm.topic.children.forEach(c => walk(c, { ...res, line: sm.topic.line ?? base.line }, Math.max(2, base.depth + 1), base.branch));
   }
   return out;
+}
+
+/** A topic's own text settings on top of its resolved look. */
+function withText(r: Resolved, st: MMStyle, scale: number): Resolved {
+  if (st.fontSize) r.fontSize = Math.round(st.fontSize * scale * 10) / 10;
+  if (st.bold !== undefined) r.bold = st.bold;
+  if (st.italic) r.italic = true;
+  if (st.underline) r.underline = true;
+  if (st.strike) r.strike = true;
+  if (st.textColor) r.text = st.textColor;
+  return r;
 }
 
 /** A summary topic: the look of a first-level topic, in its run's branch colour, own overrides on top. */
@@ -578,6 +599,11 @@ function summaryLook(theme: MMTheme, base: Resolved, t: MMTopic, scale: number):
     borderDash: st.borderDash ?? 'solid',
     shape,
     fontSize: Math.round(level.fontSize * scale * 10) / 10,
+    // Its own text settings only, not those of the topic it starts at.
+    bold: level.bold,
+    italic: undefined,
+    underline: undefined,
+    strike: undefined,
   };
 }
 

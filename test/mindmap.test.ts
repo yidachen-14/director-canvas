@@ -262,3 +262,16 @@ describe('overlapping extras', () => {
     expect(brace.b).toBeLessThan(pd.y);
   });
 });
+
+describe('topic text style', () => {
+  it('applies a topic’s own text settings and keeps them off its summary', async () => {
+    const m = await import('../src/mindmap/model');
+    const d = m.newMindMap('Root');
+    const a = { id: 'a', text: 'A', children: [], style: { bold: true, italic: true, fontSize: 20, textColor: '#ff0000' } };
+    d.root.children.push(a);
+    d.summaries = [{ id: 's', parent: d.root.id, from: 'a', to: 'a', topic: { id: 'st', text: 'S', children: [] } }];
+    const r = m.resolveStyles(d);
+    expect(r.get('a')).toMatchObject({ bold: true, italic: true, fontSize: 20, text: '#ff0000' });
+    expect(r.get('st')?.italic).toBeFalsy();
+  });
+});

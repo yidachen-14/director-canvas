@@ -3,6 +3,7 @@ import type { Board } from './board';
 import { snap } from './board';
 import { nodeRect, rectsIntersect, type Rect } from '../model/board-model';
 import type { RawNode } from '../model/canvas-file';
+import type { MapDrop } from '../cards/types';
 import { cardKindOf, vcGet } from '../cards/util';
 import { getCardType } from '../cards/registry';
 import { ConnectController } from './connect-ui';
@@ -319,7 +320,7 @@ export function attachInteractions(board: Board): void {
     const mergeEl = mergeable ? board.cards.get(mergeable.id)?.el ?? null : null;
     let mergeDrop: Drop | null = null;
     let dropLine: DropLine | null = null;
-    let mapJoin: { id: string; topic: string } | null = null;
+    let mapJoin: { id: string; spot: MapDrop } | null = null;
     track(e, 'move', (ev) => {
       if (!gesture) {
         gesture = board.model.beginGesture();
@@ -364,16 +365,18 @@ export function attachInteractions(board: Board): void {
       // A mind map (a floating topic) dragged onto another map's topic joins it there.
       if (moving.length === 1 && moving[0].vc?.kind === 'mindmap') {
         const at = board.clientToWorld(ev.clientX, ev.clientY);
-        let found: { id: string; topic: string } | null = null;
+        let found: { id: string; spot: MapDrop } | null = null;
         for (let i = board.model.nodes.length - 1; i >= 0 && !found; i--) {
           const n = board.model.nodes[i];
           if (n.id === moving[0].id || n.vc?.kind !== 'mindmap') continue;
-          const topic = board.cards.get(n.id)?.handle.dropTargetAt?.(at.x, at.y);
-          if (topic) found = { id: n.id, topic };
+          const spot = board.cards.get(n.id)?.handle.dropTargetAt?.(at.x, at.y);
+          if (spot) found = { id: n.id, spot };
         }
-        if (mapJoin && (mapJoin.id !== found?.id || mapJoin.topic !== found?.topic)) board.cards.get(mapJoin.id)?.handle.markDropTarget?.(null);
+        if (mapJoin && mapJoin.id !== found?.id) board.cards.get(mapJoin.id)?.handle.markDropTarget?.(null);
+        if (found) board.cards.get(found.id)?.handle.markDropTarget?.(found.spot);
+        // See-through while over another map, so where it would join stays visible.
+        board.cards.get(moving[0].id)?.el.toggleClass('is-joining', !!found);
         mapJoin = found;
-        if (found) board.cards.get(found.id)?.handle.markDropTarget?.(found.topic);
       }
       if (spot) { mergeDrop = null; dropLine?.hide(); mergeEl?.removeClass('is-merging'); }
       else if (mergeable && mergeEl) {
@@ -386,6 +389,7 @@ export function attachInteractions(board: Board): void {
       }
     }, () => {
       root.removeClass('is-dragging');
+      for (const n of moving) board.cards.get(n.id)?.el.removeClass('is-joining');
       // Columns take the dropped cards in again (before the move becomes an undo step).
       board.draggingIds = new Set();
       showColumnDrop(null);
@@ -398,7 +402,7 @@ export function attachInteractions(board: Board): void {
         const target = board.cards.get(join.id)?.handle;
         if (target?.adoptMap) {
           board.model.transact(() => {
-            target.adoptMap!(join.topic, src.vc?.mm, src.text ?? '');
+            target.adoptMap!(join.spot, src.vc?.mm, src.text ?? '');
             board.model.removeNodes([src.id]);
           });
           board.select([join.id]);

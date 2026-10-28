@@ -361,20 +361,53 @@ export function themeItem(ctl: MindMapControl): BarItem {
   return { id: 'mm-theme', icon: 'vc-mm-theme', label: t('Map style'), dropdown: (pop) => themePanel(pop, ctl) };
 }
 
-/** The six controls shown while topics are selected (Boardmix). */
+const FONT_SIZES = [12, 13, 14, 15, 16, 18, 20, 24, 28, 32, 40];
+
+function fontSizePanel(pop: HTMLElement, ctl: MindMapControl): void {
+  pop.addClass('vc-mm-pop');
+  const raw = rawStyle(ctl);
+  section(pop, t('Font size'));
+  const row = pop.createDiv('vc-mm-row is-wrap');
+  for (const n of FONT_SIZES) chip(row, `${n}`, raw.fontSize === n, () => styleSelected(ctl, s => { s.fontSize = n; }));
+  const reset = pop.createDiv('vc-mm-row');
+  chip(reset, t('Theme default'), !raw.fontSize, () => styleSelected(ctl, s => { s.fontSize = undefined; }));
+}
+
+function textColorPanel(pop: HTMLElement, ctl: MindMapControl): void {
+  pop.addClass('vc-mm-pop');
+  const raw = rawStyle(ctl);
+  section(pop, t('Text colour'));
+  palette(pop, raw.textColor, c => styleSelected(ctl, s => { s.textColor = c; }));
+  const row = pop.createDiv('vc-mm-row');
+  chip(row, t('Theme default'), !raw.textColor, () => styleSelected(ctl, s => { s.textColor = undefined; }));
+  customColor(pop, row, 'text', raw.textColor, (c, pv) => styleSelected(ctl, s => { s.textColor = c; }, pv));
+}
+
+/**
+ * The bar while topics are selected, in Boardmix's order: map style | fill, border |
+ * topic shape, branch lines, branch colour | text size, bold, italic, underline, strikethrough, text colour.
+ */
 export function mindMapBarItems(ctl: MindMapControl): BarItem[] {
   const res = resolved(ctl);
+  const sep: BarItem = { id: '@sep', icon: '', label: '' };
+  const toggle = (id: string, icon: string, label: string, on: boolean, key: 'bold' | 'italic' | 'underline' | 'strike'): BarItem =>
+    ({ id, icon, label, active: on, run: () => styleSelected(ctl, s => { s[key] = on ? (key === 'bold' ? false : undefined) : true; }) });
   return [
     themeItem(ctl),
+    sep,
     { id: 'mm-fill', icon: 'paint-bucket', label: t('Fill colour'), swatch: res.fill, dropdown: (pop) => fillPanel(pop, ctl) },
     { id: 'mm-border', icon: 'vc-mm-border', label: t('Border'), active: res.border && res.shape !== 'underline', dropdown: (pop) => borderPanel(pop, ctl) },
+    sep,
     { id: 'mm-shape', icon: `vc-mm-s-${res.shape}`, label: t('Topic shape'), dropdown: (pop) => shapePanel(pop, ctl) },
     { id: 'mm-line', icon: `vc-mm-ln-${res.line}`, label: t('Branch lines'), dropdown: (pop) => linePanel(pop, ctl) },
     { id: 'mm-branch', icon: 'vc-mm-branch', label: t('Branch colour'), swatch: res.branchColor, dropdown: (pop) => branchColorPanel(pop, ctl) },
-    ...(ctl.canWrap() ? [
-      { id: 'mm-summary', icon: 'vc-mm-summary', label: t('Add summary'), run: () => ctl.addSummary() },
-      { id: 'mm-boundary', icon: 'vc-mm-boundary', label: t('Add boundary'), run: () => ctl.addBoundary() },
-    ] : []),
+    sep,
+    { id: 'mm-size', icon: 'type', label: t('Font size'), text: `${Math.round(res.fontSize)}`, dropdown: (pop) => fontSizePanel(pop, ctl) },
+    toggle('mm-bold', 'bold', t('Bold'), res.bold, 'bold'),
+    toggle('mm-italic', 'italic', t('Italic'), !!res.italic, 'italic'),
+    toggle('mm-underline', 'underline', t('Underline'), !!res.underline, 'underline'),
+    toggle('mm-strike', 'strikethrough', t('Strikethrough'), !!res.strike, 'strike'),
+    { id: 'mm-text', icon: 'baseline', label: t('Text colour'), swatch: res.text, dropdown: (pop) => textColorPanel(pop, ctl) },
   ];
 }
 

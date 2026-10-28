@@ -31,7 +31,10 @@ export class VideoPlayer {
   private head: HTMLElement;
   private marksEl: HTMLElement;
   private pendingEl: HTMLElement;
-  private coverEl: HTMLElement;
+  private muteBtn: HTMLElement;
+  private volume: HTMLInputElement;
+  /** Holding J: playing backwards by seeking (browsers can't play in reverse). */
+  private reverse: { from: number; t0: number; rate: number; stop: (e: KeyboardEvent) => void } | null = null;
   private timeEl: HTMLElement;
   private playBtn: HTMLElement;
   private rateBtn: HTMLElement;
@@ -58,7 +61,9 @@ export class VideoPlayer {
     this.video = this.stage.createEl('video', { attr: { crossorigin: 'anonymous', preload: 'metadata', playsinline: '' } });
     this.video.src = src;
     this.sub = this.stage.createDiv('vc-video-sub');
-    this.ctrl = this.stage.createDiv('vc-video-ctrl vc-interactive');
+    // The controls hang under the card while it is selected, so they never cover the picture.
+    this.ctrl = createDiv('vc-video-ctrl vc-interactive');
+    this.attachPanel(host);
 
     // Track: marks above, then the progress bar.
     this.track = this.ctrl.createDiv('vc-vt');
@@ -66,8 +71,6 @@ export class VideoPlayer {
     const bar = this.track.createDiv('vc-vt-bar');
     this.fill = bar.createDiv('vc-vt-fill');
     this.pendingEl = this.track.createDiv('vc-vt-pending');
-    this.coverEl = this.track.createDiv('vc-vt-cover');
-    setTooltip(this.coverEl, t('Cover frame'), { placement: 'top' });
     this.head = this.track.createDiv('vc-vt-head');
 
     const row = this.ctrl.createDiv('vc-vc-row');
@@ -83,6 +86,11 @@ export class VideoPlayer {
     this.rateBtn = this.button(row, '', t('Playback speed'), (e) => this.rateMenu(e));
     this.rateBtn.addClass('vc-vc-rate');
     this.button(row, 'image', t('Set as cover'), () => void this.setCover());
+    this.muteBtn = this.button(row, 'volume-2', t('Mute'), () => { this.video.muted = !this.video.muted; });
+    this.volume = row.createEl('input', { cls: 'vc-vc-volume', type: 'range', attr: { min: '0', max: '1', step: '0.05', 'aria-label': t('Volume') } });
+    this.volume.value = String(this.video.volume);
+    this.volume.addEventListener('input', () => { this.video.volume = Number(this.volume.value); this.video.muted = this.video.volume === 0; });
+    this.button(row, 'maximize', t('Full screen'), () => this.fullScreen());
 
     this.wire();
     this.renderMarks();
@@ -129,6 +137,9 @@ export class VideoPlayer {
     v.addEventListener('seeked', () => this.renderTime());
     v.addEventListener('ratechange', () => this.renderRate());
     v.addEventListener('ended', () => this.renderPlay());
+    v.addEventListener('volumechange', () => this.renderVolume());
+    // Full screen uses the browser's own controls.
+    this.stage.addEventListener('fullscreenchange', () => { v.controls = document.fullscreenElement === this.stage; });
     this.measureFrames();
 
     // A click on the picture of the selected card plays or pauses; the first click only
@@ -143,6 +154,10 @@ export class VideoPlayer {
     });
 
     this.track.addEventListener('pointerdown', (e) => this.pressTrack(e));
+    // Clicking the controls keeps the keys (Space, ←, →, I, O, M, J, K, L) with the board.
+    this.ctrl.addEventListener('pointerdown', (e) => {
+      if (!(e.target as HTMLElement).closest('input, textarea')) window.setTimeout(() => this.ctx.board.root.focus({ preventScroll: true }), 0);
+    });
     this.ctrl.addEventListener('dblclick', e => e.stopPropagation());
     this.renderRate();
   }
@@ -189,6 +204,7 @@ export class VideoPlayer {
     this.notice.createDiv({ text: t('This video format can’t play on the board.') });
     this.notice.createDiv({ cls: 'vc-video-unsupported-hint', text: t('Convert it to H.264 or HEVC (MP4) and add it again.') });
     this.stage.addClass('is-unsupported');
+    this.ctrl.addClass('is-unsupported');
   }
 
   // ── playback ────────────────────────────────────────────
@@ -222,17 +238,68 @@ export class VideoPlayer {
     this.renderRate();
   }
 
-  /** L: play, then faster; J: slower, then back two seconds; K: pause. */
-  private shuttle(dir: 1 | -1): void {
+  /** L: play, then faster. */
+  private shuttle(): void {
     const v = this.video;
     const i = RATES.indexOf(v.playbackRate);
-    if (dir > 0) {
-      if (v.paused) { if (v.playbackRate < 1) this.setRate(1); this.togglePlay(); return; }
-      this.setRate(RATES[Math.min(RATES.length - 1, (i < 0 ? 2 : i) + 1)]);
-    } else {
-      if (!v.paused && v.playbackRate > 1) { this.setRate(RATES[Math.max(0, (i < 0 ? 2 : i) - 1)]); return; }
-      this.seek(v.currentTime - 2);
-    }
+    if (v.paused) { if (v.playbackRate < 1) this.setRate(1); this.togglePlay(); return; }
+    this.setRate(RATES[Math.min(RATES.length - 1, (i < 0 ? 2 : i) + 1)]);
+  }
+
+  /**
+   * J: back half a second at once; held down, it keeps going back in real time (⇧: half speed),
+   * seeking again as soon as each frame is shown.
+   */
+  private startReverse(rate: number): void {
+    if (this.reverse || this.notice) return;
+    const v = this.video;
+    if (!v.paused) v.pause();
+    const from = Math.max(0, v.currentTime - 0.5);
+    this.seek(from);
+    const stop = (e: KeyboardEvent) => { if (e.code === 'KeyJ') this.stopReverse(); };
+    window.addEventListener('keyup', stop, true);
+    window.addEventListener('blur', this.stopReverseBound);
+    this.reverse = { from, t0: performance.now() + 250, rate, stop };
+    const tick = () => {
+      const r = this.reverse;
+      if (!r || !v.isConnected) return;
+      const now = performance.now();
+      if (now > r.t0 && !v.seeking) {
+        const target = r.from - ((now - r.t0) / 1000) * r.rate;
+        if (target <= 0) { this.seek(0); this.stopReverse(); return; }
+        v.currentTime = target;
+        this.renderTime();
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  private stopReverseBound = () => this.stopReverse();
+
+  private stopReverse(): void {
+    if (!this.reverse) return;
+    window.removeEventListener('keyup', this.reverse.stop, true);
+    window.removeEventListener('blur', this.stopReverseBound);
+    this.reverse = null;
+  }
+
+  private fullScreen(): void {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void this.stage.requestFullscreen();
+  }
+
+  private renderVolume(): void {
+    const v = this.video;
+    setIcon(this.muteBtn, v.muted || v.volume === 0 ? 'volume-x' : v.volume < 0.5 ? 'volume-1' : 'volume-2');
+    this.volume.value = String(v.muted ? 0 : v.volume);
+  }
+
+  /** Put the controls under the card (outside its clipped body). */
+  private attachPanel(host: HTMLElement): void {
+    const card = host.closest<HTMLElement>('.vc-node');
+    if (card) { if (this.ctrl.parentElement !== card) card.appendChild(this.ctrl); return; }
+    window.setTimeout(() => { if (host.isConnected) this.attachPanel(host); }, 0);
   }
 
   private rateMenu(e: MouseEvent): void {
@@ -331,8 +398,6 @@ export class VideoPlayer {
 
   private renderCover(): void {
     const c = this.data.cover;
-    this.coverEl.toggle(!!c && !!this.duration);
-    if (c) this.coverEl.style.left = `${this.pct(c.t)}%`;
     const adapter = this.ctx.app.vault.adapter;
     const poster = c?.image ? adapter.getResourcePath(c.image) : '';
     if (poster) this.video.poster = poster; else this.video.removeAttribute('poster');
@@ -445,7 +510,7 @@ export class VideoPlayer {
     const m = this.data.marks?.find(x => x.id === id);
     if (!m) return;
     this.openMark = id;
-    const pop = this.pop = this.stage.createDiv('vc-vt-pop vc-interactive');
+    const pop = this.pop = this.ctrl.createDiv('vc-vt-pop vc-interactive');
     const head = pop.createDiv('vc-vt-pop-head');
     head.createDiv({ cls: 'vc-vt-pop-time', text: markTime(m) });
     head.createDiv('vc-vc-spacer');
@@ -474,11 +539,11 @@ export class VideoPlayer {
 
   private placePop(m: VideoMark): void {
     if (!this.pop) return;
-    const w = this.stage.clientWidth;
-    const pw = Math.min(260, w - 16);
+    const w = this.ctrl.clientWidth;
+    const pw = Math.min(280, w);
     this.pop.style.width = `${pw}px`;
     const x = (this.pct(m.in) / 100) * this.track.clientWidth + this.track.offsetLeft;
-    this.pop.style.left = `${Math.max(8, Math.min(w - pw - 8, x - pw / 2))}px`;
+    this.pop.style.left = `${Math.max(0, Math.min(w - pw, x - pw / 2))}px`;
   }
 
   private closePop(save = true): void {
@@ -553,14 +618,16 @@ export class VideoPlayer {
       case 'KeyI': this.markIn(); return true;
       case 'KeyO': this.markOut(); return true;
       case 'KeyM': this.addPoint(); return true;
-      case 'KeyJ': this.shuttle(-1); return true;
+      case 'KeyJ': if (!e.repeat) this.startReverse(e.shiftKey ? 0.5 : 1); return true;
       case 'KeyK': this.video.pause(); return true;
-      case 'KeyL': this.shuttle(1); return true;
+      case 'KeyL': this.shuttle(); return true;
       default: return false;
     }
   }
 
   destroy(): void {
+    this.stopReverse();
+    this.ctrl.remove();
     cancelAnimationFrame(this.raf);
     this.video.pause();
   }
