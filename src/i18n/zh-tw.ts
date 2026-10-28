@@ -515,4 +515,8 @@ export const ZH_TW: Record<string, string> = {
   'Remove boundary': '移除外框',
   'Remove summary': '移除概要',
   'Summary': '概要',
+  'Edit boundary title': '編輯外框標題',
+  'Add boundary title': '新增外框標題',
+  'Boundary title': '外框標題',
+  'Drag to change what the boundary covers': '拖曳以調整外框涵蓋的節點',
 };

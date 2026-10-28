@@ -51,6 +51,12 @@ export interface CardHandle {
   partsIn?(r: { x: number; y: number; width: number; height: number }): { ids: string[]; all: boolean };
   /** Select those parts (after a selection box). */
   selectParts?(ids: string[]): void;
+  /** Mind maps: the topic a dragged map or topic would join at a board point, if any. */
+  dropTargetAt?(wx: number, wy: number): string | null;
+  /** Mind maps: show (or clear) where a dragged map would join. */
+  markDropTarget?(id: string | null): void;
+  /** Mind maps: take another map's topics in, under `topicId` (its data as stored in vc.mm). */
+  adoptMap?(topicId: string, mm: unknown, text: string): void;
   /** The content's own size right now (text cards: the box hugs the text). */
   measure?(): { width: number; height: number } | undefined;
   /** Card-specific entries for its right-click menu (only when it is the sole selection). */

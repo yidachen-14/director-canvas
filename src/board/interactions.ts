@@ -319,6 +319,7 @@ export function attachInteractions(board: Board): void {
     const mergeEl = mergeable ? board.cards.get(mergeable.id)?.el ?? null : null;
     let mergeDrop: Drop | null = null;
     let dropLine: DropLine | null = null;
+    let mapJoin: { id: string; topic: string } | null = null;
     track(e, 'move', (ev) => {
       if (!gesture) {
         gesture = board.model.beginGesture();
@@ -360,6 +361,20 @@ export function attachInteractions(board: Board): void {
         ? columnDropAt(board.model.nodes, { x: leadNode.x + leadNode.width / 2, y: leadNode.y + leadNode.height / 2 }, board.draggingIds)
         : null;
       showColumnDrop(spot);
+      // A mind map (a floating topic) dragged onto another map's topic joins it there.
+      if (moving.length === 1 && moving[0].vc?.kind === 'mindmap') {
+        const at = board.clientToWorld(ev.clientX, ev.clientY);
+        let found: { id: string; topic: string } | null = null;
+        for (let i = board.model.nodes.length - 1; i >= 0 && !found; i--) {
+          const n = board.model.nodes[i];
+          if (n.id === moving[0].id || n.vc?.kind !== 'mindmap') continue;
+          const topic = board.cards.get(n.id)?.handle.dropTargetAt?.(at.x, at.y);
+          if (topic) found = { id: n.id, topic };
+        }
+        if (mapJoin && (mapJoin.id !== found?.id || mapJoin.topic !== found?.topic)) board.cards.get(mapJoin.id)?.handle.markDropTarget?.(null);
+        mapJoin = found;
+        if (found) board.cards.get(found.id)?.handle.markDropTarget?.(found.topic);
+      }
       if (spot) { mergeDrop = null; dropLine?.hide(); mergeEl?.removeClass('is-merging'); }
       else if (mergeable && mergeEl) {
         const target = richAt(ev.clientX, ev.clientY, mergeEl);
@@ -374,6 +389,22 @@ export function attachInteractions(board: Board): void {
       // Columns take the dropped cards in again (before the move becomes an undo step).
       board.draggingIds = new Set();
       showColumnDrop(null);
+      if (mapJoin && gesture) {
+        // Put the dragged map back where it was, then hand its topics to the other map.
+        const join = mapJoin;
+        const src = moving[0];
+        board.cards.get(join.id)?.handle.markDropTarget?.(null);
+        gesture.cancel();
+        const target = board.cards.get(join.id)?.handle;
+        if (target?.adoptMap) {
+          board.model.transact(() => {
+            target.adoptMap!(join.topic, src.vc?.mm, src.text ?? '');
+            board.model.removeNodes([src.id]);
+          });
+          board.select([join.id]);
+        }
+        return;
+      }
       dropLine?.remove();
       mergeEl?.removeClass('is-merging');
       if (mergeable && mergeDrop && gesture) {

@@ -5,8 +5,8 @@ import { cardKindOf } from '../cards/util';
 export const COLUMN_HEADER = 44;
 export const COLUMN_PAD = 12;
 export const COLUMN_GAP = 10;
-/** Space between the title row's line and the first card. */
-export const COLUMN_TOP_GAP = 10;
+/** Space between the title row's line and the first card: the same as the sides and the bottom. */
+export const COLUMN_TOP_GAP = COLUMN_PAD;
 const MIN_HEIGHT = 120;
 
 /** Card kinds that keep their own width inside a column (their box follows their text). */

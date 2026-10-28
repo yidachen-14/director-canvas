@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  addBoundary, addChild, addSibling, addSummary, anyTopic, boundsOf, layoutExtras, siblingRange, findTopic, fromMarkdown, layoutMindMap, moveTopic, newMindMap, normalizeData,
+  addBoundary, findIn, respanBoundary, addChild, addSibling, addSummary, anyTopic, boundsOf, layoutExtras, siblingRange, findTopic, fromMarkdown, layoutMindMap, moveTopic, newMindMap, normalizeData,
   removeTopics, resolveStyles, sidesOf, toMarkdown, type MMData, type Size,
 } from '../src/mindmap/model';
 
@@ -214,5 +214,51 @@ describe('summaries and boundaries', () => {
     const sum = d.summaries![0].topic.id;
     removeTopics(d, [sum]);
     expect(d.summaries ?? []).toHaveLength(0);
+  });
+});
+
+describe('summary subtopics and boundary spans', () => {
+  it('a summary topic takes subtopics, laid out beyond it', () => {
+    const d = newMindMap('Root');
+    const a = addChild(d, d.root.id, 'A')!, b = addChild(d, d.root.id, 'B')!;
+    const s = addSummary(d, [a.id, b.id], 'Sum')!;
+    const k = addChild(d, s.id, 'Kid')!;
+    expect(findIn(d, k.id)?.parent?.id).toBe(s.id);
+    const sizes = new Map<string, { w: number; h: number }>();
+    const placed = layoutMindMap(d, sizes);
+    layoutExtras(d, sizes, placed);
+    expect(placed.get(k.id)!.x).toBeGreaterThan(placed.get(s.id)!.x + placed.get(s.id)!.w);
+    removeTopics(d, [k.id]);
+    expect(findIn(d, k.id)).toBeNull();
+  });
+
+  it('a boundary re-spans over the siblings between its new edges', () => {
+    const d = newMindMap('Root');
+    const a = addChild(d, d.root.id, 'A')!, b = addChild(d, d.root.id, 'B')!, c = addChild(d, d.root.id, 'C')!;
+    const bd = addBoundary(d, [b.id])!;
+    const sizes = new Map<string, { w: number; h: number }>();
+    const placed = layoutMindMap(d, sizes);
+    const pa = placed.get(a.id)!, pc = placed.get(c.id)!;
+    expect(respanBoundary(d, bd.id, placed, pa.y, pc.y + pc.h, 'y')).toBe(true);
+    expect(d.boundaries![0]).toMatchObject({ from: a.id, to: c.id });
+    expect(respanBoundary(d, bd.id, placed, -9999, -9000, 'y')).toBe(false);
+  });
+});
+
+describe('overlapping extras', () => {
+  it('a summary of A–B is not stretched by a boundary around B–D', () => {
+    const d = newMindMap('Root');
+    const a = addChild(d, d.root.id, 'A')!, b = addChild(d, d.root.id, 'B')!;
+    addChild(d, d.root.id, 'C'); const dd = addChild(d, d.root.id, 'D')!;
+    addBoundary(d, [b.id, dd.id]);
+    addSummary(d, [a.id, b.id], 'Sum');
+    const sizes = new Map<string, { w: number; h: number }>();
+    const placed = layoutMindMap(d, sizes);
+    const ex = layoutExtras(d, sizes, placed);
+    const brace = ex.braces[0];
+    const pa = placed.get(a.id)!, pb = placed.get(b.id)!, pd = placed.get(dd.id)!;
+    expect(brace.a).toBeCloseTo(pa.y, 0);
+    expect(brace.b).toBeCloseTo(pb.y + pb.h, 0);
+    expect(brace.b).toBeLessThan(pd.y);
   });
 });

@@ -1712,3 +1712,27 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
   margin: 0 !important;
   font-size: inherit !important;
 }
+
+/* Mind map boundaries: a frame you can click (between the topics), resize and title */
+.vc-mm-bnd-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+.vc-mm-bnd { position: absolute; left: 0; top: 0; box-sizing: border-box; border-radius: 12px; cursor: pointer; }
+.vc-mm-bnd:hover { box-shadow: 0 0 0 calc(1px / var(--vc-zoom, 1)) var(--vc-bnd-color); }
+.vc-mm-bnd.is-selected, .vc-mm-bnd.is-resizing { box-shadow: 0 0 0 calc(2px / var(--vc-zoom, 1)) var(--vc-select); }
+.vc-mm-bnd-label {
+  position: absolute; left: 10px; bottom: 100%;
+  width: max-content; max-width: 320px; height: 22px; line-height: 22px; padding: 0 10px; box-sizing: border-box;
+  border-radius: 6px 6px 0 0; background: var(--vc-bnd-color); color: #fff;
+  font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px solid var(--vc-select); font: inherit; font-size: 12px; color: var(--text-normal); background: var(--background-primary); cursor: text; }
+.vc-mm-bnd-handle {
+  position: absolute; left: 50%; width: 14px; height: 14px; margin-left: -7px; box-sizing: border-box;
+  border-radius: 50%; background: var(--background-primary); border: 2px solid var(--vc-select);
+  scale: calc(1 / var(--vc-zoom, 1)); cursor: ns-resize; display: none;
+}
+.vc-mm-bnd-handle.is-start { top: -7px; }
+.vc-mm-bnd-handle.is-end { bottom: -7px; }
+.vc-mm-bnd-handle.is-x { left: auto; top: 50%; margin: -7px 0 0; cursor: ew-resize; }
+.vc-mm-bnd-handle.is-x.is-start { left: -7px; }
+.vc-mm-bnd-handle.is-x.is-end { right: -7px; bottom: auto; }
+.vc-mm-bnd.is-selected .vc-mm-bnd-handle, .vc-mm-bnd.is-resizing .vc-mm-bnd-handle { display: block; }

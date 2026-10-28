@@ -40,7 +40,7 @@ export interface MMTopic {
  */
 export interface MMSummary { id: string; parent: string; from: string; to: string; topic: MMTopic }
 /** A boundary (Boardmix 外框): a frame drawn around a run of sibling topics and their subtrees. */
-export interface MMBoundary { id: string; parent: string; from: string; to: string }
+export interface MMBoundary { id: string; parent: string; from: string; to: string; /** A title shown on a tab above the frame (XMind). */ label?: string }
 
 export interface MMData {
   summaries?: MMSummary[];
@@ -265,14 +265,14 @@ export function summaryOfTopic(d: MMData, topicId: string): MMSummary | undefine
 
 /** A topic anywhere: in the tree or a summary's. */
 export function anyTopic(d: MMData, id: string): MMTopic | null {
-  return findTopic(d.root, id)?.topic ?? summaryOfTopic(d, id)?.topic ?? null;
+  return findIn(d, id)?.topic ?? null;
 }
 
 /** Summaries and boundaries touching any of these topics (as one of the run). */
 export function extrasCovering(d: MMData, ids: string[]): { summaries: MMSummary[]; boundaries: MMBoundary[] } {
   const want = new Set(ids);
   const covers = (x: { parent: string; from: string; to: string }) => {
-    const p = findTopic(d.root, x.parent)?.topic;
+    const p = findIn(d, x.parent)?.topic;
     if (!p) return false;
     const a = p.children.findIndex(c => c.id === x.from), b = p.children.findIndex(c => c.id === x.to);
     for (let i = Math.min(a, b); i <= Math.max(a, b); i++) if (p.children[i] && want.has(p.children[i].id)) return true;
@@ -281,10 +281,31 @@ export function extrasCovering(d: MMData, ids: string[]): { summaries: MMSummary
   return { summaries: (d.summaries ?? []).filter(covers), boundaries: (d.boundaries ?? []).filter(covers) };
 }
 
+/**
+ * Re-span a boundary over the siblings whose middles lie between two heights (sideways maps) or
+ * widths (org chart), as found in `placed`. False when that would leave it empty.
+ */
+export function respanBoundary(d: MMData, id: string, placed: Map<string, Placed>, lo: number, hi: number, axis: 'y' | 'x'): boolean {
+  const b = d.boundaries?.find(x => x.id === id);
+  const p = b && findIn(d, b.parent)?.topic;
+  if (!b || !p) return false;
+  const side = placed.get(b.from)?.side;
+  const inside = p.children.filter((c) => {
+    const q = placed.get(c.id);
+    if (!q || (axis === 'y' && q.side !== side)) return false;
+    const m = axis === 'y' ? q.y + q.h / 2 : q.x + q.w / 2;
+    return m >= lo && m <= hi;
+  });
+  if (!inside.length) return false;
+  b.from = inside[0].id;
+  b.to = inside[inside.length - 1].id;
+  return true;
+}
+
 /** Drop summaries and boundaries whose topics are gone or no longer siblings; keep runs in order. */
 export function pruneExtras(d: MMData): void {
   const fix = <T extends { parent: string; from: string; to: string }>(x: T): T | null => {
-    const p = findTopic(d.root, x.parent)?.topic;
+    const p = findIn(d, x.parent)?.topic;
     if (!p) return null;
     const a = p.children.findIndex(c => c.id === x.from), b = p.children.findIndex(c => c.id === x.to);
     if (a < 0 && b < 0) return null;
@@ -321,7 +342,7 @@ export function normalizeData(raw: unknown, fallbackText: string): MMData {
       : undefined,
     boundaries: Array.isArray(d.boundaries)
       ? d.boundaries.filter(x => x && typeof x.parent === 'string' && typeof x.from === 'string' && typeof x.to === 'string')
-        .map(x => ({ id: typeof x.id === 'string' ? x.id : rid(), parent: x.parent, from: x.from, to: x.to }))
+        .map(x => ({ id: typeof x.id === 'string' ? x.id : rid(), parent: x.parent, from: x.from, to: x.to, ...(typeof x.label === 'string' && x.label ? { label: x.label } : {}) }))
       : undefined,
   };
 }
@@ -340,6 +361,20 @@ export function findTopic(root: MMTopic, id: string): Found | null {
   return walk(root, null, 0, 0);
 }
 
+/**
+ * Find a topic in the map: the tree under the central topic, or under a summary's own topic
+ * (a summary topic can have subtopics too; it answers like a central topic: no parent).
+ */
+export function findIn(d: MMData, id: string): (Found & { summary?: MMSummary }) | null {
+  const f = findTopic(d.root, id);
+  if (f) return f;
+  for (const sm of d.summaries ?? []) {
+    const g = findTopic(sm.topic, id);
+    if (g) return { ...g, summary: sm };
+  }
+  return null;
+}
+
 export function isInside(ancestor: MMTopic, id: string): boolean {
   for (const c of ancestor.children) if (c.id === id || isInside(c, id)) return true;
   return false;
@@ -356,10 +391,10 @@ export function eachTopic(t: MMTopic, fn: (t: MMTopic, depth: number) => void, d
 
 /** Add a child at the end (or at `index`). In two-sided maps a new first-level topic goes to the emptier side. */
 export function addChild(d: MMData, parentId: string, text: string, side?: 'left' | 'right', index?: number): MMTopic | null {
-  const f = findTopic(d.root, parentId);
+  const f = findIn(d, parentId);
   if (!f) return null;
   const t = newTopic(text);
-  if (f.depth === 0 && side) t.side = side;
+  if (f.depth === 0 && side && !f.summary && f.topic === d.root) t.side = side;
   f.topic.collapsed = false;
   if (index === undefined) f.topic.children.push(t); else f.topic.children.splice(index, 0, t);
   return t;
@@ -367,7 +402,7 @@ export function addChild(d: MMData, parentId: string, text: string, side?: 'left
 
 /** A sibling right after the topic (for the central topic: a child). */
 export function addSibling(d: MMData, id: string, text: string): MMTopic | null {
-  const f = findTopic(d.root, id);
+  const f = findIn(d, id);
   if (!f) return null;
   if (!f.parent) return addChild(d, id, text);
   const t = newTopic(text);
@@ -388,7 +423,7 @@ export function removeTopics(d: MMData, ids: string[]): string | null {
     d.boundaries = d.boundaries?.filter(b => !gone.has(b.id));
   }
   for (const id of ids) {
-    const f = findTopic(d.root, id);
+    const f = findIn(d, id);
     if (!f || !f.parent) continue;
     // A run that starts or ends at this topic now starts / ends at its neighbour inside the run.
     const kids = f.parent.children;
@@ -405,7 +440,7 @@ export function removeTopics(d: MMData, ids: string[]): string | null {
     next = sib?.id ?? f.parent.id;
   }
   pruneExtras(d);
-  return next && findTopic(d.root, next) ? next : d.root.id;
+  return next && findIn(d, next) ? next : d.root.id;
 }
 
 export type DropMode = 'child' | 'before' | 'after';
@@ -413,8 +448,8 @@ export type DropMode = 'child' | 'before' | 'after';
 /** Move a topic under another one or next to it. False when not allowed. */
 export function moveTopic(d: MMData, id: string, targetId: string, mode: DropMode, side?: 'left' | 'right'): boolean {
   if (id === targetId) return false;
-  const src = findTopic(d.root, id);
-  const dst = findTopic(d.root, targetId);
+  const src = findIn(d, id);
+  const dst = findIn(d, targetId);
   if (!src || !dst || !src.parent) return false;
   if (isInside(src.topic, targetId)) return false;
   if (mode !== 'child' && !dst.parent) mode = 'child';
@@ -423,7 +458,7 @@ export function moveTopic(d: MMData, id: string, targetId: string, mode: DropMod
   if (mode === 'child') {
     dst.topic.collapsed = false;
     dst.topic.children.push(t);
-    if (!dst.parent) { if (side) t.side = side; } else delete t.side;
+    if (!dst.parent && dst.topic === d.root) { if (side) t.side = side; } else delete t.side;
   } else {
     const parent = dst.parent!;
     const at = parent.children.indexOf(dst.topic);
@@ -519,7 +554,11 @@ export function resolveStyles(d: MMData): Map<string, Resolved> {
   walk(d.root, null, 0, 0);
   for (const sm of d.summaries ?? []) {
     const base = out.get(sm.from);
-    if (base) out.set(sm.topic.id, { ...base, ...summaryLook(theme, base, sm.topic, scale) });
+    if (!base) continue;
+    const res: Resolved = { ...base, ...summaryLook(theme, base, sm.topic, scale) };
+    out.set(sm.topic.id, res);
+    // Its own subtopics look like the topics one level below the run.
+    sm.topic.children.forEach(c => walk(c, { ...res, line: sm.topic.line ?? base.line }, Math.max(2, base.depth + 1), base.branch));
   }
   return out;
 }
@@ -572,12 +611,19 @@ export function layoutMindMap(d: MMData, sizes: Map<string, Size>): Map<string, 
   const kids = (t: MMTopic) => (t.collapsed ? [] : t.children);
   const root = d.root;
   const rs = size(root);
+  // Room around boundaries: their padding, plus a title tab above.
+  const before = new Map<string, number>(), after = new Map<string, number>();
+  for (const b of d.boundaries ?? []) {
+    before.set(b.from, (before.get(b.from) ?? 0) + 10 + (b.label && d.layout !== 'down' ? 24 : 0));
+    after.set(b.to, (after.get(b.to) ?? 0) + 10);
+  }
+  const extra = (c: MMTopic) => (before.get(c.id) ?? 0) + (after.get(c.id) ?? 0);
 
   if (d.layout === 'right' || d.layout === 'both') {
     const hOf = new Map<string, number>();
     const subH = (t: MMTopic): number => {
       const k = kids(t);
-      const sum = k.reduce((s, c) => s + subH(c), 0) + Math.max(0, k.length - 1) * g.v;
+      const sum = k.reduce((s, c) => s + subH(c) + extra(c), 0) + Math.max(0, k.length - 1) * g.v;
       const v = Math.max(size(t).h, sum);
       hOf.set(t.id, v);
       return v;
@@ -604,23 +650,25 @@ export function layoutMindMap(d: MMData, sizes: Map<string, Size>): Map<string, 
       const total = hOf.get(t.id) ?? s.h;
       out.set(t.id, { x: side === 'left' ? x - s.w : x, y: top + total / 2 - s.h / 2, w: s.w, h: s.h, depth, side });
       const k = kids(t);
-      const sum = k.reduce((acc, c) => acc + (hOf.get(c.id) ?? 0), 0) + Math.max(0, k.length - 1) * g.v;
+      const sum = k.reduce((acc, c) => acc + (hOf.get(c.id) ?? 0) + extra(c), 0) + Math.max(0, k.length - 1) * g.v;
       let cy = top + (total - sum) / 2;
       for (const c of k) {
         const cx = d.align ? colX[side].get(depth + 1)! : side === 'left' ? x - s.w - g.h : x + s.w + g.h;
+        cy += before.get(c.id) ?? 0;
         place(c, cx, cy, depth + 1, side);
-        cy += (hOf.get(c.id) ?? 0) + g.v;
+        cy += (hOf.get(c.id) ?? 0) + (after.get(c.id) ?? 0) + g.v;
       }
     };
     out.set(root.id, { x: 0, y: 0, w: rs.w, h: rs.h, depth: 0, side: 'right' });
     const stack = (list: MMTopic[], side: 'left' | 'right') => {
       for (const c of list) subH(c);
-      const total = list.reduce((s, c) => s + (hOf.get(c.id) ?? 0), 0) + Math.max(0, list.length - 1) * g.v;
+      const total = list.reduce((s, c) => s + (hOf.get(c.id) ?? 0) + extra(c), 0) + Math.max(0, list.length - 1) * g.v;
       let top = rs.h / 2 - total / 2;
       for (const c of list) {
         const x = d.align ? colX[side].get(1)! : side === 'left' ? -g.h : rs.w + g.h;
+        top += before.get(c.id) ?? 0;
         place(c, x, top, 1, side);
-        top += (hOf.get(c.id) ?? 0) + g.v;
+        top += (hOf.get(c.id) ?? 0) + (after.get(c.id) ?? 0) + g.v;
       }
     };
     stack(right, 'right');
@@ -633,7 +681,7 @@ export function layoutMindMap(d: MMData, sizes: Map<string, Size>): Map<string, 
     const wOf = new Map<string, number>();
     const subW = (t: MMTopic): number => {
       const k = kids(t);
-      const sum = k.reduce((s, c) => s + subW(c), 0) + Math.max(0, k.length - 1) * sib;
+      const sum = k.reduce((s, c) => s + subW(c) + extra(c), 0) + Math.max(0, k.length - 1) * sib;
       const v = Math.max(size(t).w, sum);
       wOf.set(t.id, v);
       return v;
@@ -654,9 +702,13 @@ export function layoutMindMap(d: MMData, sizes: Map<string, Size>): Map<string, 
       const ty = d.align ? (rowY.get(depth) ?? 0) : top;
       out.set(t.id, { x: left + total / 2 - s.w / 2, y: ty, w: s.w, h: s.h, depth, side: 'right' });
       const k = kids(t);
-      const sum = k.reduce((acc, c) => acc + (wOf.get(c.id) ?? 0), 0) + Math.max(0, k.length - 1) * sib;
+      const sum = k.reduce((acc, c) => acc + (wOf.get(c.id) ?? 0) + extra(c), 0) + Math.max(0, k.length - 1) * sib;
       let cx = left + (total - sum) / 2;
-      for (const c of k) { place(c, cx, ty + s.h + g.level, depth + 1); cx += (wOf.get(c.id) ?? 0) + sib; }
+      for (const c of k) {
+        cx += before.get(c.id) ?? 0;
+        place(c, cx, ty + s.h + g.level, depth + 1);
+        cx += (wOf.get(c.id) ?? 0) + (after.get(c.id) ?? 0) + sib;
+      }
     };
     place(root, 0, 0, 0);
     const r = out.get(root.id)!;
@@ -705,7 +757,7 @@ export interface Bounds { x: number; y: number; w: number; h: number }
 
 /** Where a boundary frame and a summary brace go (the summary's topic is added to `placed`). */
 export interface ExtrasLayout {
-  boundaries: { id: string; from: string; x: number; y: number; w: number; h: number }[];
+  boundaries: { id: string; from: string; label?: string; x: number; y: number; w: number; h: number }[];
   /** `vertical`: a brace standing beside the run (sideways maps); else lying under it (org chart). */
   braces: { id: string; from: string; vertical: boolean; dir: 1 | -1; at: number; a: number; b: number; mid: number }[];
 }
@@ -721,17 +773,22 @@ export function layoutExtras(d: MMData, sizes: Map<string, Size>, placed: Map<st
   const out: ExtrasLayout = { boundaries: [], braces: [] };
   if (!extrasSupported(d.layout)) return out;
   const down = d.layout === 'down';
+  const g = gapsFor(d.size);
   const PADB = 8, BRACE = 14, GAPT = 10;
-  // Box of a topic and everything shown under it (plus extras already placed inside it).
-  const extraBoxes = new Map<string, Bounds[]>();
+  // Extras already placed, by the topic whose children they wrap (and which of them).
+  const done: { parent: string; lo: number; hi: number; box: Bounds }[] = [];
+  const indexIn = (parent: MMTopic, id: string) => parent.children.findIndex(c => c.id === id);
+  // Box of a topic and everything shown under it, with the extras around its children.
   const subtreeBox = (t: MMTopic): Bounds | null => {
     const parts: Bounds[] = [];
     const walk = (x: MMTopic) => {
       const p = placed.get(x.id);
       if (!p) return;
       parts.push(p);
-      for (const e of extraBoxes.get(x.id) ?? []) parts.push(e);
-      if (!x.collapsed) x.children.forEach(walk);
+      if (!x.collapsed) {
+        for (const e of done) if (e.parent === x.id) parts.push(e.box);
+        x.children.forEach(walk);
+      }
     };
     walk(t);
     if (!parts.length) return null;
@@ -740,15 +797,18 @@ export function layoutExtras(d: MMData, sizes: Map<string, Size>, placed: Map<st
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   };
   const runOf = (x: { parent: string; from: string; to: string }) => {
-    const f = findTopic(d.root, x.parent);
+    const f = findIn(d, x.parent);
     if (!f || f.topic.collapsed) return null;
     const kids = f.topic.children;
     const a = kids.findIndex(c => c.id === x.from), b = kids.findIndex(c => c.id === x.to);
     if (a < 0 || b < 0) return null;
     return { parent: f.topic, depth: f.depth, run: kids.slice(Math.min(a, b), Math.max(a, b) + 1) };
   };
-  const unionOf = (list: MMTopic[]): Bounds | null => {
+  // A run's box: its topics' subtrees, and extras around runs that lie within it.
+  const unionOf = (parent: MMTopic, list: MMTopic[]): Bounds | null => {
     const boxes = list.map(subtreeBox).filter((q): q is Bounds => !!q);
+    const lo = indexIn(parent, list[0].id), hi = indexIn(parent, list[list.length - 1].id);
+    for (const e of done) if (e.parent === parent.id && e.lo >= lo && e.hi <= hi) boxes.push(e.box);
     if (!boxes.length) return null;
     const x0 = Math.min(...boxes.map(q => q.x)), y0 = Math.min(...boxes.map(q => q.y));
     const x1 = Math.max(...boxes.map(q => q.x + q.w)), y1 = Math.max(...boxes.map(q => q.y + q.h));
@@ -762,37 +822,110 @@ export function layoutExtras(d: MMData, sizes: Map<string, Size>, placed: Map<st
   items.sort((p, q) => q.depth - p.depth || (p.kind === 'b' ? -1 : 1) - (q.kind === 'b' ? -1 : 1));
   for (const it of items) {
     const r = runOf(it.x)!;
-    const box = unionOf(r.run);
+    const box = unionOf(r.parent, r.run);
     if (!box) continue;
     const first = r.run[0];
     const side = placed.get(first.id)?.side ?? 'right';
-    const keep = (b: Bounds) => { const l = extraBoxes.get(first.id) ?? []; l.push(b); extraBoxes.set(first.id, l); };
+    const keep = (b: Bounds) => done.push({ parent: r.parent.id, lo: indexIn(r.parent, first.id), hi: indexIn(r.parent, r.run[r.run.length - 1].id), box: b });
     if (it.kind === 'b') {
       const b = { x: box.x - PADB, y: box.y - PADB, w: box.w + PADB * 2, h: box.h + PADB * 2 };
-      out.boundaries.push({ id: it.x.id, from: first.id, ...b });
-      keep(b);
+      const label = (it.x as MMBoundary).label;
+      out.boundaries.push({ id: it.x.id, from: first.id, label, ...b });
+      // A label tab sits above the frame.
+      keep(label ? { x: b.x, y: b.y - 24, w: b.w, h: b.h + 24 } : b);
       continue;
     }
     const sm = it.x as MMSummary;
-    const sz = sizes.get(sm.topic.id) ?? { w: 80, h: 30 };
+    const depth = r.depth + 1;
+    // A frame that only partly overlaps the run still pushes the brace out past it.
+    {
+      const lo = indexIn(r.parent, first.id), hi = indexIn(r.parent, r.run[r.run.length - 1].id);
+      for (const e of done) {
+        if (e.parent !== r.parent.id || e.hi < lo || e.lo > hi) continue;
+        if (down) { const y1 = Math.max(box.y + box.h, e.box.y + e.box.h); box.h = y1 - box.y; }
+        else if (side === 'left') { const x0 = Math.min(box.x, e.box.x); box.w += box.x - x0; box.x = x0; }
+        else { const x1 = Math.max(box.x + box.w, e.box.x + e.box.w); box.w = x1 - box.x; }
+      }
+    }
+    let ext: Bounds;
     if (down) {
       const at = box.y + box.h + 6, mid = box.x + box.w / 2;
-      const ty = at + BRACE + GAPT;
-      placed.set(sm.topic.id, { x: mid - sz.w / 2, y: ty, w: sz.w, h: sz.h, depth: r.depth + 1, side: 'right' });
+      ext = placeSubtreeDown(sm.topic, mid, at + BRACE + GAPT, depth);
       out.braces.push({ id: sm.id, from: first.id, vertical: false, dir: 1, at, a: box.x, b: box.x + box.w, mid });
-      keep({ x: Math.min(box.x, mid - sz.w / 2), y: box.y, w: Math.max(box.w, sz.w), h: ty + sz.h - box.y });
     } else {
       const dir: 1 | -1 = side === 'left' ? -1 : 1;
       const at = dir === 1 ? box.x + box.w + 6 : box.x - 6;
       const mid = box.y + box.h / 2;
-      const tx = dir === 1 ? at + BRACE + GAPT : at - BRACE - GAPT - sz.w;
-      placed.set(sm.topic.id, { x: tx, y: mid - sz.h / 2, w: sz.w, h: sz.h, depth: r.depth + 1, side });
+      ext = placeSubtreeSideways(sm.topic, dir === 1 ? at + BRACE + GAPT : at - BRACE - GAPT, mid, depth, side);
       out.braces.push({ id: sm.id, from: first.id, vertical: true, dir, at, a: box.y, b: box.y + box.h, mid });
-      const x0 = Math.min(box.x, tx), x1 = Math.max(box.x + box.w, tx + sz.w);
-      keep({ x: x0, y: Math.min(box.y, mid - sz.h / 2), w: x1 - x0, h: Math.max(box.h, sz.h) });
     }
+    const x0 = Math.min(box.x, ext.x), y0 = Math.min(box.y, ext.y);
+    keep({ x: x0, y: y0, w: Math.max(box.x + box.w, ext.x + ext.w) - x0, h: Math.max(box.y + box.h, ext.y + ext.h) - y0 });
   }
   return out;
+
+  /** A summary topic and its subtopics flowing away from the run (sideways maps); returns their box. */
+  function placeSubtreeSideways(t: MMTopic, edge: number, mid: number, depth: number, side: 'left' | 'right'): Bounds {
+    const hOf = new Map<string, number>();
+    const kids = (x: MMTopic) => (x.collapsed ? [] : x.children);
+    const sz = (x: MMTopic) => sizes.get(x.id) ?? { w: 80, h: 30 };
+    const subH = (x: MMTopic): number => {
+      const k = kids(x);
+      const sum = k.reduce((acc, c) => acc + subH(c), 0) + Math.max(0, k.length - 1) * g.v;
+      const v = Math.max(sz(x).h, sum);
+      hOf.set(x.id, v);
+      return v;
+    };
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    const place = (x: MMTopic, at: number, top: number, dd: number) => {
+      const s = sz(x);
+      const total = hOf.get(x.id) ?? s.h;
+      const px = side === 'left' ? at - s.w : at;
+      const py = top + total / 2 - s.h / 2;
+      placed.set(x.id, { x: px, y: py, w: s.w, h: s.h, depth: dd, side });
+      x0 = Math.min(x0, px); y0 = Math.min(y0, py); x1 = Math.max(x1, px + s.w); y1 = Math.max(y1, py + s.h);
+      const k = kids(x);
+      const sum = k.reduce((acc, c) => acc + (hOf.get(c.id) ?? 0), 0) + Math.max(0, k.length - 1) * g.v;
+      let cy = top + (total - sum) / 2;
+      for (const c of k) {
+        place(c, side === 'left' ? px - g.h : px + s.w + g.h, cy, dd + 1);
+        cy += (hOf.get(c.id) ?? 0) + g.v;
+      }
+    };
+    const total = subH(t);
+    place(t, edge, mid - total / 2, depth);
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
+
+  /** The same for org charts: under the run, children spreading in a row. */
+  function placeSubtreeDown(t: MMTopic, mid: number, top: number, depth: number): Bounds {
+    const sib = g.h * 0.5;
+    const wOf = new Map<string, number>();
+    const kids = (x: MMTopic) => (x.collapsed ? [] : x.children);
+    const sz = (x: MMTopic) => sizes.get(x.id) ?? { w: 80, h: 30 };
+    const subW = (x: MMTopic): number => {
+      const k = kids(x);
+      const sum = k.reduce((acc, c) => acc + subW(c), 0) + Math.max(0, k.length - 1) * sib;
+      const v = Math.max(sz(x).w, sum);
+      wOf.set(x.id, v);
+      return v;
+    };
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    const place = (x: MMTopic, left: number, ty: number, dd: number) => {
+      const s = sz(x);
+      const total = wOf.get(x.id) ?? s.w;
+      const px = left + total / 2 - s.w / 2;
+      placed.set(x.id, { x: px, y: ty, w: s.w, h: s.h, depth: dd, side: 'right' });
+      x0 = Math.min(x0, px); y0 = Math.min(y0, ty); x1 = Math.max(x1, px + s.w); y1 = Math.max(y1, ty + s.h);
+      const k = kids(x);
+      const sum = k.reduce((acc, c) => acc + (wOf.get(c.id) ?? 0), 0) + Math.max(0, k.length - 1) * sib;
+      let cx = left + (total - sum) / 2;
+      for (const c of k) { place(c, cx, ty + s.h + g.level, dd + 1); cx += (wOf.get(c.id) ?? 0) + sib; }
+    };
+    const total = subW(t);
+    place(t, mid - total / 2, top, depth);
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
 }
 
 /** A curly brace lying under a run (org chart), from x0 to x1 at y, its tip pointing down at mid. */

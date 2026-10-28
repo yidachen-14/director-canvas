@@ -3,7 +3,7 @@ import type { BarItem } from '../cards/types';
 import { t } from '../i18n';
 import {
   type MMDash, type MMData, type MMLayout, type MMLine, type MMShape, type MMSize, type MMTopic, type MMStyle,
-  MM_THEMES, anyTopic, branchSideways, eachTopic, findTopic, resolveStyles, themeById,
+  MM_THEMES, anyTopic, branchSideways, eachTopic, findIn, resolveStyles, themeById,
 } from './model';
 import type { MindMapControl } from './card';
 import { colorPicker } from '../ui/color-picker';
@@ -132,7 +132,7 @@ function branchSelected(ctl: MindMapControl, key: 'line' | 'branchColor', value:
       return;
     }
     for (const id of ids) {
-      const f = findTopic(d.root, id);
+      const f = findIn(d, id);
       if (!f) continue;
       eachTopic(f.topic, tp => { delete tp[key]; });
       if (value !== undefined) (f.topic as unknown as Record<string, string>)[key] = value;
@@ -346,7 +346,7 @@ function linePanel(pop: HTMLElement, ctl: MindMapControl): void {
 function branchColorPanel(pop: HTMLElement, ctl: MindMapControl): void {
   pop.addClass('vc-mm-pop');
   const d = ctl.mapData();
-  const f = findTopic(d.root, primaryOf(ctl));
+  const f = findIn(d, primaryOf(ctl));
   const own = ctl.rootSelected() ? d.branchColor : f?.topic.branchColor;
   section(pop, t('Branch colour'), ctl.rootSelected() ? t('Whole map') : t('This branch and below'));
   palette(pop, own, c => branchSelected(ctl, 'branchColor', c));
