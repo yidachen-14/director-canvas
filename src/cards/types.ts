@@ -58,7 +58,7 @@ export interface CardHandle {
   /** Mind maps: take another map's topics in at `spot` (its data as stored in vc.mm). */
   adoptMap?(spot: MapDrop, mm: unknown, text: string): void;
   /** Pictures and videos: the card at the media's own pixel size. */
-  originalSize?(): { width: number; height: number } | null;
+  originalSize?(): { width: number; height: number; media: { width: number; height: number } } | null;
   /** The content's own size right now (text cards: the box hugs the text). */
   measure?(): { width: number; height: number } | undefined;
   /** Card-specific entries for its right-click menu (only when it is the sole selection). */

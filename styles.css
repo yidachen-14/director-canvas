@@ -1846,3 +1846,4 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
   padding: 1px 6px; border-radius: 4px; background: #e0407b; color: #fff; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .vc-spacing-handle:hover .vc-spacing-label, .vc-spacing-handle.is-active .vc-spacing-label { display: block; }
+.vc-spacing.is-dragging .vc-spacing-handle:not(.is-active) { display: none; }

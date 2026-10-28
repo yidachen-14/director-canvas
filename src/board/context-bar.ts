@@ -436,7 +436,7 @@ export class ContextBar {
     const handle = nodes.length === 1 ? b.cards.get(nodes[0].id)?.handle : undefined;
     const orig = handle?.originalSize?.();
     if (orig) {
-      const btn = pop.createEl('button', { cls: 'vc-ctx-size-orig', text: `${t('Original size')} · ${orig.width} × ${orig.height}` });
+      const btn = pop.createEl('button', { cls: 'vc-ctx-size-orig', text: `${t('Original size')} · ${orig.media.width} × ${orig.media.height}` });
       btn.addEventListener('click', () => {
         const n = nodes[0];
         b.model.transact(() => { n.width = orig.width; n.height = orig.height; b.model.touch(n.id); });
@@ -484,6 +484,7 @@ export class ContextBar {
     row('row', t('In a row'), 'more-horizontal');
     row('column', t('In a column'), 'ellipsis-vertical');
     row('optimal', t('Automatic (fit the view)'), 'layout-grid');
+    row('tidy', t('Tidy up, keeping positions'));
     row('stack', t('Stacked'), 'layers');
     pop.createDiv('vc-ctx-pop-sep');
     row('by-name', t('Arrange by name'));

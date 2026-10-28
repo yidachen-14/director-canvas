@@ -89,12 +89,13 @@ export class SpacingHandles {
     e.stopPropagation();
     const b = this.board;
     const gaps = run.items.slice(1).map((it, i) => it.s - run.items[i].e);
-    const base = gaps.reduce((s, g) => s + g, 0) / gaps.length;
+    // The gap grabbed is the starting point; every other gap follows it.
+    const base = gaps[k - 1];
     const start = run.axis === 'h' ? e.clientX : e.clientY;
     const gesture = b.model.beginGesture();
     this.dragging = true;
     handle.addClass('is-active');
-    handle.setPointerCapture(e.pointerId);
+    this.layer.addClass('is-dragging');
     const nodes = new Map(run.items.map(it => [it.id, b.model.node(it.id)!]));
     const move = (ev: PointerEvent) => {
       // Dragging the mark further along the row opens every gap up (by twice the move: both sides).
@@ -114,16 +115,24 @@ export class SpacingHandles {
       const p = run.axis === 'h' ? b.vp.toScreen(mid, cross) : b.vp.toScreen(cross, mid);
       handle.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`;
     };
+    const win = handle.ownerDocument.defaultView ?? window;
+    let done = false;
     const up = () => {
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', up);
-      handle.removeEventListener('pointercancel', up);
+      if (done) return;
+      done = true;
+      win.removeEventListener('pointermove', move, true);
+      win.removeEventListener('pointerup', up, true);
+      win.removeEventListener('pointercancel', up, true);
+      win.removeEventListener('blur', up);
       this.dragging = false;
+      this.layer.removeClass('is-dragging');
       gesture.end();
       this.refresh();
     };
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', up);
-    handle.addEventListener('pointercancel', up);
+    // On the window: the pointer can outrun the small mark, and a lost capture must still end the drag.
+    win.addEventListener('pointermove', move, true);
+    win.addEventListener('pointerup', up, true);
+    win.addEventListener('pointercancel', up, true);
+    win.addEventListener('blur', up);
   }
 }

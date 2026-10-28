@@ -233,11 +233,11 @@ class MediaCard implements CardHandle {
   }
 
   /** The card at the media's own size (plus its link bar and description). */
-  originalSize(): { width: number; height: number } | null {
+  originalSize(): { width: number; height: number; media: { width: number; height: number } } | null {
     const nat = this.natural();
     if (!nat) return null;
     const extra = Number(this.ctx.board.model.node(this.node.id)?.vc?.descH) || 0;
-    return { width: nat.width, height: nat.height + extra };
+    return { width: nat.width, height: nat.height + extra, media: { width: nat.width, height: nat.height } };
   }
 
   private showInfo(): void {
