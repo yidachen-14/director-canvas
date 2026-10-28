@@ -81,6 +81,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
   private sizeWatch: ResizeObserver;
   private relayoutFrame = 0;
   private dragCleanup: (() => void) | null = null;
+  private joinHint: HTMLElement | null = null;
 
   constructor(private node: RawNode, private body: HTMLElement, private ctx: CardContext) {
     this.cardEl = body.parentElement ?? body;
@@ -236,6 +237,27 @@ export class MindMapCard implements CardHandle, MindMapControl {
 
   markDropTarget(id: string | null): void {
     for (const [tid, el] of this.topicEls) el.toggleClass('is-drop-target', tid === id);
+    // Where the joining topic will go: the slot for a new subtopic, as inside a map.
+    const p = id ? this.placed.get(id) : undefined;
+    if (!p) { this.joinHint?.remove(); this.joinHint = null; return; }
+    if (!this.joinHint?.isConnected) this.joinHint = this.overlay.createDiv('vc-mm-drop is-child');
+    this.joinHint.show();
+    const g = this.childSlot(p);
+    this.joinHint.style.transform = `translate(${g.x}px, ${g.y}px)`;
+    this.joinHint.style.width = '60px';
+    this.joinHint.style.height = '22px';
+  }
+
+  /** Top-left (overlay coordinates) of the slot a new subtopic of a placed topic takes. */
+  private childSlot(p: Placed, side?: 'left' | 'right'): { x: number; y: number } {
+    const x = p.x + this.shift.x, y = p.y + this.shift.y;
+    const down = this.data.layout === 'down';
+    const list = this.data.layout === 'list' || (this.data.layout === 'timeline' && p.depth >= 1);
+    const left = !down && !list && (side === 'left' || (p.depth > 0 && p.side === 'left'));
+    return {
+      x: down ? x + p.w / 2 - 30 : list ? x + 24 : left ? x - 76 : x + p.w + 16,
+      y: down ? y + p.h + 16 : list ? y + p.h + 6 : y + p.h / 2 - 11,
+    };
   }
 
   /** Another map (a floating topic and what hangs under it) becomes a subtopic of `topicId`. */
@@ -423,8 +445,12 @@ export class MindMapCard implements CardHandle, MindMapControl {
   }
 
   barAvoid(): { x: number; y: number; width: number; height: number }[] {
-    if (!this.sel.size) return [];
+    // A selected topic or boundary: the bar keeps clear of every topic (and boundary title).
+    if (!this.sel.size && !this.bndSel) return [];
     const out: { x: number; y: number; width: number; height: number }[] = [];
+    for (const q of this.extras.boundaries) {
+      if (q.label && q.id !== this.bndSel) out.push({ x: this.node.x + this.shift.x + q.x, y: this.node.y + this.shift.y + q.y - 24, width: q.w, height: 24 });
+    }
     for (const [id, p] of this.placed) {
       const x = this.node.x + p.x + this.shift.x, y = this.node.y + p.y + this.shift.y;
       // The selected topic's "+" buttons sit just outside it.
@@ -1195,12 +1221,8 @@ export class MindMapCard implements CardHandle, MindMapControl {
       if (drop.mode === 'child') {
         this.topicEls.get(drop.target)?.addClass('is-drop-target');
         hint!.addClass('is-child');
-        const down = this.data.layout === 'down';
-        const list = this.data.layout === 'list' || (this.data.layout === 'timeline' && p.depth >= 1);
-        const left = !down && !list && (drop.side === 'left' || (p.depth > 0 && p.side === 'left'));
-        const gx = down ? x + p.w / 2 - 30 : list ? x + 24 : left ? x - 76 : x + p.w + 16;
-        const gy = down ? y + p.h + 16 : list ? y + p.h + 6 : y + p.h / 2 - 11;
-        hs.transform = `translate(${gx}px, ${gy}px)`;
+        const g = this.childSlot(p, drop.side);
+        hs.transform = `translate(${g.x}px, ${g.y}px)`;
         hs.width = '60px'; hs.height = '22px';
       } else {
         hint!.removeClass('is-child');

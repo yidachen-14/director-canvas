@@ -5,6 +5,7 @@ import { applyCardColor, resolveFile, vcGet } from './util';
 import { commitNode, missingFile } from './basic';
 import { t } from '../i18n';
 import { RichText } from '../richtext/editor';
+import { VideoPlayer } from './video-player';
 
 // ── image, video, audio ─────────────────────────────────────
 
@@ -68,6 +69,7 @@ class MediaCard implements CardHandle {
   private descRich: RichText | null = null;
   private ro: ResizeObserver;
   private shownFile = '';
+  private player: VideoPlayer | null = null;
 
   constructor(private kind: MediaKind, node: RawNode, private el: HTMLElement, private ctx: CardContext) {
     this.node = node;
@@ -107,6 +109,8 @@ class MediaCard implements CardHandle {
     applyCardColor(this.el.closest<HTMLElement>('.vc-node') ?? this.el, n.color);
     if (this.shownFile !== (n.file ?? '')) {
       this.shownFile = n.file ?? '';
+      this.player?.destroy();
+      this.player = null;
       this.frame.empty();
       const file = resolveFile(this.ctx.app, n);
       if (!file) missingFile(this.frame, n.file);
@@ -116,8 +120,7 @@ class MediaCard implements CardHandle {
           const img = this.frame.createEl('img', { attr: { src, draggable: 'false', alt: file.basename } });
           img.addEventListener('load', () => this.fitToMedia(img.naturalWidth, img.naturalHeight));
         } else if (this.kind === 'video') {
-          const v = this.frame.createEl('video', { attr: { src, controls: '', preload: 'metadata' } });
-          v.addEventListener('loadedmetadata', () => this.fitToMedia(v.videoWidth, v.videoHeight));
+          this.player = new VideoPlayer(this.frame, src, this.ctx, n, (w, h) => this.fitToMedia(w, h));
         }
         else {
           const wrap = this.frame.createDiv('vc-audio-wrap');
@@ -222,6 +225,7 @@ class MediaCard implements CardHandle {
   update(n: RawNode): void {
     this.node = n;
     this.render();
+    this.player?.update(n);
     this.refit();
   }
 
@@ -237,6 +241,7 @@ class MediaCard implements CardHandle {
 
   destroy(): void {
     this.ro.disconnect();
+    this.player?.destroy();
     this.descRich?.destroy();
     this.el.querySelectorAll('video,audio').forEach(m => (m as HTMLMediaElement).pause());
   }
@@ -254,6 +259,8 @@ class MediaCard implements CardHandle {
   }
 
   isEditing(): boolean { return !!this.descRich?.editing; }
+
+  onKey(e: KeyboardEvent): boolean { return this.player?.onKey(e) ?? false; }
 
   stopEditing(): void { this.descRich?.stopEditing(); }
 
@@ -283,6 +290,11 @@ class MediaCard implements CardHandle {
     if (this.descText()) {
       menu.addItem(i => i.setTitle(t('Remove description')).setIcon('x').setSection('edit')
         .onClick(() => commitNode(this.ctx, this.node.id, (n) => { n.vc = { ...(n.vc ?? {}) }; delete n.vc.desc; })));
+    }
+    const player = this.player;
+    if (player) {
+      menu.addItem(i => i.setTitle(t('Set as cover')).setIcon('image').setSection('edit').onClick(() => void player.setCover()));
+      if (player.hasCover()) menu.addItem(i => i.setTitle(t('Remove cover')).setIcon('image-off').setSection('edit').onClick(() => player.removeCover()));
     }
     const file = resolveFile(this.ctx.app, this.node);
     if (file) {

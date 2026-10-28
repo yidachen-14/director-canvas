@@ -12,7 +12,7 @@ Visual Canvas 是 Obsidian 的無限白板插件，直接開啟並編輯你現�
 
 - **原生檔案**：讀寫 Obsidian 的 JSON Canvas。Visual Canvas 額外的資料（文字格式、心智圖、媒體描述等）存在節點的 `vc` 欄位，內建 Canvas 照樣顯示基本內容。白板標題列可一鍵切換「用內建 Canvas 開啟」。
 - **文字卡片**：Text、Note（完整多格式編輯：標題、清單、待辦、引用、程式碼、顏色、螢光筆、字級、對齊）、便利貼、Callout。輸入 `/` 叫出段落選單，支援 Markdown 快捷輸入；段落可以拖曳排序、拖到別張卡片或拖出白板成為新卡片。任何一行文字都能加上待辦框。
-- **媒體與其他卡片**：圖片、影片（可加描述）、音訊、筆記連結與檔案、書籤（網址預覽）、看板、欄、畫筆（壓感筆跡、螢光筆、橡皮擦）、色票、行事曆（規劃表，會顯示各卡片中帶 📅 日期的待辦）。
+- **媒體與其他卡片**：圖片、影片（審片播放器：封面格、標記與入出點區段加註記、逐格、倍速、循環）、音訊、筆記連結與檔案、書籤（網址預覽）、看板、欄、畫筆（壓感筆跡、螢光筆、橡皮擦）、色票、行事曆（規劃表，會顯示各卡片中帶 📅 日期的待辦）。
 - **心智圖**：仿 Boardmix。5 種佈局（向右、左右展開、組織圖、時間軸、大綱）、12 組配色、緊湊／正常／較大，以及主題的填充、邊框、外形、分支線樣式與分支顏色。Tab／Enter／Delete／方向鍵操作，可以直接打字（支援中文輸入法），拖曳改掛，可收合。
 - **排列（仿 PureRef）**：最佳排列、依名稱／加入順序／路徑、隨機、四向推齊、堆疊、統一高度／寬度／大小／面積、水平／垂直分佈，以及對齊。
 - **浮動選單**：選取物件時出現在上方（仿 Boardmix），單選時是該物件的工具，多選時提供大小、對齊、排列與組合。
@@ -62,7 +62,7 @@ Visual Canvas is an infinite whiteboard for Obsidian that opens and edits your e
 
 - **Native files**: reads and writes Obsidian's JSON Canvas. Anything extra (text formatting, mind maps, media descriptions…) lives in each node's `vc` field, so the core Canvas still shows the basic content. Switch a board to the core Canvas from its header.
 - **Text cards**: Text, Note (full rich text: headings, lists, to-dos, quotes, code, colours, highlight, font size, alignment), Sticky note, Callout. `/` opens a block menu and Markdown shortcuts work. Drag paragraphs to reorder them, move them into another card, or drop them on the board as a new card. Any line can get a to-do checkbox.
-- **Media and more**: pictures and videos (with descriptions), audio, notes and files, bookmarks (link previews), kanban, columns, pen (pressure ink, highlighter, eraser), colour swatches, and a calendar planner that also shows dated 📅 to-dos from other cards.
+- **Media and more**: pictures and videos (a review player: cover frame, point and range marks with notes, frame stepping, speed, loops), audio, notes and files, bookmarks (link previews), kanban, columns, pen (pressure ink, highlighter, eraser), colour swatches, and a calendar planner that also shows dated 📅 to-dos from other cards.
 - **Mind maps**, Boardmix-style:
   - Five layouts (right, both sides, org chart, timeline, outline), twelve themes, and compact / normal / large sizes.
   - Per-topic fill, border, shape, branch line style and branch colour.

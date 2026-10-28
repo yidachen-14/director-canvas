@@ -132,7 +132,7 @@ export function shortcutLabel(id: string, custom: Record<string, string>): strin
 export function installShortcuts(scope: Scope, board: () => Board | null): void {
   scope.register(null, null, (e: KeyboardEvent) => {
     const b = board();
-    if (!b || b.editingId) return true;
+    if (!b || b.editingId || e.defaultPrevented) return true;
     const el = document.activeElement as HTMLElement | null;
     if (!el || !b.root.contains(el)) return true;
     if (el !== b.root && el.closest('input, textarea, select, [contenteditable="true"], [contenteditable="plaintext-only"]:not([data-vc-armed])')) return true;
@@ -140,6 +140,11 @@ export function installShortcuts(scope: Scope, board: () => Board | null): void 
     if (!ks) return true;
     // Keys without ⌘/Ctrl type into an armed mind map topic; leave them to it.
     if (!ks.includes('Mod') && !ks.includes('Ctrl') && el.hasAttribute('data-vc-armed')) return true;
+    // The selected card's own keys come first (a video's player keys: Space, I, O, M, J, K, L).
+    if (!ks.includes('Mod') && !ks.includes('Ctrl') && b.selection.size === 1) {
+      const id = [...b.selection][0];
+      if (b.cards.get(id)?.handle.onKey?.(e)) { e.preventDefault(); return false; }
+    }
     const custom = b.settings.hotkeys;
     const hit = allShortcuts().find(s => keysFor(s, custom).includes(ks));
     if (!hit) return true;
