@@ -375,9 +375,16 @@ function appearanceMenu(board: Board, e: MouseEvent): void {
   const menu = new Menu();
   const save = () => { void plugin.saveSettings(); plugin.refreshBoards(); };
   menu.addItem(i => i.setTitle(t('Snap to grid')).setIcon('grid-3x3').setChecked(s.snapToGrid).onClick(() => { s.snapToGrid = !s.snapToGrid; save(); }));
-  const sizes: [number, string][] = [[1, 'Small dots'], [1.5, 'Medium dots'], [2.5, 'Large dots'], [0, 'Hide dots']];
-  for (const [size, label] of sizes) {
-    menu.addItem(i => i.setTitle(t(label)).setSection('dots').setChecked(s.dotSize === size).onClick(() => { s.dotSize = size; save(); }));
+  const grids: ['lines' | 'dots' | 'none', number, string][] = [
+    ['dots', 1, 'Small dots'], ['dots', 1.5, 'Medium dots'], ['dots', 2.5, 'Large dots'], ['lines', 0, 'Square grid'], ['none', 0, 'Hide the grid'],
+  ];
+  for (const [style, size, label] of grids) {
+    const on = style === 'none' ? s.dotSize === 0 : s.dotSize > 0 && s.gridStyle === style && (style === 'lines' || s.dotSize === size);
+    menu.addItem(i => i.setTitle(t(label)).setSection('dots').setChecked(on).onClick(() => {
+      if (style === 'none') s.dotSize = 0;
+      else { s.gridStyle = style; if (style === 'dots') s.dotSize = size; else if (!s.dotSize) s.dotSize = 1.5; }
+      save();
+    }));
   }
   menu.addItem(i => i.setTitle(t('More appearance settings…')).setIcon('settings').setSection('more').onClick(() => plugin.openSettings()));
   menu.showAtMouseEvent(e);

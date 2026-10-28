@@ -38,6 +38,8 @@ export interface VisualCanvasSettings {
 
   /** Pan with: the space bar + drag always works; this adds a mouse button. */
   panButton: 'middle' | 'right' | 'none';
+  /** Background grid: an even square lattice of dots (Boardmix) or of lines. */
+  gridStyle: 'lines' | 'dots';
   dotColor: string;
   dotSize: number;
   backgroundColor: string;
@@ -54,7 +56,7 @@ export interface VisualCanvasSettings {
   autoRelink: boolean;
 }
 
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 3;
 
 export const DEFAULT_SETTINGS: VisualCanvasSettings = {
   language: 'zh-TW',
@@ -71,7 +73,7 @@ export const DEFAULT_SETTINGS: VisualCanvasSettings = {
   pasteTextKind: 'note',
   dragOutKind: 'text',
   defaultTextSize: 16,
-  defaultStickyColor: '#D2BA23',
+  defaultStickyColor: '#F4D81E',
 
   imageRadius: 4,
   imageShadow: true,
@@ -81,6 +83,7 @@ export const DEFAULT_SETTINGS: VisualCanvasSettings = {
   defaultRoute: 'straight',
 
   panButton: 'middle',
+  gridStyle: 'dots',
   dotColor: '',
   dotSize: 1.5,
   backgroundColor: '',
@@ -120,9 +123,14 @@ export function normalizeSettings(raw: unknown): VisualCanvasSettings {
     s.toolbarPosition = 'top';
     s.toolbarSize = 'S';
   }
+  // Version 3: new default sticky yellow (R244 G216 B30), if the old default was never changed.
+  if (typeof r.settingsVersion !== 'number' || r.settingsVersion < 3) {
+    if (s.defaultStickyColor.toUpperCase() === '#D2BA23') s.defaultStickyColor = '#F4D81E';
+  }
   s.toolbarTools = s.toolbarTools.filter(id => id !== 'select' && id !== 'hand');
   s.settingsVersion = SETTINGS_VERSION;
   if (![1, 2, 3].includes(s.pngScale)) s.pngScale = 2;
+  if (!['lines', 'dots'].includes(s.gridStyle)) s.gridStyle = 'dots';
   if (!['straight', 'curve', 'elbow'].includes(s.defaultRoute)) s.defaultRoute = 'straight';
   s.defaultTextSize = Math.min(96, Math.max(8, s.defaultTextSize));
   s.gridSize = Math.min(200, Math.max(4, s.gridSize));

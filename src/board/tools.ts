@@ -34,9 +34,9 @@ export const TOOLS: Tool[] = [
   cardTool('group'),
   { id: 'connect', label: 'Connect', icon: 'spline' },
   { id: 'pen', label: 'Pen', icon: 'pen-line', available: () => !!getCardType('drawing') },
+  cardTool('swatch'),
   cardTool('bookmark'),
   cardTool('mindmap'),
-  cardTool('swatch'),
   cardTool('calendar'),
 ];
 

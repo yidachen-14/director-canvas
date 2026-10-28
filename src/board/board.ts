@@ -3,7 +3,7 @@ import type VisualCanvasPlugin from '../main';
 import type { CanvasView } from '../view/canvas-view';
 import { BoardModel, nodeRect, unionRect, type ChangeEvent, type Rect } from '../model/board-model';
 import { newId, type CanvasFile, type RawEdge, type RawNode } from '../model/canvas-file';
-import { Viewport, gridLayers, type Point } from './viewport';
+import { Viewport, gridStep, type Point } from './viewport';
 import { edgeGeometry, edgeWidth, vcOf } from './connections';
 import type { ConnectController } from './connect-ui';
 import { drawingHit, recolorDrawing } from '../cards/drawing';
@@ -160,6 +160,7 @@ export class Board {
     const s = this.settings;
     this.root.style.setProperty('--vc-dot-color', s.dotColor || 'var(--vc-dot-default)');
     this.root.style.setProperty('--vc-dot-size', `${s.dotSize}px`);
+    this.root.setAttr('data-grid', s.dotSize > 0 ? s.gridStyle : 'none');
     if (s.backgroundColor) this.root.style.setProperty('--vc-bg', s.backgroundColor);
     else this.root.style.removeProperty('--vc-bg');
     this.root.setAttr('data-toolbar-size', s.toolbarSize);
@@ -181,13 +182,13 @@ export class Board {
   }
 
   private applyGrid(): void {
-    const { coarse, fine, fineAlpha } = gridLayers(this.settings.gridSize, this.vp.zoom);
-    const ox = this.vp.x, oy = this.vp.y;
+    const step = gridStep(this.settings.gridSize, this.vp.zoom);
     const g = this.gridEl.style;
-    g.setProperty('--vc-grid-coarse', `${coarse}px`);
-    g.setProperty('--vc-grid-fine', `${fine}px`);
-    g.setProperty('--vc-grid-fine-alpha', String(fineAlpha));
-    g.backgroundPosition = `${ox % coarse}px ${oy % coarse}px, ${ox % fine}px ${oy % fine}px`;
+    g.setProperty('--vc-grid-step', `${step}px`);
+    // Dots sit in the middle of each tile, lines on its edges: both land on the board grid.
+    const off = this.settings.gridStyle === 'dots' ? -step / 2 : 0;
+    const px = ((this.vp.x + off) % step + step) % step, py = ((this.vp.y + off) % step + step) % step;
+    g.backgroundPosition = `${px}px ${py}px`;
   }
 
   /** Size of the visible board area in screen pixels. */

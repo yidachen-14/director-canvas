@@ -8,6 +8,7 @@
 
 .vc-board {
   --vc-dot-default: color-mix(in srgb, var(--text-faint) 55%, transparent);
+  --vc-line-color: color-mix(in srgb, var(--vc-dot-color, var(--text-faint)) 45%, transparent);
   --vc-select: var(--interactive-accent);
   position: absolute;
   inset: 0;
@@ -19,15 +20,20 @@
   -webkit-user-select: none;
 }
 
-/* Dot grid: a coarse layer always shown, a fine layer fading in between. */
+/* Background grid: one even layer of square lines (or dots), one step apart. */
 .vc-grid {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  background-size: var(--vc-grid-step) var(--vc-grid-step);
+}
+.vc-board[data-grid='lines'] .vc-grid {
   background-image:
-    radial-gradient(circle, var(--vc-dot-color) calc(var(--vc-dot-size) / 2), transparent calc(var(--vc-dot-size) / 2 + 0.6px)),
-    radial-gradient(circle, color-mix(in srgb, var(--vc-dot-color) calc(var(--vc-grid-fine-alpha) * 100%), transparent) calc(var(--vc-dot-size) / 2), transparent calc(var(--vc-dot-size) / 2 + 0.6px));
-  background-size: var(--vc-grid-coarse) var(--vc-grid-coarse), var(--vc-grid-fine) var(--vc-grid-fine);
+    linear-gradient(to right, var(--vc-line-color) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--vc-line-color) 1px, transparent 1px);
+}
+.vc-board[data-grid='dots'] .vc-grid {
+  background-image: radial-gradient(circle, var(--vc-dot-color) calc(var(--vc-dot-size) / 2), transparent calc(var(--vc-dot-size) / 2 + 0.6px));
 }
 
 .vc-world {
@@ -79,14 +85,26 @@
 
 .vc-node { --vc-radius: 8px; --vc-radius-on: 1; }
 .vc-node-body { border-radius: var(--vc-radius); }
-/* The outline sits 2px outside the card: its corners are the card's corners grown by 2px, so they meet it evenly. */
+/*
+ * Selection: one look for every card. The outline lies exactly on the card's own edge, with the
+ * card's own corner radius, and is at least as thick as the card's border, so it covers that
+ * border completely instead of sitting beside it. Frameless cards (text, ink, mind maps) get it
+ * just outside instead, so it doesn't run over their content.
+ */
+.vc-node { --vc-own-border: 1px; --vc-sel-w: max(calc(2px / var(--vc-zoom)), var(--vc-own-border)); }
 .vc-node.is-selected::after {
   content: '';
   position: absolute;
-  inset: calc(-2px / var(--vc-zoom));
-  border: calc(2px / var(--vc-zoom)) solid var(--vc-select);
-  border-radius: calc(var(--vc-radius) + var(--vc-radius-on) * 2px / var(--vc-zoom));
+  inset: 0;
+  border: var(--vc-sel-w) solid var(--vc-select);
+  border-radius: var(--vc-radius);
   pointer-events: none;
+  z-index: 3;
+}
+.vc-kind-text.is-selected::after, .vc-kind-drawing.is-selected::after, .vc-kind-mindmap.is-selected::after {
+  inset: calc(-2px / var(--vc-zoom));
+  border-width: calc(2px / var(--vc-zoom));
+  border-radius: calc(var(--vc-radius) + 2px / var(--vc-zoom));
 }
 /* Pictures: small corners and a soft shadow, like Freeform; both adjustable in settings. */
 .vc-kind-image, .vc-kind-video { --vc-radius: var(--vc-img-radius, 4px); --vc-radius-on: var(--vc-img-radius-on, 1); }
@@ -154,11 +172,13 @@
 .vc-media-link {
   flex: none;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   height: 30px;
-  padding: 5px 8px 0;
+  padding: 0 10px;
   box-sizing: border-box;
-  background: var(--background-secondary-alt, var(--background-secondary));
+  /* Inverted for contrast: dark with light text in a light theme, light with dark text in a dark one. */
+  background: var(--text-normal);
+  color: var(--background-primary);
 }
 .vc-media-link-tab {
   display: flex;
@@ -166,17 +186,13 @@
   gap: 6px;
   min-width: 0;
   max-width: 100%;
-  height: 25px;
-  padding: 0 12px 0 9px;
-  box-sizing: border-box;
-  border-radius: 7px 7px 0 0;
-  background: var(--background-primary);
   font-size: 12px;
-  color: var(--text-muted);
+  font-weight: 500;
+  color: inherit;
 }
 .vc-node.is-selected .vc-media-link-tab { cursor: pointer; }
-.vc-node.is-selected .vc-media-link-tab:hover { color: var(--text-accent); }
-.vc-media-link-icon { display: flex; flex: none; }
+.vc-node.is-selected .vc-media-link-tab:hover .vc-media-link-text { text-decoration: underline; }
+.vc-media-link-icon { display: flex; flex: none; opacity: 0.8; }
 .vc-media-link-icon svg { width: 13px; height: 13px; }
 .vc-media-link-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* With a link bar or a description, the card always casts a shadow so the white parts show their edge. */
@@ -557,10 +573,10 @@
 .vc-tool-sep { flex: none; align-self: stretch; width: 1px; margin: 6px 3px; background: var(--background-modifier-border); }
 .vc-board[data-toolbar-pos='left'] .vc-tool-sep, .vc-board[data-toolbar-pos='right'] .vc-tool-sep { width: auto; height: 1px; margin: 3px 6px; }
 
-.vc-toolbar[data-size='L'] .vc-tool { min-width: 56px; height: 58px; padding: 0 6px; }
+.vc-toolbar[data-size='L'] .vc-tool { min-width: 58px; height: 66px; padding: 0 6px; gap: 9px; }
 .vc-toolbar[data-size='L'] .vc-tool-icon svg { width: 20px; height: 20px; }
 .vc-toolbar[data-size='L'] .vc-tool-label { font-size: 11px; }
-.vc-toolbar[data-size='M'] .vc-tool { min-width: 46px; height: 48px; padding: 0 4px; gap: 4px; }
+.vc-toolbar[data-size='M'] .vc-tool { min-width: 48px; height: 56px; padding: 0 5px; gap: 8px; }
 .vc-toolbar[data-size='M'] .vc-tool-icon svg { width: 17px; height: 17px; }
 .vc-toolbar[data-size='M'] .vc-tool-label { font-size: 10px; }
 .vc-toolbar[data-size='S'] .vc-tool { width: 32px; height: 32px; }
@@ -1584,16 +1600,6 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-cal-modal-color.is-none { border: 1.5px dashed var(--text-faint); }
 .vc-cal-modal-color.is-active { box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--interactive-accent); }
 
-/* Frames (groups, columns, kanban, calendar): selecting one thickens its own frame, so the
-   outline follows its exact corners instead of a second box around it. */
-.vc-kind-group.is-selected::after, .vc-kind-column.is-selected::after,
-.vc-kind-kanban.is-selected::after, .vc-kind-calendar.is-selected::after { display: none; }
-.vc-kind-group.is-selected .vc-group, .vc-kind-column.is-selected .vc-group,
-.vc-kind-kanban.is-selected .vc-kb-board, .vc-kind-calendar.is-selected .vc-cal {
-  border-color: var(--vc-select) !important;
-  border-style: solid !important;
-  box-shadow: inset 0 0 0 calc(1.5px / var(--vc-zoom)) var(--vc-select);
-}
 .vc-kind-kanban, .vc-kind-calendar { --vc-radius: 10px; }
 .vc-kind-group, .vc-kind-column { --vc-radius: 12px; }
 
@@ -1621,3 +1627,30 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-keys-chip.is-conflict { border-color: var(--text-error); color: var(--text-error); }
 .vc-keys-row .clickable-icon.is-hidden { visibility: hidden; }
 .vc-tool-more.is-tool-active { background: color-mix(in srgb, var(--interactive-accent) 18%, transparent); color: var(--interactive-accent); }
+
+/* Corner radius of each card's own frame, so the selection outline matches it exactly. */
+.vc-kind-sticky { --vc-radius: 4px; }
+.vc-kind-bookmark { --vc-radius: 10px; }
+.vc-kind-group { --vc-own-border: 0px; }
+.vc-node.has-media-frame { --vc-own-border: 2px; }
+
+/* folder picker */
+.vc-folder-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.vc-folder-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 8px; border-radius: 999px; background: var(--background-modifier-hover); color: var(--text-normal); font-size: var(--font-ui-smaller); }
+.vc-folder-chip-icon, .vc-folder-chip-x { display: flex; }
+.vc-folder-chip-icon svg { width: 12px; height: 12px; color: var(--text-muted); }
+.vc-folder-chip-x { cursor: pointer; border-radius: 50%; padding: 2px; color: var(--text-muted); }
+.vc-folder-chip-x:hover { background: var(--background-modifier-border); color: var(--text-normal); }
+.vc-folder-chip-x svg { width: 11px; height: 11px; }
+.vc-folder-modal { width: min(520px, 92vw); }
+.vc-folder-search { width: 100%; margin-bottom: 8px; }
+.vc-folder-tree { max-height: 55vh; overflow-y: auto; border: 1px solid var(--background-modifier-border); border-radius: 8px; padding: 4px 0; }
+.vc-folder-row { display: flex; align-items: center; gap: 6px; padding: 3px 8px; cursor: pointer; font-size: var(--font-ui-small); }
+.vc-folder-row:hover { background: var(--background-modifier-hover); }
+.vc-folder-row input { margin: 0; }
+.vc-folder-caret { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex: none; }
+.vc-folder-caret svg { width: 14px; height: 14px; }
+.vc-folder-icon { display: flex; color: var(--text-muted); }
+.vc-folder-icon svg { width: 14px; height: 14px; }
+.vc-folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vc-folder-empty { padding: 8px 12px; color: var(--text-faint); font-size: var(--font-ui-small); }

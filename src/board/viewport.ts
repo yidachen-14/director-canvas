@@ -55,6 +55,18 @@ export function clampZoom(z: number): number {
  * the board zooms out, every other dot fades away; zooming in, new dots fade
  * in between the old ones.
  */
+/**
+ * One even grid step on screen: the board grid scaled by the zoom, doubled or halved until it
+ * lies in [min, 2·min) pixels. Every line / dot has the same weight, so the grid always reads
+ * as a plain square lattice, never as rows of stronger and weaker marks.
+ */
+export function gridStep(gridSize: number, zoom: number, minPx = 18): number {
+  let step = gridSize * zoom;
+  while (step < minPx) step *= 2;
+  while (step >= minPx * 2) step /= 2;
+  return step;
+}
+
 export function gridLayers(gridSize: number, zoom: number, minPx = 18): { coarse: number; fine: number; fineAlpha: number } {
   let step = gridSize * zoom;
   while (step < minPx) step *= 2;

@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS, type TextCardKind, type ToolbarPosition, type Toolbar
 import { availableTools, FIXED_TOOLS } from './board/tools';
 import { setLanguage, t, type Language } from './i18n';
 import { ShortcutsModal } from './shortcuts-modal';
+import { FolderPickModal } from './folder-picker';
 
 const TEXT_KINDS: TextCardKind[] = ['text', 'note', 'sticky', 'callout'];
 const KIND_LABEL: Record<TextCardKind, string> = { text: 'Text', note: 'Note', sticky: 'Sticky note', callout: 'Callout' };
@@ -44,16 +45,33 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
       .setName(t('Open .canvas files with Visual Canvas'))
       .setDesc(t('Boards open here instead of the core Canvas. You can always switch a board back from its header.'))
       .addToggle(tg => tg.setValue(s.openCanvasByDefault).onChange(async (v) => { s.openCanvasByDefault = v; await this.save(false); }));
-    new Setting(el)
+    const folders = new Setting(el)
       .setName(t('Only in these folders'))
-      .setDesc(t('One folder per line. Leave empty to open every board with Visual Canvas.'))
-      .addTextArea(ta => {
-        ta.inputEl.rows = 3;
-        ta.setPlaceholder(t('One folder per line')).setValue(s.takeoverFolders.join('\n')).onChange(async (v) => {
-          s.takeoverFolders = v.split('\n').map(x => x.trim()).filter(Boolean);
+      .setDesc(t('Boards in these folders (and the folders inside them) open with Visual Canvas. None chosen: every board.'));
+    const chips = folders.descEl.createDiv('vc-folder-chips');
+    const paintChips = () => {
+      chips.empty();
+      for (const f of s.takeoverFolders) {
+        const chip = chips.createDiv('vc-folder-chip');
+        setIcon(chip.createSpan('vc-folder-chip-icon'), 'folder');
+        chip.createSpan({ text: f });
+        const x = chip.createSpan({ cls: 'vc-folder-chip-x', attr: { 'aria-label': t('Remove') } });
+        setIcon(x, 'x');
+        x.addEventListener('click', async () => {
+          s.takeoverFolders = s.takeoverFolders.filter(v => v !== f);
           await this.save(false);
+          paintChips();
         });
-      });
+      }
+    };
+    paintChips();
+    folders.addButton(b => b.setButtonText(t('Choose folders…')).onClick(() => {
+      new FolderPickModal(this.app, s.takeoverFolders, async (list) => {
+        s.takeoverFolders = list;
+        await this.save(false);
+        paintChips();
+      }).open();
+    }));
 
     // ── Toolbar ──
     new Setting(el).setName(t('Toolbar')).setHeading();
@@ -149,7 +167,12 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
         .setValue(s.panButton)
         .onChange(async (v) => { s.panButton = v as typeof s.panButton; await this.save(false); }));
     new Setting(el)
+      .setName(t('Grid'))
+      .addDropdown(d => d.addOption('dots', t('Dots')).addOption('lines', t('Square grid'))
+        .setValue(s.gridStyle).onChange(async (v) => { s.gridStyle = v as typeof s.gridStyle; await this.save(); }));
+    new Setting(el)
       .setName(t('Dot size'))
+      .setDesc(t('0 hides the grid.'))
       .addSlider(sl => sl.setLimits(0, 4, 0.5).setValue(s.dotSize).setDynamicTooltip().onChange(async (v) => { s.dotSize = v; await this.save(); }));
     this.colorSetting(el, t('Dot colour'), 'dotColor');
     this.colorSetting(el, t('Background colour'), 'backgroundColor');

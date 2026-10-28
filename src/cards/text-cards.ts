@@ -372,7 +372,7 @@ export const textCard = richCard({
 });
 
 export const noteCard = richCard({
-  id: 'note', label: 'Note', icon: 'file', placeholder: 'Type "/" for blocks…',
+  id: 'note', label: 'Note', icon: 'file-text', placeholder: 'Type "/" for blocks…',
   defaultSize: { width: 320, height: 200 },
   create: () => ({ type: 'text', text: '' }),
 });

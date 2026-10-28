@@ -138,7 +138,7 @@ interface EmbedLike extends Component { loadFile?: (file: TFile, subpath?: strin
 export const fileCard: CardType = {
   id: 'file',
   label: 'File',
-  icon: 'file-text',
+  icon: 'file',
   defaultSize: { width: 400, height: 400 },
   mount(node, el, ctx) {
     let current = node;
