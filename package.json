@@ -1,8 +1,8 @@
 {
   "name": "visual-canvas",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
-  "description": "Visual Canvas: an infinite whiteboard for Obsidian that reads and writes native .canvas files.",
+  "description": "Direct Canvas: an infinite whiteboard for Obsidian that reads and writes native .canvas files.",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc --noEmit -skipLibCheck && node esbuild.config.mjs production",

@@ -162,7 +162,7 @@ export async function addFiles(board: Board, files: File[], at: Point): Promise<
     try {
       saved.push(await saveAttachment(board.app, await f.arrayBuffer(), f.name || 'pasted', board.sourcePath));
     } catch (err) {
-      console.error('Visual Canvas: could not save', f.name, err);
+      console.error('Direct Canvas: could not save', f.name, err);
       new Notice(t('Could not add "{name}".', { name: f.name }));
     }
   }

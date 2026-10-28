@@ -252,7 +252,7 @@ export class BoardModel {
       this.normalizing = true;
       this.txDepth++;
       try { for (const fn of this.normalizers) fn(new Set(this.txChanged)); }
-      catch (err) { console.error('Visual Canvas: layout failed', err); }
+      catch (err) { console.error('Direct Canvas: layout failed', err); }
       finally { this.txDepth--; this.normalizing = false; }
     }
     const now = Date.now();

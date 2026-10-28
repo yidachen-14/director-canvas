@@ -7,7 +7,7 @@
  * - free: a point on the board, attached to nothing.
  *
  * Card-to-card connections are stored as ordinary JSON Canvas edges (so the
- * core Canvas still shows them); everything only Visual Canvas understands
+ * core Canvas still shows them); everything only Direct Canvas understands
  * lives in the edge's `vc` object. Connections with a free end cannot be
  * expressed in JSON Canvas and are kept in the file's `vc.lines`.
  */

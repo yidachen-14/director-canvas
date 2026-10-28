@@ -176,7 +176,7 @@ export const fileCard: CardType = {
           void embed.loadFile?.(file, current.subpath);
           return;
         } catch (err) {
-          console.warn('Visual Canvas: embed failed, falling back', err);
+          console.warn('Direct Canvas: embed failed, falling back', err);
           embed = null;
         }
       }

@@ -48,7 +48,7 @@ export function resolveFile(app: App, node: RawNode): TFile | null {
   return f instanceof TFile ? f : null;
 }
 
-/** Card kind for a node: the Visual Canvas kind, or one derived from the core node type. */
+/** Card kind for a node: the Direct Canvas kind, or one derived from the core node type. */
 export function cardKindOf(node: RawNode): string {
   const vk = node.vc?.kind;
   if (typeof vk === 'string' && vk) return vk;
@@ -64,7 +64,7 @@ export function cardKindOf(node: RawNode): string {
   }
 }
 
-/** Read a Visual Canvas field with a fallback. */
+/** Read a Direct Canvas field with a fallback. */
 export function vcGet<T>(node: RawNode, key: string, fallback: T): T {
   const v = node.vc?.[key];
   return (v === undefined ? fallback : v) as T;

@@ -27,7 +27,7 @@ export class CanvasView extends TextFileView {
   }
 
   getViewType(): string { return VIEW_TYPE; }
-  getDisplayText(): string { return this.file?.basename ?? 'Visual Canvas'; }
+  getDisplayText(): string { return this.file?.basename ?? 'Direct Canvas'; }
   getIcon(): string { return 'layout-dashboard'; }
 
   async onOpen(): Promise<void> {
@@ -64,7 +64,7 @@ export class CanvasView extends TextFileView {
   async onClose(): Promise<void> {
     if (this.board && this.file) {
       this.board.stopEditing();
-      try { await this.save(); } catch (err) { console.error('Visual Canvas: save on close failed', err); }
+      try { await this.save(); } catch (err) { console.error('Direct Canvas: save on close failed', err); }
     }
     this.board?.destroy();
     this.board = null;

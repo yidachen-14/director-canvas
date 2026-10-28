@@ -1,4 +1,4 @@
-/* ── Visual Canvas ─────────────────────────────────────────────── */
+/* ── Direct Canvas ─────────────────────────────────────────────── */
 
 .vc-view {
   padding: 0 !important;
@@ -1747,7 +1747,6 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 .vc-vc-btn svg { width: 16px; height: 16px; }
 .vc-vc-rate { font-size: 12px; font-weight: 600; min-width: 34px; justify-content: center; font-variant-numeric: tabular-nums; }
 .vc-vc-time { font-size: 12px; font-variant-numeric: tabular-nums; margin-left: 6px; white-space: nowrap; color: var(--text-muted); }
-.vc-vc-volume { width: 64px; margin: 0 4px; }
 .vc-vt-pop {
   position: absolute; top: calc(100% + 6px); z-index: 3; display: flex; flex-direction: column; gap: 6px; padding: 8px; box-sizing: border-box;
   background: var(--background-primary); color: var(--text-normal); border: 1px solid var(--background-modifier-border);
@@ -1768,8 +1767,6 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 
 .vc-mm-row.is-wrap { flex-wrap: wrap; }
 .vc-node.is-joining { opacity: 0.45; }
-.vc-vc-volume { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; background: var(--background-modifier-border); }
-.vc-vc-volume::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--interactive-accent); border: none; box-shadow: none; }
 .vc-node.is-join-target { z-index: 100000 !important; }
 .vc-node.is-joining { opacity: 0.35; }
 .vc-board path.is-highlight, .vc-pen-live.is-highlight { fill-opacity: 0.45; }
@@ -1782,3 +1779,50 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
   body.vc-printing > .vc-print-host { display: block !important; position: relative !important; left: 0 !important; top: 0 !important; }
   body.vc-printing .vc-print-host * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
+/* Mind map font size: a number field, then the sizes in a column (Boardmix). */
+.vc-mm-pop.is-font-size { width: 96px; padding: 6px; }
+.vc-mm-size-input { width: 100%; box-sizing: border-box; margin-bottom: 4px; text-align: center; }
+.vc-mm-size-list { display: flex; flex-direction: column; max-height: 260px; overflow-y: auto; }
+.vc-mm-size-item { padding: 4px 8px; border-radius: 4px; font-size: 13px; text-align: center; cursor: pointer; font-variant-numeric: tabular-nums; }
+.vc-mm-size-item:hover { background: var(--background-modifier-hover); }
+.vc-mm-size-item.is-active { color: var(--interactive-accent); font-weight: 600; }
+.vc-mm-size-item.is-reset { font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--background-modifier-border); margin-top: 4px; padding-top: 6px; border-radius: 0; }
+
+/* Volume: a small vertical slider above its button. */
+.vc-vc-volwrap { position: relative; display: flex; }
+.vc-vc-volpop {
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 6;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px 4px;
+  background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 8px; box-shadow: var(--shadow-s);
+}
+.vc-vc-volval { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.vc-vc-volpop input[type='range'].vc-vc-volume {
+  appearance: auto; writing-mode: vertical-lr; direction: rtl;
+  width: 18px !important; height: 96px !important; min-width: 0 !important; margin: 2px 0 !important; padding: 0 !important;
+  background: transparent !important; accent-color: var(--interactive-accent);
+}
+.vc-vc-volpop input[type='range'].vc-vc-volume::-webkit-slider-runnable-track { width: 4px; border-radius: 2px; background: var(--background-modifier-border); }
+.vc-vc-volpop input[type='range'].vc-vc-volume::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px !important; height: 14px !important; margin: 0 0 0 -5px !important; border-radius: 50% !important;
+  background: var(--interactive-accent) !important; border: none !important; box-shadow: none !important;
+}
+.vc-vt-range.is-looping { box-shadow: 0 0 0 2px #34c759; }
+
+/* Full screen: the card fills the screen with the picture on top and its controls below. */
+.vc-node.vc-kind-video:fullscreen { display: flex; flex-direction: column; background: #000; }
+.vc-node.vc-kind-video:fullscreen::after,
+.vc-node.vc-kind-video:fullscreen > :not(.vc-node-body):not(.vc-video-ctrl) { display: none !important; }
+.vc-node.vc-kind-video:fullscreen > .vc-node-body { position: relative; inset: auto; flex: 1; min-height: 0; border-radius: 0; box-shadow: none; }
+.vc-node.vc-kind-video:fullscreen > .vc-video-ctrl { display: flex !important; position: relative; top: auto; min-width: 0; margin: 0; border-radius: 0; border-width: 1px 0 0; }
+.vc-node.vc-kind-video:fullscreen .vc-vt-pop { top: auto; bottom: calc(100% + 6px); }
+.vc-node.vc-kind-video:fullscreen .vc-video-sub { font-size: 22px; bottom: 24px; }
+.vc-node.vc-kind-video:fullscreen .vc-media-desc, .vc-node.vc-kind-video:fullscreen .vc-media-link { display: none; }
+.vc-node.vc-kind-video:fullscreen > .vc-video-ctrl { padding: 8px 16px 8px; gap: 4px; }
+.vc-node.vc-kind-video:fullscreen .vc-vt { height: 28px; }
+.vc-node.vc-kind-video:fullscreen .vc-vt-marks { height: 13px; }
+.vc-node.vc-kind-video:fullscreen .vc-vt-range { height: 13px; }
+.vc-node.vc-kind-video:fullscreen .vc-vt-point { width: 13px; height: 13px; margin-left: -6.5px; }
+.vc-node.vc-kind-video:fullscreen .vc-vt-bar { top: 17px; height: 5px; }
+.vc-node.vc-kind-video:fullscreen .vc-vt-head { top: 13px; width: 14px; height: 14px; margin-left: -7px; }
+.vc-node.vc-kind-video:fullscreen .vc-vc-btn svg { width: 20px; height: 20px; }
+.vc-node.vc-kind-video:fullscreen .vc-vc-time, .vc-node.vc-kind-video:fullscreen .vc-vc-rate { font-size: 14px; }

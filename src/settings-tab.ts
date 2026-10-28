@@ -40,12 +40,12 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
         }));
 
     new Setting(el)
-      .setName(t('Open .canvas files with Visual Canvas'))
+      .setName(t('Open .canvas files with Direct Canvas'))
       .setDesc(t('Boards open here instead of the core Canvas. You can always switch a board back from its header.'))
       .addToggle(tg => tg.setValue(s.openCanvasByDefault).onChange(async (v) => { s.openCanvasByDefault = v; await this.save(false); }));
     const folders = new Setting(el)
       .setName(t('Only in these folders'))
-      .setDesc(t('Boards in these folders (and the folders inside them) open with Visual Canvas. None chosen: every board.'));
+      .setDesc(t('Boards in these folders (and the folders inside them) open with Direct Canvas. None chosen: every board.'));
     const chips = folders.descEl.createDiv('vc-folder-chips');
     const paintChips = () => {
       chips.empty();

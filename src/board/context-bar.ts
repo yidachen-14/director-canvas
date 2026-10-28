@@ -104,7 +104,10 @@ export class ContextBar {
     const a = vp.toScreen(r.x, r.y), b = vp.toScreen(r.x + r.width, r.y + r.height);
     const { width, height } = this.board.screenSize();
     const w = this.el.offsetWidth, h = this.el.offsetHeight;
-    const gap = 14;
+    // Over a part of a card (a mind map topic) the bar keeps a little more room, like Boardmix.
+    const nodes0 = this.board.selectedNodes();
+    const part = nodes0.length === 1 && !!this.board.cards.get(nodes0[0].id)?.handle.barAnchor?.();
+    const gap = part ? 24 : 14;
     let x = (a.x + b.x) / 2 - w / 2;
     let y = a.y - h - gap;
     // A group's name sits above it; keep clear of it.

@@ -15,8 +15,9 @@ addIcon('vc-mark-in', '<path d="M62 18H38v64h24" fill="none" stroke="currentColo
 addIcon('vc-mark-out', '<path d="M38 18h24v64H38" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 50h28" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>');
 
 const RATES = [0.25, 0.5, 1, 1.5, 2];
-/** A point mark's note shows this long (seconds) around it while playing. */
-const POINT_SPAN = 0.6;
+/** A point mark's note shows from just before it to about a second after. */
+const POINT_BEFORE = 0.1;
+const POINT_AFTER = 1;
 
 const markTime = (m: VideoMark) => (m.out - m.in < 1e-3 ? formatTime(m.in) : `${formatTime(m.in)} – ${formatTime(m.out)}`);
 const isPoint = (m: VideoMark) => m.out - m.in < 1e-3;
@@ -31,14 +32,16 @@ export class VideoPlayer {
   private head: HTMLElement;
   private marksEl: HTMLElement;
   private pendingEl: HTMLElement;
-  private muteBtn: HTMLElement;
-  private volume: HTMLInputElement;
+  private volBtn: HTMLElement;
+  private volPop: HTMLElement | null = null;
+  private fsBtn: HTMLElement;
+  /** When J last slowed playback down (held J repeats). */
+  private lastSlow = 0;
   /** Holding J: playing backwards by seeking (browsers can't play in reverse). */
   private reverse: { from: number; t0: number; rate: number; stop: (e: KeyboardEvent) => void } | null = null;
   private timeEl: HTMLElement;
   private playBtn: HTMLElement;
   private rateBtn: HTMLElement;
-  private loopBtn: HTMLElement;
   private sub: HTMLElement;
   private pop: HTMLElement | null = null;
   private popSave: (() => void) | null = null;
@@ -47,7 +50,9 @@ export class VideoPlayer {
   private node: RawNode;
   private pendingIn: number | null = null;
   private openMark: string | null = null;
-  private loop: { in: number; out: number } | null = null;
+  private loop: { id: string; in: number; out: number } | null = null;
+  /** The last click on a mark, to tell a double-click. */
+  private lastMarkClick: { id: string; at: number } | null = null;
   /** Length of one frame, measured while playing; 30 fps until then. */
   private frameDur = 1 / 30;
   private raf = 0;
@@ -82,15 +87,12 @@ export class VideoPlayer {
     this.button(row, 'vc-mark-in', t('Mark in (I)'), () => this.markIn());
     this.button(row, 'vc-mark-out', t('Mark out (O)'), () => this.markOut());
     this.button(row, 'flag', t('Add a mark (M)'), () => this.addPoint());
-    this.loopBtn = this.button(row, 'repeat', t('Loop'), () => this.toggleLoop());
     this.rateBtn = this.button(row, '', t('Playback speed'), (e) => this.rateMenu(e));
     this.rateBtn.addClass('vc-vc-rate');
     this.button(row, 'image', t('Set as cover'), () => void this.setCover());
-    this.muteBtn = this.button(row, 'volume-2', t('Mute'), () => { this.video.muted = !this.video.muted; });
-    this.volume = row.createEl('input', { cls: 'vc-vc-volume', type: 'range', attr: { min: '0', max: '1', step: '0.05', 'aria-label': t('Volume') } });
-    this.volume.value = String(this.video.volume);
-    this.volume.addEventListener('input', () => { this.video.volume = Number(this.volume.value); this.video.muted = this.video.volume === 0; });
-    this.button(row, 'maximize', t('Full screen'), () => this.fullScreen());
+    const volWrap = row.createDiv('vc-vc-volwrap');
+    this.volBtn = this.button(volWrap, 'volume-2', t('Volume'), () => this.toggleVolume(volWrap));
+    this.fsBtn = this.button(row, 'maximize', t('Full screen'), () => this.fullScreen());
 
     this.wire();
     this.renderMarks();
@@ -133,13 +135,17 @@ export class VideoPlayer {
     });
     v.addEventListener('error', () => this.unsupported());
     v.addEventListener('play', () => { this.played = true; this.renderPlay(); this.tick(); });
-    v.addEventListener('pause', () => { this.renderPlay(); this.renderTime(); });
+    v.addEventListener('pause', () => {
+      // Pausing ends a range loop.
+      if (this.loop && !this.reverse) { this.loop = null; this.renderMarks(); }
+      this.renderPlay();
+      this.renderTime();
+    });
     v.addEventListener('seeked', () => this.renderTime());
     v.addEventListener('ratechange', () => this.renderRate());
     v.addEventListener('ended', () => this.renderPlay());
     v.addEventListener('volumechange', () => this.renderVolume());
-    // Full screen uses the browser's own controls.
-    this.stage.addEventListener('fullscreenchange', () => { v.controls = document.fullscreenElement === this.stage; });
+    document.addEventListener('fullscreenchange', this.onFullscreen);
     this.measureFrames();
 
     // A click on the picture of the selected card plays or pauses; the first click only
@@ -154,6 +160,7 @@ export class VideoPlayer {
     });
 
     this.track.addEventListener('pointerdown', (e) => this.pressTrack(e));
+
     // Clicking the controls keeps the keys (Space, ←, →, I, O, M, J, K, L) with the board.
     this.ctrl.addEventListener('pointerdown', (e) => {
       if (!(e.target as HTMLElement).closest('input, textarea')) window.setTimeout(() => this.ctx.board.root.focus({ preventScroll: true }), 0);
@@ -247,19 +254,34 @@ export class VideoPlayer {
   }
 
   /**
-   * J: back half a second at once; held down, it keeps going back in real time (⇧: half speed),
-   * seeking again as soon as each frame is shown.
+   * J: while playing faster than normal, each press (or a held key) slows down a step: 2×, 1.5×, 1×.
+   * Then, or when paused, it goes backwards for as long as it is held (⇧: half speed), seeking again
+   * as soon as each frame is shown; a tap moves back only a tenth of a second.
    */
+  private pressJ(e: KeyboardEvent): void {
+    const v = this.video;
+    const now = performance.now();
+    if (this.reverse) return;
+    if (!v.paused && v.playbackRate > 1) {
+      if (e.repeat && now - this.lastSlow < 350) return;
+      this.lastSlow = now;
+      this.setRate([...RATES].reverse().find(r => r >= 1 && r < v.playbackRate) ?? 1);
+      return;
+    }
+    if (e.repeat && now - this.lastSlow < 350) return;
+    this.startReverse(e.shiftKey ? 0.5 : 1);
+  }
+
   private startReverse(rate: number): void {
     if (this.reverse || this.notice) return;
     const v = this.video;
     if (!v.paused) v.pause();
-    const from = Math.max(0, v.currentTime - 0.5);
+    const from = Math.max(0, v.currentTime - 0.1);
     this.seek(from);
     const stop = (e: KeyboardEvent) => { if (e.code === 'KeyJ') this.stopReverse(); };
     window.addEventListener('keyup', stop, true);
     window.addEventListener('blur', this.stopReverseBound);
-    this.reverse = { from, t0: performance.now() + 250, rate, stop };
+    this.reverse = { from, t0: performance.now() + 120, rate, stop };
     const tick = () => {
       const r = this.reverse;
       if (!r || !v.isConnected) return;
@@ -284,21 +306,66 @@ export class VideoPlayer {
     this.reverse = null;
   }
 
+  /** The card itself goes full screen, controls, marks and notes included. */
   private fullScreen(): void {
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void this.stage.requestFullscreen();
+    const card = this.ctrl.parentElement;
+    if (!card) return;
+    if (document.fullscreenElement === card) void document.exitFullscreen();
+    else void card.requestFullscreen();
+  }
+
+  private onFullscreen = (): void => {
+    const card = this.ctrl.parentElement;
+    const on = !!card && document.fullscreenElement === card;
+    setIcon(this.fsBtn, on ? 'minimize' : 'maximize');
+    setTooltip(this.fsBtn, on ? t('Exit full screen') : t('Full screen'), { placement: 'top' });
+    if (on) this.ctx.board.root.focus({ preventScroll: true });
+    this.placeOpenPop();
+  };
+
+  /** A small vertical slider above the volume button. */
+  private toggleVolume(wrap: HTMLElement): void {
+    if (this.volPop) { this.closeVolume(); return; }
+    const pop = this.volPop = wrap.createDiv('vc-vc-volpop');
+    const v = this.video;
+    const label = pop.createDiv({ cls: 'vc-vc-volval' });
+    const range = pop.createEl('input', { cls: 'vc-vc-volume', type: 'range', attr: { min: '0', max: '1', step: '0.05', 'aria-label': t('Volume') } });
+    range.value = String(v.muted ? 0 : v.volume);
+    const show = () => label.setText(`${Math.round(Number(range.value) * 100)}`);
+    show();
+    range.addEventListener('input', () => { v.volume = Number(range.value); v.muted = v.volume === 0; show(); });
+    const mute = this.button(pop, v.muted ? 'volume-x' : 'volume-2', t('Mute'), () => { v.muted = !v.muted; range.value = String(v.muted ? 0 : v.volume); show(); setIcon(mute, v.muted ? 'volume-x' : 'volume-2'); });
+    const away = (e: PointerEvent) => { if (!wrap.contains(e.target as Node)) this.closeVolume(); };
+    window.setTimeout(() => document.addEventListener('pointerdown', away, true), 0);
+    this.closeVolumeAway = () => document.removeEventListener('pointerdown', away, true);
+  }
+
+  private closeVolumeAway: (() => void) | null = null;
+
+  private closeVolume(): void {
+    this.closeVolumeAway?.();
+    this.closeVolumeAway = null;
+    this.volPop?.remove();
+    this.volPop = null;
   }
 
   private renderVolume(): void {
     const v = this.video;
-    setIcon(this.muteBtn, v.muted || v.volume === 0 ? 'volume-x' : v.volume < 0.5 ? 'volume-1' : 'volume-2');
-    this.volume.value = String(v.muted ? 0 : v.volume);
+    setIcon(this.volBtn, v.muted || v.volume === 0 ? 'volume-x' : v.volume < 0.5 ? 'volume-1' : 'volume-2');
   }
 
   /** Put the controls under the card (outside its clipped body). */
   private attachPanel(host: HTMLElement): void {
     const card = host.closest<HTMLElement>('.vc-node');
-    if (card) { if (this.ctrl.parentElement !== card) card.appendChild(this.ctrl); return; }
+    if (card) {
+      if (this.ctrl.parentElement === card) return;
+      card.appendChild(this.ctrl);
+      // In full screen the board must not move, zoom or edit the card underneath.
+      for (const ev of ['pointerdown', 'wheel', 'dblclick'] as const) {
+        card.addEventListener(ev, (e) => { if (document.fullscreenElement === card) e.stopPropagation(); });
+      }
+      return;
+    }
     window.setTimeout(() => { if (host.isConnected) this.attachPanel(host); }, 0);
   }
 
@@ -310,20 +377,12 @@ export class VideoPlayer {
     menu.showAtMouseEvent(e);
   }
 
-  private toggleLoop(): void {
-    if (this.loop || this.video.loop) { this.loop = null; this.video.loop = false; this.renderLoop(); return; }
-    const m = this.openMark ? this.data.marks?.find(x => x.id === this.openMark) : undefined;
-    if (m && !isPoint(m)) this.loop = { in: m.in, out: m.out };
-    else this.video.loop = true;
-    this.renderLoop();
-  }
-
   private loopMark(m: VideoMark): void {
-    this.loop = { in: m.in, out: m.out };
+    this.loop = { id: m.id, in: m.in, out: m.out };
     this.video.loop = false;
     this.seek(m.in);
-    this.renderLoop();
-    if (this.video.paused) this.togglePlay();
+    this.renderMarks();
+    if (this.video.paused) void this.video.play();
   }
 
   // ── marks ───────────────────────────────────────────────
@@ -391,6 +450,7 @@ export class VideoPlayer {
       if (!isPoint(m)) el.style.width = `${Math.max(0.4, this.pct(m.out) - this.pct(m.in))}%`;
       el.toggleClass('is-open', m.id === this.openMark);
       el.toggleClass('has-note', !!m.note.trim());
+      el.toggleClass('is-looping', !!this.loop && this.loop.id === m.id);
     }
     this.pendingEl.toggle(this.pendingIn !== null);
     if (this.pendingIn !== null) this.pendingEl.style.left = `${this.pct(this.pendingIn)}%`;
@@ -410,9 +470,8 @@ export class VideoPlayer {
     this.head.style.left = `${this.pct(now)}%`;
     this.timeEl.setText(`${formatTime(now)} / ${formatTime(d)}`);
     // Notes of the marks under the playhead read like subtitles.
-    if (this.pop) { this.sub.hide(); return; }
     const notes = this.sortedMarks()
-      .filter(m => m.note.trim() && (isPoint(m) ? Math.abs(now - m.in) <= POINT_SPAN : now >= m.in && now <= m.out))
+      .filter(m => m.note.trim() && (isPoint(m) ? now >= m.in - POINT_BEFORE && now <= m.in + POINT_AFTER : now >= m.in && now <= m.out))
       .map(m => m.note.trim());
     this.sub.setText(notes.join('\n'));
     this.sub.toggle(notes.length > 0);
@@ -425,10 +484,6 @@ export class VideoPlayer {
 
   private renderRate(): void {
     this.rateBtn.setText(`${this.video.playbackRate}×`);
-  }
-
-  private renderLoop(): void {
-    this.loopBtn.toggleClass('is-active', !!this.loop || this.video.loop);
   }
 
   // ── track ───────────────────────────────────────────────
@@ -491,10 +546,14 @@ export class VideoPlayer {
       this.track.removeEventListener('pointerup', up);
       if (moved) {
         this.commit(d => { const x = d.marks?.find(y => y.id === mark.id); if (x) { x.in = a; x.out = b; } });
-        if (this.loop && this.openMark === mark.id) this.loop = { in: a, out: b };
+        if (this.loop?.id === mark.id) this.loop = { id: mark.id, in: a, out: b };
         return;
       }
-      if (e.shiftKey && !isPoint(mark)) { this.loopMark(mark); return; }
+      // A double-click on a range plays it in a loop until paused.
+      const at = performance.now();
+      const dbl = this.lastMarkClick?.id === mark.id && at - this.lastMarkClick.at < 450;
+      this.lastMarkClick = { id: mark.id, at };
+      if (dbl && !isPoint(mark)) { this.lastMarkClick = null; this.closePop(); this.loopMark(mark); return; }
       if (!this.video.paused) this.video.pause();
       this.seek(mark.in);
       this.openPop(mark.id);
@@ -514,7 +573,6 @@ export class VideoPlayer {
     const head = pop.createDiv('vc-vt-pop-head');
     head.createDiv({ cls: 'vc-vt-pop-time', text: markTime(m) });
     head.createDiv('vc-vc-spacer');
-    if (!isPoint(m)) this.button(head, 'repeat', t('Loop this range (⇧-click)'), () => this.loopMark(m));
     this.button(head, 'trash-2', t('Delete mark'), () => this.removeMark(id));
     this.button(head, 'x', t('Close'), () => this.closePop());
     const area = pop.createEl('textarea', { cls: 'vc-vt-note', attr: { placeholder: t('Add a note…'), rows: '3' } });
@@ -535,6 +593,11 @@ export class VideoPlayer {
     this.renderMarks();
     this.renderTime();
     window.setTimeout(() => area.focus({ preventScroll: true }), 0);
+  }
+
+  private placeOpenPop(): void {
+    const m = this.openMark ? this.data.marks?.find(x => x.id === this.openMark) : undefined;
+    if (m) this.placePop(m);
   }
 
   private placePop(m: VideoMark): void {
@@ -618,7 +681,7 @@ export class VideoPlayer {
       case 'KeyI': this.markIn(); return true;
       case 'KeyO': this.markOut(); return true;
       case 'KeyM': this.addPoint(); return true;
-      case 'KeyJ': if (!e.repeat) this.startReverse(e.shiftKey ? 0.5 : 1); return true;
+      case 'KeyJ': this.pressJ(e); return true;
       case 'KeyK': this.video.pause(); return true;
       case 'KeyL': this.shuttle(); return true;
       default: return false;
@@ -627,6 +690,9 @@ export class VideoPlayer {
 
   destroy(): void {
     this.stopReverse();
+    this.closeVolume();
+    document.removeEventListener('fullscreenchange', this.onFullscreen);
+    if (document.fullscreenElement === this.ctrl.parentElement) void document.exitFullscreen();
     this.ctrl.remove();
     cancelAnimationFrame(this.raf);
     this.video.pause();

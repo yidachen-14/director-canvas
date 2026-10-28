@@ -7,7 +7,7 @@ export type TextCardKind = 'text' | 'note' | 'sticky' | 'callout';
 export interface VisualCanvasSettings {
   language: Language;
   openCanvasByDefault: boolean;
-  /** Only boards inside these folders open with Visual Canvas; empty = every board. */
+  /** Only boards inside these folders open with Direct Canvas; empty = every board. */
   takeoverFolders: string[];
 
   toolbarPosition: ToolbarPosition;

@@ -144,7 +144,7 @@ export async function exportHtml(board: Board, scope: Scope, name: string, singl
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="generator" content="Visual Canvas">
+<meta name="generator" content="Direct Canvas">
 <title>${esc(name)}</title>
 <style>${collectCss()}</style>
 <style>${VIEWER_CSS}</style>

@@ -361,16 +361,35 @@ export function themeItem(ctl: MindMapControl): BarItem {
   return { id: 'mm-theme', icon: 'vc-mm-theme', label: t('Map style'), dropdown: (pop) => themePanel(pop, ctl) };
 }
 
-const FONT_SIZES = [12, 13, 14, 15, 16, 18, 20, 24, 28, 32, 40];
+const FONT_SIZES = [10, 12, 13, 14, 15, 16, 18, 20, 24, 28, 32, 36, 48, 64];
 
-function fontSizePanel(pop: HTMLElement, ctl: MindMapControl): void {
-  pop.addClass('vc-mm-pop');
+function fontSizePanel(pop: HTMLElement, ctl: MindMapControl, close: () => void): void {
+  pop.addClass('vc-mm-pop', 'is-font-size');
   const raw = rawStyle(ctl);
-  section(pop, t('Font size'));
-  const row = pop.createDiv('vc-mm-row is-wrap');
-  for (const n of FONT_SIZES) chip(row, `${n}`, raw.fontSize === n, () => styleSelected(ctl, s => { s.fontSize = n; }));
-  const reset = pop.createDiv('vc-mm-row');
-  chip(reset, t('Theme default'), !raw.fontSize, () => styleSelected(ctl, s => { s.fontSize = undefined; }));
+  const res = resolved(ctl);
+  // Any size typed in (Enter to apply), then the common sizes in a column, like Boardmix.
+  const input = pop.createEl('input', { cls: 'vc-mm-size-input', type: 'number', attr: { min: '6', max: '200', step: '1' } });
+  input.value = String(raw.fontSize ?? Math.round(res.fontSize));
+  const apply = () => {
+    const n = Math.round(Number(input.value));
+    if (Number.isFinite(n) && n >= 6 && n <= 200) styleSelected(ctl, s => { s.fontSize = n; });
+  };
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); apply(); close(); }
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+  });
+  input.addEventListener('change', apply);
+  window.setTimeout(() => { input.focus(); input.select(); }, 0);
+  const list = pop.createDiv('vc-mm-size-list');
+  for (const n of FONT_SIZES) {
+    const it = list.createDiv({ cls: 'vc-mm-size-item', text: `${n}` });
+    it.toggleClass('is-active', raw.fontSize === n);
+    it.addEventListener('click', () => { styleSelected(ctl, s => { s.fontSize = n; }); close(); });
+  }
+  const reset = list.createDiv({ cls: 'vc-mm-size-item is-reset', text: t('Theme default') });
+  reset.toggleClass('is-active', !raw.fontSize);
+  reset.addEventListener('click', () => { styleSelected(ctl, s => { s.fontSize = undefined; }); close(); });
 }
 
 function textColorPanel(pop: HTMLElement, ctl: MindMapControl): void {
@@ -402,7 +421,7 @@ export function mindMapBarItems(ctl: MindMapControl): BarItem[] {
     { id: 'mm-line', icon: `vc-mm-ln-${res.line}`, label: t('Branch lines'), dropdown: (pop) => linePanel(pop, ctl) },
     { id: 'mm-branch', icon: 'vc-mm-branch', label: t('Branch colour'), swatch: res.branchColor, dropdown: (pop) => branchColorPanel(pop, ctl) },
     sep,
-    { id: 'mm-size', icon: 'type', label: t('Font size'), text: `${Math.round(res.fontSize)}`, dropdown: (pop) => fontSizePanel(pop, ctl) },
+    { id: 'mm-size', icon: 'type', label: t('Font size'), text: `${Math.round(res.fontSize)}`, dropdown: (pop, close) => fontSizePanel(pop, ctl, close) },
     toggle('mm-bold', 'bold', t('Bold'), res.bold, 'bold'),
     toggle('mm-italic', 'italic', t('Italic'), !!res.italic, 'italic'),
     toggle('mm-underline', 'underline', t('Underline'), !!res.underline, 'underline'),

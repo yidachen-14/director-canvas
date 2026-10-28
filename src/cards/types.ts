@@ -67,7 +67,7 @@ export interface CardHandle {
 export interface MapDrop { topic: string; mode: 'child' | 'before' | 'after'; side?: 'left' | 'right' }
 
 export interface CardType {
-  /** Stored as node.vc.kind for Visual Canvas cards. */
+  /** Stored as node.vc.kind for Direct Canvas cards. */
   id: string;
   /** English label, translated with t(). */
   label: string;

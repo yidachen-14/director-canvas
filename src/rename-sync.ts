@@ -46,7 +46,7 @@ export function installRenameSync(plugin: VisualCanvasPlugin): void {
           return relinkCanvas(data, moves) ? serializeCanvas(data, settleSidesForSave) : current;
         });
       } catch (err) {
-        console.error('Visual Canvas: could not update links in', f.path, err);
+        console.error('Direct Canvas: could not update links in', f.path, err);
       }
     }
   };
