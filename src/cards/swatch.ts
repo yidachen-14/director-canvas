@@ -106,7 +106,8 @@ export const swatchCard: CardType = {
   id: 'swatch',
   label: 'Colour swatch',
   icon: 'palette',
-  defaultSize: { width: 160, height: 200 },
+  // Square overall: the colour above is a little wider than tall, the name strip below.
+  defaultSize: { width: 160, height: 160 },
   create: () => {
     const hex = randomNamedColor(getLanguage()).hex.toUpperCase();
     return { type: 'text', text: swatchText(hex), vc: { kind: 'swatch', color: hex } };

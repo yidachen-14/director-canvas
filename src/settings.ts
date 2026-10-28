@@ -1,7 +1,7 @@
 import type { Language } from './i18n';
 
-export type ToolbarSize = 'L' | 'M' | 'S';
-export type ToolbarPosition = 'bottom' | 'top' | 'left' | 'right';
+export type ToolbarSize = 'S' | 'M' | 'L';
+export type ToolbarPosition = 'top' | 'bottom' | 'left' | 'right';
 export type TextCardKind = 'text' | 'note' | 'sticky' | 'callout';
 
 export interface VisualCanvasSettings {
@@ -12,8 +12,12 @@ export interface VisualCanvasSettings {
 
   toolbarPosition: ToolbarPosition;
   toolbarSize: ToolbarSize;
-  /** Tool ids shown on the toolbar, in order; the rest live under "…". */
+  /** Tool ids shown on the toolbar, in order; the rest live under "…". Select and Hand are always first. */
   toolbarTools: string[];
+  /** Custom shortcuts: command id → "Mod+Shift+K" style key; missing = the default. */
+  hotkeys: Record<string, string>;
+  /** Bumped when defaults change in a way that should reach saved settings once. */
+  settingsVersion: number;
 
   doubleClickKind: TextCardKind;
   pasteTextKind: TextCardKind;
@@ -50,14 +54,18 @@ export interface VisualCanvasSettings {
   autoRelink: boolean;
 }
 
+export const SETTINGS_VERSION = 2;
+
 export const DEFAULT_SETTINGS: VisualCanvasSettings = {
   language: 'zh-TW',
   openCanvasByDefault: true,
   takeoverFolders: [],
 
-  toolbarPosition: 'bottom',
-  toolbarSize: 'M',
-  toolbarTools: ['select', 'hand', 'text', 'note', 'sticky', 'group', 'connect'],
+  toolbarPosition: 'top',
+  toolbarSize: 'S',
+  toolbarTools: ['text', 'note', 'sticky', 'group', 'connect'],
+  hotkeys: {},
+  settingsVersion: SETTINGS_VERSION,
 
   doubleClickKind: 'text',
   pasteTextKind: 'note',
@@ -90,18 +98,30 @@ export const DEFAULT_SETTINGS: VisualCanvasSettings = {
 };
 
 export function normalizeSettings(raw: unknown): VisualCanvasSettings {
-  const s: VisualCanvasSettings = { ...DEFAULT_SETTINGS };
+  const s: VisualCanvasSettings = { ...DEFAULT_SETTINGS, hotkeys: {}, toolbarTools: [...DEFAULT_SETTINGS.toolbarTools] };
   if (!raw || typeof raw !== 'object') return s;
   const r = raw as Record<string, unknown>;
   for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof VisualCanvasSettings)[]) {
     const def = DEFAULT_SETTINGS[key];
     const val = r[key];
     if (val === undefined) continue;
+    if (key === 'hotkeys') {
+      if (val && typeof val === 'object' && !Array.isArray(val)) s.hotkeys = Object.fromEntries(Object.entries(val as Record<string, unknown>).filter(([, v]) => typeof v === 'string')) as Record<string, string>;
+      continue;
+    }
     if (Array.isArray(def)) { if (Array.isArray(val) && val.every(v => typeof v === 'string')) (s as unknown as Record<string, unknown>)[key] = [...val]; }
     else if (typeof val === typeof def) (s as unknown as Record<string, unknown>)[key] = val;
   }
   if (!['zh-TW', 'en'].includes(s.language)) s.language = 'zh-TW';
-  if (!['L', 'M', 'S'].includes(s.toolbarSize)) s.toolbarSize = 'M';
+  if (!['L', 'M', 'S'].includes(s.toolbarSize)) s.toolbarSize = 'S';
+  if (!['top', 'bottom', 'left', 'right'].includes(s.toolbarPosition)) s.toolbarPosition = 'top';
+  // Version 2: the toolbar moved to the top at size S; Select and Hand are fixed, not listed.
+  if (r.settingsVersion === undefined || (typeof r.settingsVersion === 'number' && r.settingsVersion < 2)) {
+    s.toolbarPosition = 'top';
+    s.toolbarSize = 'S';
+  }
+  s.toolbarTools = s.toolbarTools.filter(id => id !== 'select' && id !== 'hand');
+  s.settingsVersion = SETTINGS_VERSION;
   if (![1, 2, 3].includes(s.pngScale)) s.pngScale = 2;
   if (!['straight', 'curve', 'elbow'].includes(s.defaultRoute)) s.defaultRoute = 'straight';
   s.defaultTextSize = Math.min(96, Math.max(8, s.defaultTextSize));

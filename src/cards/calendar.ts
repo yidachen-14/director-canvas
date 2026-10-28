@@ -1,4 +1,4 @@
-import { FuzzySuggestModal, Menu, TFile, setIcon, setTooltip, type App } from 'obsidian';
+import { FuzzySuggestModal, Menu, Modal, Setting, TFile, setIcon, setTooltip, type App } from 'obsidian';
 import type { RawNode } from '../model/canvas-file';
 import type { BarItem, CardContext, CardHandle, CardType } from './types';
 import { commitNode } from './basic';
@@ -80,6 +80,74 @@ class ImageModal extends FuzzySuggestModal<TFile> {
   getItems(): TFile[] { return this.app.vault.getFiles().filter(f => IMAGE_EXT.includes(f.extension.toLowerCase())); }
   getItemText(f: TFile): string { return f.path; }
   onChooseItem(f: TFile): void { this.pick(f); }
+}
+
+/**
+ * Add or edit a calendar note in its own window: the text in a roomy box, its day,
+ * colour and importance. Nothing is written until "Save".
+ */
+class NoteModal extends Modal {
+  private draft: CalNote;
+
+  constructor(app: App, note: CalNote, private isNew: boolean, private save: (n: CalNote) => void, private remove?: () => void) {
+    super(app);
+    this.draft = { ...note };
+  }
+
+  onOpen(): void {
+    const el = this.contentEl;
+    el.addClass('vc-cal-modal');
+    this.titleEl.setText(this.isNew ? t('Add a note') : t('Edit note'));
+    const d = this.draft;
+
+    const text = el.createEl('textarea', { cls: 'vc-cal-modal-text', attr: { rows: '4', placeholder: t('What is happening this day?') } });
+    text.value = d.text;
+    text.addEventListener('input', () => { d.text = text.value; });
+    text.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); this.commit(); }
+    });
+
+    new Setting(el).setName(t('Date')).addText(tx => {
+      tx.inputEl.type = 'date';
+      tx.setValue(d.date).onChange(v => { if (isISO(v)) d.date = v; });
+    });
+
+    const colors = new Setting(el).setName(t('Colour')).controlEl.createDiv('vc-cal-modal-colors');
+    const paintColors = () => {
+      colors.empty();
+      for (const c of COLORS) {
+        const sw = colors.createDiv({ cls: 'vc-cal-modal-color', attr: { role: 'button', 'aria-label': t(!c ? 'No colour' : ['Red', 'Orange', 'Yellow', 'Green', 'Cyan', 'Purple'][Number(c) - 1]) } });
+        if (c) sw.style.background = presetColor(c); else sw.addClass('is-none');
+        sw.toggleClass('is-active', (d.color ?? undefined) === c);
+        sw.addEventListener('click', () => { if (c) d.color = c; else delete d.color; paintColors(); });
+      }
+    };
+    paintColors();
+
+    new Setting(el).setName(t('Importance')).addDropdown(dd => {
+      for (const imp of IMPORTANCE) dd.addOption(imp.v ?? '', t(imp.label));
+      dd.setValue(d.importance ?? '').onChange(v => { if (v) d.importance = v as Importance; else delete d.importance; });
+    });
+    if (!this.isNew) {
+      new Setting(el).setName(t('Done')).addToggle(tg => tg.setValue(!!d.done).onChange(v => { if (v) d.done = true; else delete d.done; }));
+    }
+
+    const buttons = new Setting(el);
+    if (this.remove) buttons.addButton(b => b.setButtonText(t('Delete')).setWarning().onClick(() => { this.close(); this.remove!(); }));
+    buttons
+      .addButton(b => b.setButtonText(t('Cancel')).onClick(() => this.close()))
+      .addButton(b => b.setButtonText(this.isNew ? t('Add') : t('Save')).setCta().onClick(() => this.commit()));
+    window.setTimeout(() => { text.focus(); text.select(); }, 0);
+  }
+
+  private commit(): void {
+    const text = this.draft.text.trim();
+    if (!text) { this.close(); return; }
+    this.close();
+    this.save({ ...this.draft, text });
+  }
+
+  onClose(): void { this.contentEl.empty(); }
 }
 
 // ── card ──────────────────────────────────────────────────────
@@ -266,7 +334,7 @@ class CalendarCard implements CardHandle {
     chip.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); this.itemMenu(e, it); });
     chip.addEventListener('dblclick', (e) => {
       e.stopPropagation();
-      if (it.note) this.editNoteText(chip, it.note);
+      if (it.note) this.editNote(it.note);
       else if (it.task) this.revealTask(it);
     });
     chip.addEventListener('pointerdown', (e) => this.dragChip(e, chip, it));
@@ -297,19 +365,17 @@ class CalendarCard implements CardHandle {
     window.setTimeout(() => { input.focus(); input.select(); }, 0);
   }
 
-  private addNote(cell: HTMLElement, date: string): void {
-    this.inlineInput(cell, '', (v) => {
-      if (v) this.change(vc => { vc.notes = [...((vc.notes as CalNote[]) ?? []), { id: newId(), date, text: v }]; });
-      else this.render();
-    }, 'vc-cal-input is-new');
+  private addNote(_cell: HTMLElement, date: string): void {
+    new NoteModal(this.ctx.app, { id: newId(), date, text: '' }, true, (n) => {
+      this.change(vc => { vc.notes = [...((vc.notes as CalNote[]) ?? []), n]; });
+    }).open();
   }
 
-  private editNoteText(chip: HTMLElement, note: CalNote): void {
-    chip.empty();
-    this.inlineInput(chip, note.text, (v) => {
-      if (v !== null && v !== note.text) this.patchNote(note.id, n => { if (v) n.text = v; });
-      else this.render();
-    });
+  private editNote(note: CalNote): void {
+    new NoteModal(this.ctx.app, note, false,
+      (n) => this.change(vc => { vc.notes = ((vc.notes as CalNote[]) ?? []).map(x => (x.id === note.id ? n : x)); }),
+      () => this.change(vc => { vc.notes = ((vc.notes as CalNote[]) ?? []).filter(x => x.id !== note.id); }),
+    ).open();
   }
 
   private editTitle(titleEl: HTMLElement): void {
@@ -449,10 +515,7 @@ class CalendarCard implements CardHandle {
     menu.addItem(i => i.setTitle(t('Change date…')).setIcon('calendar').onClick(() => this.pickDate(e, it)));
     if (it.note) {
       const note = it.note;
-      menu.addItem(i => i.setTitle(t('Edit text')).setIcon('pencil').onClick(() => {
-        const chip = this.el.querySelector<HTMLElement>(`.vc-cal-chip[data-key="${note.id}"]`);
-        if (chip) this.editNoteText(chip, note);
-      }));
+      menu.addItem(i => i.setTitle(t('Edit…')).setIcon('pencil').onClick(() => this.editNote(note)));
       menu.addItem(i => i.setTitle(note.done ? t('Mark as not done') : t('Mark as done')).setIcon('check').onClick(() => this.patchNote(note.id, n => { n.done = !n.done || undefined; })));
       menu.addSeparator();
       this.submenu(menu, t('Colour'), 'palette', m => this.colorMenu(m, note.color, c => this.patchNote(note.id, n => { n.color = c; })));

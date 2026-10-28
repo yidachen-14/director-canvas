@@ -107,8 +107,8 @@ function boardMenu(menu: Menu, board: Board, at: Point): void {
   });
   addArrangeMenu(menu, board, (title, icon, section, build) => submenu(menu, title, icon, section, build), false);
   for (const c of contributions) if (c.where === 'board') c.add(menu, board, at);
-  menu.addItem(i => i.setTitle(t('Zoom to fit')).setIcon('maximize').setSection('view').onClick(() => board.zoomToFit()));
-  menu.addItem(i => i.setTitle(t('Zoom to 100%')).setIcon('scan').setSection('view').onClick(() => board.setZoom(1)));
+  menu.addItem(i => i.setTitle(t('Zoom to fit')).setIcon('maximize').setSection('view').onClick(() => board.zoomToFit(undefined, true)));
+  menu.addItem(i => i.setTitle(t('Zoom to 100%')).setIcon('scan').setSection('view').onClick(() => board.setZoom(1, true)));
 }
 
 function cardMenu(menu: Menu, board: Board, at: Point): void {
@@ -135,7 +135,7 @@ function cardMenu(menu: Menu, board: Board, at: Point): void {
   menu.addItem(i => i.setTitle(t('Create group from selection')).setIcon('box-select').setSection('order').onClick(() => board.groupSelection()));
   if (multi) addArrangeMenu(menu, board, (title, icon, section, build) => submenu(menu, title, icon, section, build), true);
   for (const c of contributions) if (c.where === 'card' || (multi && c.where === 'multi')) c.add(menu, board, at);
-  menu.addItem(i => i.setTitle(t('Zoom to selection')).setIcon('scan-search').setSection('view').onClick(() => board.zoomToFit([...board.selection])));
+  menu.addItem(i => i.setTitle(t('Zoom to selection')).setIcon('scan-search').setSection('view').onClick(() => board.zoomToFit([...board.selection], true)));
   menu.addItem(i => i.setTitle(t('Delete')).setIcon('trash-2').setSection('danger').setWarning(true).onClick(() => board.deleteSelection()));
 }
 

@@ -1,8 +1,9 @@
 import { Menu, setIcon, setTooltip } from 'obsidian';
 import type { Board } from './board';
-import { availableTools, toolById, type Tool } from './tools';
+import { availableTools, FIXED_TOOLS, toolById, type Tool } from './tools';
+import { ZOOM_STEPS } from './board';
+import { shortcutLabel } from './shortcuts';
 import { getCardType } from '../cards/registry';
-import { ARRANGE, runArrange } from './arrange-commands';
 import type { Point } from './viewport';
 import { nodeRect, unionRect } from '../model/board-model';
 import { cssColor } from '../cards/util';
@@ -104,17 +105,15 @@ export function attachToolbar(board: Board): void {
   bar.addEventListener('dblclick', e => e.stopPropagation());
   let panel: OverflowPanel | null = null;
 
-  /** A click on a tool: modes toggle, actions run, cards appear in the middle of the view. */
+  /**
+   * A click on a tool: modes toggle, actions run, card kinds wait for a click on the board
+   * (the cursor shows the tool; the click is the card's top-left corner).
+   */
   const activate = (tool: Tool) => {
     panel?.close();
     if (tool.run) { board.setTool('select'); tool.run(board); return; }
-    if (MODE_TOOLS.has(tool.id) || tool.id === 'group') {
-      board.setTool(board.tool === tool.id && tool.id !== 'select' ? 'select' : tool.id);
-      board.root.focus({ preventScroll: true });
-      return;
-    }
-    const kind = dragKind(tool);
-    if (kind) placeCard(board, kind, board.viewCenter());
+    board.setTool(board.tool === tool.id && tool.id !== 'select' ? 'select' : tool.id);
+    board.root.focus({ preventScroll: true });
   };
 
   const render = () => {
@@ -123,35 +122,49 @@ export function attachToolbar(board: Board): void {
     const s = board.settings;
     bar.setAttr('data-size', s.toolbarSize);
     const avail = availableTools();
-    const shown = s.toolbarTools.map(id => avail.find(x => x.id === id)).filter((x): x is Tool => !!x);
-    if (!shown.some(x => x.id === 'select')) shown.unshift(toolById('select')!);
-    for (const tool of shown) {
+    const fixed = FIXED_TOOLS.map(id => toolById(id)!).filter(Boolean);
+    const chosen = s.toolbarTools.filter(id => !FIXED_TOOLS.includes(id)).map(id => avail.find(x => x.id === id)).filter((x): x is Tool => !!x);
+    const tip = { placement: ({ top: 'bottom', bottom: 'top', left: 'right', right: 'left' } as const)[s.toolbarPosition] };
+    const button = (tool: Tool) => {
       const b = bar.createDiv({ cls: 'vc-tool', attr: { 'data-tool': tool.id, role: 'button', 'aria-label': t(tool.label) } });
       setIcon(b.createDiv('vc-tool-icon'), tool.icon);
       if (s.toolbarSize !== 'S') b.createDiv({ cls: 'vc-tool-label', text: t(tool.label) });
-      setTooltip(b, dragKind(tool) ? t('{tool} — drag onto the board, or click', { tool: t(tool.label) }) : t(tool.label), { placement: s.toolbarPosition === 'bottom' ? 'top' : 'bottom' });
+      setTooltip(b, t(tool.label), tip);
       b.toggleClass('is-active', board.tool === tool.id);
       bindToolPress(board, b, tool, () => activate(tool));
-    }
+    };
+    for (const tool of fixed) button(tool);
+    bar.createDiv('vc-tool-sep');
+    for (const tool of chosen) button(tool);
+    if (chosen.length) bar.createDiv('vc-tool-sep');
     const more = bar.createDiv({ cls: 'vc-tool vc-tool-more', attr: { role: 'button', 'aria-label': t('More') } });
-    setIcon(more.createDiv('vc-tool-icon'), 'layout-grid');
+    setIcon(more.createDiv('vc-tool-icon'), 'more-horizontal');
     if (s.toolbarSize !== 'S') more.createDiv({ cls: 'vc-tool-label', text: t('More') });
-    setTooltip(more, t('More'), { placement: s.toolbarPosition === 'bottom' ? 'top' : 'bottom' });
+    setTooltip(more, t('More'), tip);
     more.addEventListener('click', () => {
       if (panel) { panel.close(); return; }
-      panel = new OverflowPanel(board, more, avail.filter(x => !shown.includes(x)), activate, () => { panel = null; more.removeClass('is-active'); });
+      const rest = avail.filter(x => !FIXED_TOOLS.includes(x.id) && !chosen.includes(x));
+      panel = new OverflowPanel(board, more, rest, activate, () => { panel = null; more.removeClass('is-active'); });
       more.addClass('is-active');
     });
   };
   render();
-  board.on('tool', () => {
-    for (const el of Array.from(bar.querySelectorAll<HTMLElement>('.vc-tool'))) if (el.dataset.tool) el.toggleClass('is-active', el.dataset.tool === board.tool);
-  });
+  const syncActive = () => {
+    let onBar = false;
+    for (const el of Array.from(bar.querySelectorAll<HTMLElement>('.vc-tool'))) {
+      if (!el.dataset.tool) continue;
+      el.toggleClass('is-active', el.dataset.tool === board.tool);
+      if (el.dataset.tool === board.tool) onBar = true;
+    }
+    // A tool picked from "More" lights up the More button while it is in use.
+    bar.querySelector('.vc-tool-more')?.toggleClass('is-tool-active', !onBar && board.tool !== 'select');
+  };
+  board.on('tool', syncActive);
   board.addRefresher(render);
   board.addDisposer(() => panel?.close());
 }
 
-/** The toolbar's "More" panel: the other tools (click or drag), then board actions. */
+/** The toolbar's "More" list: the other tools (click or drag), board actions, then "Customise the toolbar". */
 class OverflowPanel {
   private el: HTMLElement;
   private offDoc: () => void;
@@ -163,59 +176,41 @@ class OverflowPanel {
     el.addEventListener('dblclick', e => e.stopPropagation());
     el.addEventListener('wheel', e => e.stopPropagation());
 
-    if (tools.length) {
-      el.createDiv({ cls: 'vc-more-title', text: t('More tools') });
-      const grid = el.createDiv('vc-more-grid');
-      for (const tool of tools) {
-        const tile = grid.createDiv({ cls: 'vc-more-tile', attr: { role: 'button', 'aria-label': t(tool.label) } });
-        setIcon(tile.createDiv('vc-more-tile-icon'), tool.icon);
-        tile.createDiv({ cls: 'vc-more-tile-label', text: t(tool.label) });
-        tile.toggleClass('is-active', board.tool === tool.id);
-        bindToolPress(board, tile, tool, () => activate(tool), () => this.close());
-      }
-    }
+    const row = (icon: string, label: string) => {
+      const r = el.createDiv({ cls: 'vc-more-row', attr: { role: 'button', 'aria-label': label } });
+      setIcon(r.createDiv('vc-more-row-icon'), icon);
+      r.createDiv({ cls: 'vc-more-row-label', text: label });
+      return r;
+    };
 
-    // Arranging, as tiles: the same commands as the right-click menu.
-    el.createDiv({ cls: 'vc-more-title', text: t('Arrange') });
-    const agrid = el.createDiv('vc-more-grid');
-    for (const d of ARRANGE.filter(x => x.group === 'arrange' || x.group === 'distribute')) {
-      const tile = agrid.createDiv({ cls: 'vc-more-tile is-action', attr: { role: 'button', 'aria-label': t(d.label) } });
-      setIcon(tile.createDiv('vc-more-tile-icon'), d.icon);
-      tile.createDiv({ cls: 'vc-more-tile-label', text: t(d.label) });
-      if (d.keys) setTooltip(tile, `${t(d.label)}  ${d.keys}`, { placement: 'top' });
-      tile.addEventListener('click', () => { this.close(); runArrange(board, d.id); });
+    for (const tool of tools) {
+      const r = row(tool.icon, t(tool.label));
+      r.toggleClass('is-active', board.tool === tool.id);
+      bindToolPress(board, r, tool, () => activate(tool), () => this.close());
     }
 
     const sections = new Map<string, OverflowAction[]>();
-    const builtIn: OverflowAction[] = [
-      { section: 'view', icon: 'maximize', label: 'Zoom to fit', run: b => b.zoomToFit() },
-      { section: 'view', icon: 'scan', label: 'Zoom to 100%', run: b => b.setZoom(1) },
-      { section: 'board', icon: 'settings-2', label: 'Customise the toolbar…', run: b => b.plugin.openSettings() },
-    ];
-    for (const a of [...overflowActions, ...builtIn]) {
+    for (const a of overflowActions) {
       if (a.available && !a.available(board)) continue;
       if (!sections.has(a.section)) sections.set(a.section, []);
       sections.get(a.section)!.push(a);
     }
     for (const list of sections.values()) {
-      el.createDiv('vc-more-sep');
-      for (const a of list) {
-        const row = el.createDiv({ cls: 'vc-more-row', attr: { role: 'button' } });
-        setIcon(row.createDiv('vc-more-row-icon'), a.icon);
-        row.createDiv({ cls: 'vc-more-row-label', text: t(a.label) });
-        row.addEventListener('click', () => { this.close(); a.run(board); });
-      }
+      if (el.childElementCount) el.createDiv('vc-more-sep');
+      for (const a of list) row(a.icon, t(a.label)).addEventListener('click', () => { this.close(); a.run(board); });
     }
+    if (el.childElementCount) el.createDiv('vc-more-sep');
+    row('settings-2', t('Customise the toolbar…')).addEventListener('click', () => { this.close(); board.plugin.openSettings(); });
 
     // Open next to the button, kept inside the board.
     const br = board.root.getBoundingClientRect();
     const ar = anchor.getBoundingClientRect();
     const pos = board.settings.toolbarPosition;
     const pw = el.offsetWidth, ph = el.offsetHeight;
-    let x = ar.left + ar.width / 2 - pw / 2 - br.left;
-    let y = pos === 'top' ? ar.bottom + 8 - br.top : ar.top - ph - 8 - br.top;
-    if (pos === 'left') { x = ar.right + 8 - br.left; y = ar.top + ar.height / 2 - ph / 2 - br.top; }
-    if (pos === 'right') { x = ar.left - pw - 8 - br.left; y = ar.top + ar.height / 2 - ph / 2 - br.top; }
+    let x = ar.right - pw - br.left;
+    let y = pos === 'bottom' ? ar.top - ph - 8 - br.top : ar.bottom + 8 - br.top;
+    if (pos === 'left') { x = ar.right + 8 - br.left; y = ar.top - br.top; }
+    if (pos === 'right') { x = ar.left - pw - 8 - br.left; y = ar.top - br.top; }
     x = Math.max(8, Math.min(br.width - pw - 8, x));
     y = Math.max(8, Math.min(br.height - ph - 8, y));
     el.style.left = `${x}px`;
@@ -240,7 +235,7 @@ class OverflowPanel {
   }
 }
 
-// ── bottom-left: search, minimap, appearance, zoom ───────────
+// ── bottom-left: history · search, minimap, appearance · zoom ─
 
 export function attachCorner(board: Board): void {
   const corner = board.uiEl.createDiv('vc-corner');
@@ -249,36 +244,59 @@ export function attachCorner(board: Board): void {
   corner.addEventListener('wheel', e => e.stopPropagation());
 
   const panel = corner.createDiv('vc-corner-panel');
-  const row = corner.createDiv('vc-corner-row');
-  const btn = (icon: string, label: string, onClick: (e: MouseEvent) => void) => {
+  const bars = corner.createDiv('vc-corner-bars');
+  const pill = () => bars.createDiv('vc-corner-row');
+  const btn = (row: HTMLElement, icon: string, label: string, onClick: (e: MouseEvent) => void) => {
     const b = row.createDiv({ cls: 'vc-corner-btn clickable-icon', attr: { role: 'button', 'aria-label': label } });
     setIcon(b, icon);
     setTooltip(b, label, { placement: 'top' });
     b.addEventListener('click', onClick);
     return b;
   };
+  const sep = (row: HTMLElement) => row.createDiv('vc-corner-sep');
 
+  // 1. History
+  const history = pill();
+  const undoBtn = btn(history, 'undo-2', t('Undo'), () => board.undo());
+  sep(history);
+  const redoBtn = btn(history, 'redo-2', t('Redo'), () => board.redo());
+  const updateHistory = () => {
+    undoBtn.toggleClass('is-disabled', !board.model.canUndo());
+    redoBtn.toggleClass('is-disabled', !board.model.canRedo());
+  };
+  updateHistory();
+  board.addDisposer(board.onChange(updateHistory));
+
+  // 2. View tools
+  const view = pill();
   const search = new SearchBox(board, panel);
   const minimap = new Minimap(board, panel);
-
-  const searchBtn = btn('search', t('Search the board'), () => { search.toggle(); searchBtn.toggleClass('is-active', search.open); });
+  const searchBtn = btn(view, 'search', t('Search the board'), () => { search.toggle(); searchBtn.toggleClass('is-active', search.open); });
   board.addDisposer(() => search.close());
-  const mapBtn = btn('map', t('Minimap'), () => { minimap.toggle(); mapBtn.toggleClass('is-active', minimap.open); });
-  btn('palette', t('Appearance'), (e) => appearanceMenu(board, e));
-  const zoom = row.createDiv({ cls: 'vc-zoom-label', attr: { role: 'button', 'aria-label': t('Zoom') } });
-  setTooltip(zoom, t('Zoom'), { placement: 'top' });
-  zoom.addEventListener('click', (e) => {
-    const menu = new Menu();
-    menu.addItem(i => i.setTitle(t('Zoom in')).setIcon('zoom-in').onClick(() => board.zoomBy(1.25)));
-    menu.addItem(i => i.setTitle(t('Zoom out')).setIcon('zoom-out').onClick(() => board.zoomBy(0.8)));
-    menu.addItem(i => i.setTitle(t('Zoom to 100%')).setIcon('scan').onClick(() => board.setZoom(1)));
-    menu.addItem(i => i.setTitle(t('Zoom to fit')).setIcon('maximize').onClick(() => board.zoomToFit()));
-    if (board.selection.size) menu.addItem(i => i.setTitle(t('Zoom to selection')).setIcon('scan-search').onClick(() => board.zoomToFit([...board.selection])));
-    menu.showAtMouseEvent(e);
+  const mapBtn = btn(view, 'map', t('Minimap'), () => { minimap.toggle(); mapBtn.toggleClass('is-active', minimap.open); });
+  btn(view, 'palette', t('Appearance'), (e) => appearanceMenu(board, e));
+
+  // 3. Zoom: + · 100% ▾ · −
+  const zoomRow = pill();
+  zoomRow.addClass('vc-zoom-row');
+  btn(zoomRow, 'plus', t('Zoom in'), () => board.zoomStep(1));
+  const zoom = zoomRow.createDiv({ cls: 'vc-zoom-label', attr: { role: 'button', 'aria-label': t('Zoom to 100%') } });
+  setTooltip(zoom, t('Zoom to 100%'), { placement: 'top' });
+  zoom.addEventListener('click', () => board.setZoom(1, true));
+  const caret = zoomRow.createDiv({ cls: 'vc-zoom-caret clickable-icon', attr: { role: 'button', 'aria-label': t('Zoom options') } });
+  setIcon(caret, 'chevron-down');
+  setTooltip(caret, t('Zoom options'), { placement: 'top' });
+  let zoomPop: ZoomPopover | null = null;
+  caret.addEventListener('click', () => {
+    if (zoomPop) { zoomPop.close(); return; }
+    zoomPop = new ZoomPopover(board, zoomRow, () => { zoomPop = null; caret.removeClass('is-active'); });
+    caret.addClass('is-active');
   });
+  btn(zoomRow, 'minus', t('Zoom out'), () => board.zoomStep(-1));
   const updateZoom = () => zoom.setText(`${Math.round(board.vp.zoom * 100)}%`);
   updateZoom();
   board.on('viewport', updateZoom);
+  board.addDisposer(() => zoomPop?.close());
 
   // ⌘F (hotkeys.ts) opens search.
   board.openSearch = () => {
@@ -286,6 +304,69 @@ export function attachCorner(board: Board): void {
     search.focus();
   };
   search.onClose = () => searchBtn.removeClass('is-active');
+}
+
+/** Under the zoom caret: a slider, and the overview views. */
+class ZoomPopover {
+  private el: HTMLElement;
+  private offs: (() => void)[] = [];
+
+  constructor(private board: Board, anchor: HTMLElement, private onClose: () => void) {
+    const el = board.uiEl.createDiv('vc-zoom-pop');
+    this.el = el;
+    el.addEventListener('pointerdown', e => e.stopPropagation());
+    el.addEventListener('wheel', e => e.stopPropagation());
+
+    // Slider on a log scale, 10% – 400%.
+    const MIN = Math.log(0.1), MAX = Math.log(4);
+    const sliderRow = el.createDiv('vc-zoom-slider');
+    const slider = sliderRow.createEl('input', { type: 'range', cls: 'slider', attr: { min: '0', max: '1000', step: '1' } });
+    const value = sliderRow.createDiv({ cls: 'vc-zoom-slider-value' });
+    const sync = () => {
+      const z = board.vp.zoom;
+      slider.value = String(Math.round(((Math.log(Math.min(4, Math.max(0.1, z))) - MIN) / (MAX - MIN)) * 1000));
+      value.setText(`${Math.round(z * 100)}%`);
+    };
+    sync();
+    slider.addEventListener('input', () => {
+      const z = Math.exp(MIN + (Number(slider.value) / 1000) * (MAX - MIN));
+      // Settle on round percentages near the fixed levels.
+      const near = ZOOM_STEPS.find(s => Math.abs(s - z) / s < 0.03);
+      board.setZoom(near ?? Math.round(z * 100) / 100);
+    });
+    this.offs.push(board.on('viewport', sync));
+
+    const item = (icon: string, label: string, keys: string, run: () => void) => {
+      const r = el.createDiv({ cls: 'vc-more-row', attr: { role: 'button' } });
+      setIcon(r.createDiv('vc-more-row-icon'), icon);
+      r.createDiv({ cls: 'vc-more-row-label', text: label });
+      if (keys) r.createDiv({ cls: 'vc-more-row-keys', text: keys });
+      r.addEventListener('click', () => { this.close(); run(); });
+    };
+    el.createDiv('vc-more-sep');
+    const keys = (id: string) => shortcutLabel(id, board.settings.hotkeys);
+    item('maximize', t('Zoom to fit'), keys('zoom-fit'), () => board.zoomToFit(undefined, true));
+    if (board.selection.size) item('scan-search', t('Zoom to selection'), keys('zoom-selection'), () => board.zoomToFit([...board.selection], true));
+    item('scan', t('Zoom to 100%'), keys('zoom-100'), () => board.setZoom(1, true));
+
+    const br = board.root.getBoundingClientRect(), ar = anchor.getBoundingClientRect();
+    el.style.left = `${Math.max(8, ar.left - br.left)}px`;
+    el.style.bottom = `${br.bottom - ar.top + 8}px`;
+
+    const doc = el.ownerDocument;
+    const outside = (e: PointerEvent) => { if (!el.contains(e.target as Node) && !anchor.contains(e.target as Node)) this.close(); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); this.close(); } };
+    doc.addEventListener('pointerdown', outside, true);
+    doc.addEventListener('keydown', key, true);
+    this.offs.push(() => { doc.removeEventListener('pointerdown', outside, true); doc.removeEventListener('keydown', key, true); });
+  }
+
+  close(): void {
+    if (!this.el.isConnected) return;
+    for (const off of this.offs.splice(0)) off();
+    this.el.remove();
+    this.onClose();
+  }
 }
 
 function appearanceMenu(board: Board, e: MouseEvent): void {

@@ -11,7 +11,7 @@ import { attachContextMenu } from '../board/menus';
 import { attachCorner, attachToolbar } from '../board/ui';
 import { ContextBar } from '../board/context-bar';
 import { t } from '../i18n';
-import { installHotkeys } from '../board/hotkeys';
+import { installShortcuts } from '../board/shortcuts';
 
 interface SavedViewport { x: number; y: number; zoom: number; }
 
@@ -45,7 +45,7 @@ export class CanvasView extends TextFileView {
     this.addAction('layout-grid', t('Open in core Canvas'), () => { void switchCanvasView(this.leaf, 'native'); });
     this.setupTitleRename();
     this.scope = new Scope(this.app.scope);
-    installHotkeys(this.scope, () => this.board);
+    installShortcuts(this.scope, () => this.board);
     // Keep the board sized to its pane.
     const ro = new ResizeObserver(() => { board.applyViewport(); this.tryInitialView(); });
     ro.observe(this.contentEl);

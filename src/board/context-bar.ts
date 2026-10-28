@@ -1,3 +1,4 @@
+import { shortcutLabel } from './shortcuts';
 import { getIcon, setIcon, setTooltip } from 'obsidian';
 import type { Board } from './board';
 import type { BarItem } from '../cards/types';
@@ -360,7 +361,7 @@ export class ContextBar {
     groups.forEach((g, i) => {
       if (i) pop.createDiv('vc-ctx-pop-sep');
       for (const d of ARRANGE.filter(x => x.group === g)) {
-        this.listItem(pop, iconFor(d.icon), t(d.label), () => { runArrange(this.board, d.id); close(); }, false, d.keys);
+        this.listItem(pop, iconFor(d.icon), t(d.label), () => { runArrange(this.board, d.id); close(); }, false, shortcutLabel(`arrange-${d.id}`, this.board.settings.hotkeys));
       }
     });
   }
@@ -374,7 +375,7 @@ export class ContextBar {
       for (const d of ARRANGE.filter(x => x.group === g)) {
         const cell = grid.createDiv({ cls: 'vc-ctx-cell', attr: { role: 'button', 'aria-label': t(d.label) } });
         setIconSafe(cell, iconFor(d.icon));
-        setTooltip(cell, d.keys ? `${t(d.label)}  ${d.keys}` : t(d.label), { placement: 'bottom' });
+        { const k = shortcutLabel(`arrange-${d.id}`, this.board.settings.hotkeys); setTooltip(cell, k ? `${t(d.label)}  ${k}` : t(d.label), { placement: 'bottom' }); }
         cell.addEventListener('click', () => { runArrange(this.board, d.id); close(); });
       }
     }
@@ -452,7 +453,7 @@ export class ContextBar {
       if (!d) continue;
       const cell = grid.createDiv({ cls: 'vc-ctx-cell', attr: { role: 'button', 'aria-label': t(d.label) } });
       setIconSafe(cell, iconFor(d.icon));
-      setTooltip(cell, d.keys ? `${t(d.label)}  ${d.keys}` : t(d.label), { placement: 'bottom' });
+      { const k = shortcutLabel(`arrange-${d.id}`, this.board.settings.hotkeys); setTooltip(cell, k ? `${t(d.label)}  ${k}` : t(d.label), { placement: 'bottom' }); }
       cell.addEventListener('click', () => runArrange(this.board, d.id));
     }
   }
@@ -462,7 +463,7 @@ export class ContextBar {
     pop.addClass('is-list');
     const row = (id: string, label: string, icon?: string) => {
       const d = ARRANGE.find(x => x.id === id)!;
-      this.listItem(pop, iconFor(icon ?? d.icon), label, () => { runArrange(this.board, d.id); close(); }, false, d.keys);
+      this.listItem(pop, iconFor(icon ?? d.icon), label, () => { runArrange(this.board, d.id); close(); }, false, shortcutLabel(`arrange-${d.id}`, this.board.settings.hotkeys));
     };
     row('row', t('In a row'), 'more-horizontal');
     row('column', t('In a column'), 'ellipsis-vertical');

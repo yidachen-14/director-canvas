@@ -1,8 +1,9 @@
 import { App, ColorComponent, PluginSettingTab, Setting, setIcon } from 'obsidian';
 import type VisualCanvasPlugin from './main';
 import { DEFAULT_SETTINGS, type TextCardKind, type ToolbarPosition, type ToolbarSize } from './settings';
-import { availableTools } from './board/tools';
+import { availableTools, FIXED_TOOLS } from './board/tools';
 import { setLanguage, t, type Language } from './i18n';
+import { ShortcutsModal } from './shortcuts-modal';
 
 const TEXT_KINDS: TextCardKind[] = ['text', 'note', 'sticky', 'callout'];
 const KIND_LABEL: Record<TextCardKind, string> = { text: 'Text', note: 'Note', sticky: 'Sticky note', callout: 'Callout' };
@@ -59,17 +60,24 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
     new Setting(el)
       .setName(t('Position'))
       .addDropdown(d => d
-        .addOption('bottom', t('Bottom')).addOption('top', t('Top')).addOption('left', t('Left')).addOption('right', t('Right'))
+        .addOption('top', t('Top')).addOption('bottom', t('Bottom')).addOption('left', t('Left')).addOption('right', t('Right'))
         .setValue(s.toolbarPosition)
         .onChange(async (v) => { s.toolbarPosition = v as ToolbarPosition; await this.save(); }));
     new Setting(el)
       .setName(t('Size'))
-      .setDesc(t('L and M show names under the icons; S shows icons only.'))
+      .setDesc(t('S shows icons only; M and L show names under the icons.'))
       .addDropdown(d => d
-        .addOption('L', 'L').addOption('M', 'M').addOption('S', 'S')
+        .addOption('S', 'S').addOption('M', 'M').addOption('L', 'L')
         .setValue(s.toolbarSize)
         .onChange(async (v) => { s.toolbarSize = v as ToolbarSize; await this.save(); }));
     this.toolList(el);
+
+    // ── Shortcuts ──
+    new Setting(el).setName(t('Keyboard shortcuts')).setHeading();
+    new Setting(el)
+      .setName(t('Board shortcuts'))
+      .setDesc(t('See every shortcut and change its keys.'))
+      .addButton(b => b.setButtonText(t('Edit shortcuts…')).onClick(() => new ShortcutsModal(this.app, this.plugin).open()));
 
     // ── Text ──
     new Setting(el).setName(t('Text cards')).setHeading();
@@ -201,11 +209,11 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
     const s = this.plugin.settings;
     new Setting(el)
       .setName(t('Tools on the toolbar'))
-      .setDesc(t('Ticked tools show on the toolbar in this order; the rest are under "…".'));
+      .setDesc(t('Select and Hand always come first. Ticked tools follow in this order; the rest are under "…".'));
     const list = el.createDiv('vc-tool-list');
     const render = () => {
       list.empty();
-      const tools = availableTools().filter(x => x.id !== 'select');
+      const tools = availableTools().filter(x => !FIXED_TOOLS.includes(x.id));
       const shown = s.toolbarTools.filter(id => tools.some(x => x.id === id));
       const ordered = [...shown.map(id => tools.find(x => x.id === id)!), ...tools.filter(x => !shown.includes(x.id))];
       ordered.forEach((tool) => {
@@ -217,7 +225,6 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
         cb.addEventListener('change', async () => {
           if (cb.checked) s.toolbarTools = [...shown, tool.id];
           else s.toolbarTools = shown.filter(id => id !== tool.id);
-          if (!s.toolbarTools.includes('select')) s.toolbarTools.unshift('select');
           await this.save();
           render();
         });
@@ -230,7 +237,7 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
             if (i === 0) return;
             const arr = [...shown];
             [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]];
-            s.toolbarTools = ['select', ...arr.filter(id => id !== 'select')];
+            s.toolbarTools = arr;
             await this.save(); render();
           });
           const down = row.createDiv({ cls: 'clickable-icon', attr: { 'aria-label': t('Move down') } });
@@ -240,7 +247,7 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
             if (i >= shown.length - 1) return;
             const arr = [...shown];
             [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]];
-            s.toolbarTools = ['select', ...arr.filter(id => id !== 'select')];
+            s.toolbarTools = arr;
             await this.save(); render();
           });
         }

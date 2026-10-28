@@ -1,4 +1,4 @@
-import { Menu, Notice, requestUrl, setIcon } from 'obsidian';
+import { Menu, Modal, Notice, Setting, requestUrl, setIcon, setTooltip, type App } from 'obsidian';
 import type { RawNode } from '../model/canvas-file';
 import type { BarItem, CardContext, CardHandle, CardType } from './types';
 import { applyCardColor, resolveFile, vcGet } from './util';
@@ -9,15 +9,60 @@ import { t } from '../i18n';
 
 type MediaKind = 'image' | 'video' | 'audio';
 
-/** Height of a media card's description area (0 when it has none). */
+/** Height of what a media card adds to the picture: the link bar above and the description below. */
 export function descriptionHeight(el: HTMLElement | undefined): number {
-  return el?.querySelector<HTMLElement>('.vc-media-desc')?.offsetHeight ?? 0;
+  if (!el) return 0;
+  const h = (sel: string) => { const x = el.querySelector<HTMLElement>(sel); return x && x.isShown() ? x.offsetHeight : 0; };
+  return h('.vc-media-link') + h('.vc-media-desc');
+}
+
+/**
+ * Open a web address the way Obsidian is set up: in its Web viewer when that core plugin
+ * is on and set to open external links, otherwise in the default browser.
+ */
+export function openUrl(app: App, url: string): void {
+  type WV = { enabled?: boolean; instance?: { options?: { openExternalURLs?: boolean } } };
+  const wv = (app as unknown as { internalPlugins?: { getPluginById?: (id: string) => WV | null } }).internalPlugins?.getPluginById?.('webviewer');
+  if (wv?.enabled && wv.instance?.options?.openExternalURLs) {
+    void app.workspace.getLeaf('tab').setViewState({ type: 'webviewer', active: true, state: { url, navigate: true } });
+    return;
+  }
+  window.open(url);
+}
+
+/** Ask for a web address (empty = remove the link). */
+class LinkModal extends Modal {
+  constructor(app: App, private value: string, private done: (url: string | null) => void) { super(app); }
+  onOpen(): void {
+    this.titleEl.setText(this.value ? t('Edit link') : t('Insert link'));
+    let v = this.value;
+    let input: HTMLInputElement | null = null;
+    new Setting(this.contentEl).setName(t('Address')).addText(tx => {
+      input = tx.inputEl;
+      tx.inputEl.style.width = '100%';
+      tx.setPlaceholder('https://…').setValue(v).onChange(x => { v = x; });
+      tx.inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); this.finish(v); } });
+    });
+    const buttons = new Setting(this.contentEl);
+    if (this.value) buttons.addButton(b => b.setButtonText(t('Remove link')).setWarning().onClick(() => this.finish('')));
+    buttons.addButton(b => b.setButtonText(t('Cancel')).onClick(() => this.close()))
+      .addButton(b => b.setButtonText(t('Save')).setCta().onClick(() => this.finish(v)));
+    window.setTimeout(() => { input?.focus(); input?.select(); }, 0);
+  }
+  private finish(v: string): void {
+    let url = v.trim();
+    if (url && !/^[a-z][a-z0-9+.-]*:/i.test(url)) url = `https://${url}`;
+    this.close();
+    this.done(url);
+  }
+  onClose(): void { this.contentEl.empty(); }
 }
 
 class MediaCard implements CardHandle {
   private node: RawNode;
   private frame: HTMLElement;
   private desc: HTMLElement;
+  private linkBar: HTMLElement;
   private editor: HTMLTextAreaElement | null = null;
   private ro: ResizeObserver;
   private shownFile = '';
@@ -25,10 +70,12 @@ class MediaCard implements CardHandle {
   constructor(private kind: MediaKind, node: RawNode, private el: HTMLElement, private ctx: CardContext) {
     this.node = node;
     el.addClass('vc-media', `vc-${kind}`);
+    this.linkBar = el.createDiv('vc-media-link');
     this.frame = el.createDiv('vc-media-frame');
     this.desc = el.createDiv('vc-media-desc');
     this.ro = new ResizeObserver(() => this.fitDescription());
     this.ro.observe(this.desc);
+    this.ro.observe(this.linkBar);
     this.render();
   }
 
@@ -63,6 +110,56 @@ class MediaCard implements CardHandle {
       this.desc.setText(text);
       this.desc.toggle(!!text);
     }
+    this.renderLink();
+    const card = this.el.closest<HTMLElement>('.vc-node');
+    card?.toggleClass('has-media-frame', this.hasFrame());
+    card?.toggleClass('has-media-extras', !!this.linkText() || !!this.descText() || !!this.editor);
+  }
+
+  private linkText(n = this.node): string { return vcGet(n, 'link', '') as string; }
+
+  /** The frame around the whole card: on when chosen, or by default when the card has a colour. */
+  private hasFrame(n = this.node): boolean {
+    const f = n.vc?.frame;
+    return typeof f === 'boolean' ? f : !!n.color;
+  }
+
+  /** A browser-tab-like strip above the picture with its link. */
+  private renderLink(): void {
+    const url = this.linkText();
+    const bar = this.linkBar;
+    if (bar.dataset.url === url) return;
+    bar.dataset.url = url;
+    bar.empty();
+    bar.toggle(!!url);
+    if (!url) return;
+    const tab = bar.createDiv({ cls: 'vc-media-link-tab vc-click', attr: { role: 'link' } });
+    setIcon(tab.createDiv('vc-media-link-icon'), 'globe');
+    let label = url;
+    try { const u = new URL(url); label = (u.host + (u.pathname === '/' ? '' : u.pathname) + u.search).replace(/^www\./, ''); } catch { /* keep */ }
+    tab.createDiv({ cls: 'vc-media-link-text', text: label });
+    setTooltip(tab, url, { placement: 'top' });
+    tab.addEventListener('click', (e) => {
+      const b = this.ctx.board;
+      if (!(b.selection.has(this.node.id) && b.selection.size === 1)) return;
+      e.stopPropagation();
+      openUrl(this.ctx.app, url);
+    });
+    tab.addEventListener('dblclick', e => e.stopPropagation());
+  }
+
+  private editLink(): void {
+    new LinkModal(this.ctx.app, this.linkText(), (url) => {
+      if (url === null || url === this.linkText()) return;
+      commitNode(this.ctx, this.node.id, (n) => {
+        n.vc = { ...(n.vc ?? {}) };
+        if (url) n.vc.link = url; else delete n.vc.link;
+      });
+    }).open();
+  }
+
+  private setFrame(on: boolean): void {
+    commitNode(this.ctx, this.node.id, (n) => { n.vc = { ...(n.vc ?? {}), frame: on }; });
   }
 
   /**
@@ -71,7 +168,7 @@ class MediaCard implements CardHandle {
    * the card is kept in vc.descH, so this stays right across reloads.
    */
   private fitDescription(): void {
-    const h = this.desc.isShown() ? Math.ceil(this.desc.offsetHeight) : 0;
+    const h = (this.desc.isShown() ? Math.ceil(this.desc.offsetHeight) : 0) + (this.linkBar.isShown() ? Math.ceil(this.linkBar.offsetHeight) : 0);
     const n = this.ctx.board.model.node(this.node.id);
     if (!n || !this.el.isConnected) return;
     const counted = Number(n.vc?.descH) || 0;
@@ -127,6 +224,7 @@ class MediaCard implements CardHandle {
     if (this.editor) return true;
     this.desc.empty();
     this.desc.show();
+    this.el.closest<HTMLElement>('.vc-node')?.addClass('has-media-extras');
     const ta = this.desc.createEl('textarea', { cls: 'vc-media-desc-input', attr: { rows: '1', placeholder: t('Add a description…') } });
     ta.value = this.descText();
     this.editor = ta;
@@ -170,6 +268,9 @@ class MediaCard implements CardHandle {
     const items: BarItem[] = [];
     if (this.kind !== 'audio') {
       items.push({ id: 'desc', icon: 'text', label: t(this.descText() ? 'Edit description' : 'Add description'), active: !!this.descText(), run: () => this.ctx.board.startEditing(this.node.id) });
+      items.push({ id: 'link', icon: 'link', label: t(this.linkText() ? 'Edit link' : 'Insert link'), active: !!this.linkText(), run: () => this.editLink() });
+      const on = this.hasFrame();
+      items.push({ id: 'frame', icon: 'square', label: t(on ? 'Hide the frame' : 'Show a frame'), active: on, run: () => this.setFrame(!on) });
     }
     const file = resolveFile(this.ctx.app, this.node);
     if (file) items.push({ id: 'open', icon: 'external-link', label: t('Open file'), run: () => void this.ctx.app.workspace.getLeaf('tab').openFile(file) });
@@ -180,6 +281,7 @@ class MediaCard implements CardHandle {
     if (this.kind === 'audio') return;
     menu.addItem(i => i.setTitle(t(this.descText() ? 'Edit description' : 'Add description')).setIcon('text').setSection('edit')
       .onClick(() => this.ctx.board.startEditing(this.node.id)));
+    menu.addItem(i => i.setTitle(t(this.linkText() ? 'Edit link' : 'Insert link')).setIcon('link').setSection('edit').onClick(() => this.editLink()));
     if (this.descText()) {
       menu.addItem(i => i.setTitle(t('Remove description')).setIcon('x').setSection('edit')
         .onClick(() => commitNode(this.ctx, this.node.id, (n) => { n.vc = { ...(n.vc ?? {}) }; delete n.vc.desc; })));
@@ -294,7 +396,7 @@ class BookmarkCard implements CardHandle {
     }
     const body = box.createDiv('vc-bookmark-body');
     const title = body.createEl('a', { cls: 'vc-bookmark-title', text: meta.title || host, href: url });
-    title.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); window.open(url); });
+    title.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openUrl(this.ctx.app, url); });
     if (meta.description) body.createDiv({ cls: 'vc-bookmark-desc', text: meta.description });
     else if (!meta.fetched) body.createDiv({ cls: 'vc-bookmark-desc is-loading', text: t('Loading preview…') });
     else if (meta.failed) body.createDiv({ cls: 'vc-bookmark-desc', text: t('No preview available for this page.') });
@@ -349,7 +451,7 @@ class BookmarkCard implements CardHandle {
     const url = this.node.url;
     if (!url) return [];
     return [
-      { id: 'open', icon: 'external-link', label: t('Open in browser'), run: () => window.open(url) },
+      { id: 'open', icon: 'external-link', label: t('Open in browser'), run: () => openUrl(this.ctx.app, url) },
       { id: 'copy', icon: 'link', label: t('Copy address'), run: () => { void navigator.clipboard.writeText(url); new Notice(t('Copied.')); } },
       {
         id: 'refresh', icon: 'refresh-cw', label: t('Refresh preview'),
@@ -361,7 +463,7 @@ class BookmarkCard implements CardHandle {
   menu(menu: Menu): void {
     const url = this.node.url;
     if (!url) return;
-    menu.addItem(i => i.setTitle(t('Open in browser')).setIcon('external-link').setSection('open').onClick(() => window.open(url)));
+    menu.addItem(i => i.setTitle(t('Open in browser')).setIcon('external-link').setSection('open').onClick(() => openUrl(this.ctx.app, url)));
     menu.addItem(i => i.setTitle(t('Copy address')).setIcon('copy').setSection('open').onClick(() => { void navigator.clipboard.writeText(url); new Notice(t('Copied.')); }));
     menu.addItem(i => i.setTitle(t('Refresh preview')).setIcon('refresh-cw').setSection('open').onClick(() => {
       this.ctx.board.model.quiet(() => { const n = this.ctx.board.model.node(this.node.id); if (n) { n.vc = { ...(n.vc ?? {}) }; delete n.vc.meta; this.ctx.board.model.touch(n.id); } });

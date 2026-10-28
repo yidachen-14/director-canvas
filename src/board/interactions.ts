@@ -7,10 +7,10 @@ import { cardKindOf, vcGet } from '../cards/util';
 import { getCardType } from '../cards/registry';
 import { ConnectController } from './connect-ui';
 import { PenController } from './pen';
-import { runArrange, type ArrangeCommand } from './arrange-commands';
 import { descriptionHeight } from '../cards/media';
 import { DropLine, findBlockDrop, insertMarkdownAt, richAt, type Drop } from '../richtext/block-drag';
 import { t as tr } from '../i18n';
+import { placeCursor } from '../ui/cursor';
 
 type Zone = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 
@@ -22,15 +22,11 @@ const ZONE_CURSOR: Record<Zone, string> = {
 const DRAG_THRESHOLD = 3;
 const MIN_W = 40, MIN_H = 24;
 
-const ARRANGE_KEYS: Record<string, ArrangeCommand> = {
-  KeyP: 'optimal', KeyN: 'by-name', KeyA: 'by-added', KeyD: 'by-path', KeyR: 'random', KeyS: 'stack',
-};
-
 /** Card kinds a Text card can be dropped into. */
 const MERGE_INTO = ['note', 'sticky', 'callout', 'checklist'];
 
 /** Card kinds that keep their aspect ratio when resized from a corner. */
-const KEEP_ASPECT = new Set(['image', 'video']);
+const KEEP_ASPECT = new Set(['image', 'video', 'swatch']);
 
 const isMod = (e: MouseEvent | KeyboardEvent) => (Platform.isMacOS ? e.metaKey : e.ctrlKey);
 
@@ -88,6 +84,8 @@ export function attachInteractions(board: Board): void {
   const baseCursor = () => {
     if (spaceDown || board.tool === 'hand') return 'grab';
     if (board.tool === 'select') return '';
+    const type = getCardType(board.tool);
+    if (type && typeof type.icon === 'string') return placeCursor(type.icon);
     return 'crosshair';
   };
 
@@ -164,7 +162,8 @@ export function attachInteractions(board: Board): void {
         const kind = board.tool;
         board.setTool('select');
         const editable = ['text', 'note', 'sticky', 'callout', 'checklist'].includes(kind);
-        board.createCard(kind, w, { edit: editable });
+        // The click is the card's top-left corner.
+        board.createCard(kind, w, { edit: editable, topLeft: true });
         lastPlaceAt = Date.now();
       }
       return;
@@ -547,12 +546,7 @@ export function attachInteractions(board: Board): void {
     }
 
     if (e.key === ' ' && !spaceDown) { spaceDown = true; setCursor('grab'); e.preventDefault(); return; }
-    // ⌥⌘ + letter: arranging (by physical key, see hotkeys.ts).
-    if (mod && e.altKey && !e.shiftKey) {
-      const cmd = ARRANGE_KEYS[e.code];
-      if (cmd) { runArrange(board, cmd); e.preventDefault(); return; }
-    }
-    if (mod) return; // ⌘ shortcuts go through the view's hotkey scope (hotkeys.ts)
+    if (mod) return; // shortcuts go through the view's scope (shortcuts.ts)
     if (e.key === 'Enter' && board.tool === 'pen') { board.setTool('select'); e.preventDefault(); return; }
     if (e.key === 'Escape') {
       if (board.tool !== 'select') board.setTool('select');
@@ -566,8 +560,6 @@ export function attachInteractions(board: Board): void {
       e.preventDefault();
       return;
     }
-    if (e.shiftKey && e.key === '!' || (e.shiftKey && e.code === 'Digit1')) { board.zoomToFit(); e.preventDefault(); return; }
-    if (e.shiftKey && e.code === 'Digit2') { board.zoomToFit([...board.selection]); e.preventDefault(); return; }
 
     if (!mod && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && board.selection.size) {
       const step = e.shiftKey ? 10 : 1;

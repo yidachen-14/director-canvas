@@ -1,6 +1,7 @@
 import { Component, MarkdownRenderer, TFile, setIcon } from 'obsidian';
 import type { RawNode } from '../model/canvas-file';
-import type { CardContext, CardHandle, CardType } from './types';
+import type { BarItem, CardContext, CardHandle, CardType } from './types';
+import { barRow } from './bar';
 import { applyCardColor, fileKindOf, resolveFile } from './util';
 import { t } from '../i18n';
 
@@ -47,6 +48,7 @@ export const groupCard: CardType = {
     let input: HTMLInputElement | null = null;
     const render = () => {
       applyCardColor(el.parentElement ?? el, current.color);
+      el.setAttr('data-border', borderStyleOf(current));
       if (!input) label.setText(current.label || '');
       label.toggleClass('is-empty', !current.label);
     };
@@ -83,10 +85,42 @@ export const groupCard: CardType = {
       isEditing: () => !!input,
       stopEditing: () => finish(true),
       searchText: () => current.label ?? '',
-      barItems: () => [{ id: 'rename', icon: 'pencil', label: t('Rename'), text: current.label || '', run: () => ctx.board.startEditing(current.id) }],
+      barItems: () => [
+        { id: 'rename', icon: 'pencil', label: t('Rename'), text: current.label || '', run: () => ctx.board.startEditing(current.id) },
+        borderBarItem(ctx, current),
+      ],
     };
   },
 };
+
+export type BorderStyle = 'none' | 'solid' | 'dashed';
+const BORDER_ICON: Record<BorderStyle, string> = { none: 'square-dashed', solid: 'square', dashed: 'square-dashed-bottom' };
+
+/**
+ * A group's or column's frame. Groups: no colour → fully clear (just a way to gather cards),
+ * a colour → a solid frame; columns: solid. A chosen style (vc.border) wins either way.
+ */
+export function borderStyleOf(n: RawNode): BorderStyle {
+  const b = n.vc?.border;
+  if (b === 'none' || b === 'solid' || b === 'dashed') return b;
+  if (n.vc?.kind === 'column') return 'solid';
+  return n.color ? 'solid' : 'none';
+}
+
+function borderBarItem(ctx: CardContext, n: RawNode): BarItem {
+  const cur = borderStyleOf(n);
+  return {
+    id: 'border', icon: BORDER_ICON[cur], label: t('Border'),
+    dropdown: (pop, close) => {
+      for (const [v, label] of [['none', 'No border'], ['solid', 'Solid'], ['dashed', 'Dashed']] as [BorderStyle, string][]) {
+        barRow(pop, BORDER_ICON[v], t(label), v === cur, () => {
+          close();
+          commitNode(ctx, n.id, x => { x.vc = { ...(x.vc ?? {}), border: v }; });
+        });
+      }
+    },
+  };
+}
 
 // ── Files ───────────────────────────────────────────────────
 

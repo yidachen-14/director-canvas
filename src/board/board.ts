@@ -212,23 +212,76 @@ export class Board {
     return this.vp.toWorld(width / 2, height / 2);
   }
 
-  zoomToFit(ids?: string[]): void {
+  zoomToFit(ids?: string[], animate = false): void {
     const nodes = ids?.length ? ids.map(id => this.model.node(id)).filter((n): n is RawNode => !!n) : this.model.nodes;
     const rect = unionRect(nodes.map(nodeRect));
     const { width, height } = this.screenSize();
-    if (!rect) { this.vp.zoom = 1; this.vp.x = width / 2; this.vp.y = height / 2; }
-    else this.vp.fit(rect, width, height, 64, ids?.length ? 2 : 1);
+    const target = new Viewport();
+    if (!rect) { target.zoom = 1; target.x = width / 2; target.y = height / 2; }
+    else target.fit(rect, width, height, 64, ids?.length ? 2 : 1);
+    if (animate) { this.animateTo(target); return; }
+    this.stopViewAnimation();
+    this.vp.x = target.x; this.vp.y = target.y; this.vp.zoom = target.zoom;
     this.applyViewport();
   }
 
   zoomBy(factor: number): void {
+    this.stopViewAnimation();
     const { width, height } = this.screenSize();
     this.vp.zoomAt(width / 2, height / 2, factor);
     this.applyViewport();
   }
 
-  setZoom(z: number): void {
-    this.zoomBy(z / this.vp.zoom);
+  /** Zoom to `z` around the middle of the view; smoothly when `animate`. */
+  setZoom(z: number, animate = false): void {
+    if (!animate) { this.zoomBy(z / this.vp.zoom); return; }
+    const { width, height } = this.screenSize();
+    const target = new Viewport();
+    target.x = this.vp.x; target.y = this.vp.y; target.zoom = this.vp.zoom;
+    target.zoomAt(width / 2, height / 2, z / this.vp.zoom);
+    this.animateTo(target);
+  }
+
+  /** One step in or out along the fixed zoom levels (… 50%, 67%, 75%, 100%, 125% …), smoothly. */
+  zoomStep(dir: 1 | -1): void {
+    const from = this.viewAnim?.target.zoom ?? this.vp.zoom;
+    this.setZoom(nextZoomStep(from, dir), true);
+  }
+
+  private viewAnim: { raf: number; target: Viewport; last: { x: number; y: number; zoom: number } } | null = null;
+
+  private stopViewAnimation(): void {
+    if (this.viewAnim) cancelAnimationFrame(this.viewAnim.raf);
+    this.viewAnim = null;
+  }
+
+  /** Glide to a view: zoom moves evenly on a log scale, the middle of the view moves in a line. */
+  animateTo(target: Viewport, ms = 220): void {
+    this.stopViewAnimation();
+    const { width, height } = this.screenSize();
+    const z0 = this.vp.zoom, z1 = target.zoom;
+    const c0 = this.vp.toWorld(width / 2, height / 2), c1 = target.toWorld(width / 2, height / 2);
+    const t0 = performance.now();
+    const ease = (k: number) => 1 - Math.pow(1 - k, 3);
+    const anim = { raf: 0, target, last: { x: this.vp.x, y: this.vp.y, zoom: this.vp.zoom } };
+    this.viewAnim = anim;
+    const step = (now: number) => {
+      if (this.viewAnim !== anim) return;
+      // Someone else moved the view (wheel, pan): let them have it.
+      if (this.vp.x !== anim.last.x || this.vp.y !== anim.last.y || this.vp.zoom !== anim.last.zoom) { this.viewAnim = null; return; }
+      const k = Math.min(1, (now - t0) / ms), e = ease(k);
+      const z = Math.exp(Math.log(z0) + (Math.log(z1) - Math.log(z0)) * e);
+      const cx = c0.x + (c1.x - c0.x) * e, cy = c0.y + (c1.y - c0.y) * e;
+      this.vp.zoom = z;
+      this.vp.x = width / 2 - cx * z;
+      this.vp.y = height / 2 - cy * z;
+      if (k >= 1) { this.vp.x = target.x; this.vp.y = target.y; this.vp.zoom = target.zoom; }
+      anim.last = { x: this.vp.x, y: this.vp.y, zoom: this.vp.zoom };
+      this.applyViewport();
+      if (k < 1) anim.raf = requestAnimationFrame(step);
+      else this.viewAnim = null;
+    };
+    anim.raf = requestAnimationFrame(step);
   }
 
   /** Scroll so the world rect is visible, without changing zoom when it already fits. */
@@ -507,12 +560,12 @@ export class Board {
   // ── operations ────────────────────────────────────────────
 
   /** Create a card of a kind centred on a world point, select it, optionally start editing. */
-  createCard(kind: string, at: Point, opts: { edit?: boolean; data?: Partial<RawNode>; size?: { width: number; height: number } } = {}): RawNode | null {
+  createCard(kind: string, at: Point, opts: { edit?: boolean; data?: Partial<RawNode>; size?: { width: number; height: number }; topLeft?: boolean } = {}): RawNode | null {
     const type = getCardType(kind);
     if (!type) { new Notice(t('This card type is not available yet.')); return null; }
     const size = opts.size ?? type.defaultSize;
     const base = type.create?.({ settings: this.settings }) ?? {};
-    let x = at.x - size.width / 2, y = at.y - size.height / 2;
+    let x = Math.round(opts.topLeft ? at.x : at.x - size.width / 2), y = Math.round(opts.topLeft ? at.y : at.y - size.height / 2);
     if (this.settings.snapToGrid) { x = snap(x, this.settings.gridSize); y = snap(y, this.settings.gridSize); }
     const id = newId();
     const node = this.model.transact(() => this.model.addNode({
@@ -628,6 +681,16 @@ export class Board {
 
   /** Icon helper for UI modules. */
   icon(el: HTMLElement, name: string): void { setIcon(el, name); }
+}
+
+/** Zoom levels the + / − buttons and ⌘= / ⌘− step through. */
+export const ZOOM_STEPS = [0.1, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4, 6, 8];
+
+/** The next level up or down from `z` (a zoom between levels goes to the neighbour on that side). */
+export function nextZoomStep(z: number, dir: 1 | -1): number {
+  if (dir > 0) return ZOOM_STEPS.find(s => s > z * 1.001) ?? ZOOM_STEPS[ZOOM_STEPS.length - 1];
+  for (let i = ZOOM_STEPS.length - 1; i >= 0; i--) if (ZOOM_STEPS[i] < z * 0.999) return ZOOM_STEPS[i];
+  return ZOOM_STEPS[0];
 }
 
 export function snap(v: number, grid: number): number {
