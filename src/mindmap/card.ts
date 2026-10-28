@@ -347,7 +347,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
   }
 
   /** Drag a boundary's top / bottom (or left / right) edge: it takes in the siblings it then covers. */
-  private startBoundaryResize(e: PointerEvent, id: string, edge: 'start' | 'end'): void {
+  private startBoundaryResize(_e: PointerEvent, id: string, edge: 'start' | 'end'): void {
     const q0 = this.extras.boundaries.find(b => b.id === id);
     const frame = this.bndLayer.querySelector<HTMLElement>(`.vc-mm-bnd[data-bid="${CSS.escape(id)}"]`);
     if (!q0 || !frame) return;

@@ -27,7 +27,7 @@ class SwatchCard implements CardHandle {
   private nameEl: HTMLElement;
   private input: HTMLInputElement;
 
-  constructor(node: RawNode, private el: HTMLElement, private ctx: CardContext) {
+  constructor(node: RawNode, el: HTMLElement, private ctx: CardContext) {
     this.node = node;
     el.addClass('vc-swatch');
     this.area = el.createDiv('vc-swatch-area');

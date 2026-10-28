@@ -140,7 +140,7 @@ function applyPlacement(board: Board, placement: Placement, raise: string[] | nu
 }
 
 /** Arrange entries for a right-click menu. */
-export function addArrangeMenu(menu: Menu, board: Board, submenu: (title: string, icon: string, section: string, build: (m: Menu) => void) => void, multi: boolean): void {
+export function addArrangeMenu(_menu: Menu, board: Board, submenu: (title: string, icon: string, section: string, build: (m: Menu) => void) => void, multi: boolean): void {
   const items = (m: Menu, group: ArrangeDef['group']) => {
     for (const d of ARRANGE.filter(x => x.group === group)) {
       m.addItem(i => {

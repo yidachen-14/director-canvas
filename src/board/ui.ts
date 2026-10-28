@@ -169,7 +169,7 @@ class OverflowPanel {
   private el: HTMLElement;
   private offDoc: () => void;
 
-  constructor(private board: Board, anchor: HTMLElement, tools: Tool[], activate: (t: Tool) => void, private onClose: () => void) {
+  constructor(board: Board, anchor: HTMLElement, tools: Tool[], activate: (t: Tool) => void, private onClose: () => void) {
     const el = board.uiEl.createDiv('vc-more-panel');
     this.el = el;
     el.addEventListener('pointerdown', e => e.stopPropagation());
@@ -313,7 +313,7 @@ class ZoomPopover {
   private el: HTMLElement;
   private offs: (() => void)[] = [];
 
-  constructor(private board: Board, anchor: HTMLElement, private onClose: () => void) {
+  constructor(board: Board, anchor: HTMLElement, private onClose: () => void) {
     const el = board.uiEl.createDiv('vc-zoom-pop');
     this.el = el;
     el.addEventListener('pointerdown', e => e.stopPropagation());

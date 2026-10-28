@@ -1,6 +1,6 @@
 import { Component, MarkdownRenderer, TFile, addIcon, setIcon } from 'obsidian';
 import type { RawNode } from '../model/canvas-file';
-import type { BarItem, CardContext, CardHandle, CardType } from './types';
+import type { BarItem, CardContext, CardType } from './types';
 import { barRow } from './bar';
 import { applyCardColor, fileKindOf, resolveFile } from './util';
 import { t } from '../i18n';

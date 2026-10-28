@@ -3,7 +3,6 @@ import type { Board } from './board';
 import { duplicateSelection } from './interactions';
 import { ARRANGE, runArrange } from './arrange-commands';
 import { availableTools, FIXED_TOOLS } from './tools';
-import { t } from '../i18n';
 
 /**
  * Every keyboard shortcut of a board, in one table. Keys are written "Mod+Alt+Shift+K":

@@ -41,7 +41,7 @@ export function markdownInputRules(): Plugin {
       wrappingInputRule(/^\s*([-+*])\s$/, n.bullet_list),
       wrappingInputRule(/^(\d+)\.\s$/, n.ordered_list, m => ({ order: Number(m[1]) }), (m, node) => node.childCount + node.attrs.order === Number(m[1])),
       textblockTypeInputRule(/^```([\w-]*)\s$/, n.code_block, m => ({ language: m[1] })),
-      new InputRule(/^(?:---|\*\*\*|___)$/, (state, _m, start, end) => {
+      new InputRule(/^(?:---|\*\*\*|___)$/, (state, _m, start) => {
         const $start = state.doc.resolve(start);
         if ($start.parent.type !== n.paragraph || $start.parent.textContent.length > 3) return null;
         return state.tr.replaceRangeWith($start.before(), $start.after(), n.horizontal_rule.create()).scrollIntoView();

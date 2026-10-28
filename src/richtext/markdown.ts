@@ -232,13 +232,19 @@ function looseList(tokens: Token[], closeIndex: number): boolean {
   return false;
 }
 
+/**
+ * HTML parsed into a separate, inert document: nothing in it runs or loads (no scripts,
+ * no image loads, no event handlers), unlike HTML assigned to an element of this page.
+ */
+function inertHtml(html: string): HTMLElement {
+  return new DOMParser().parseFromString(html, 'text/html').body;
+}
+
 /** `<p style="text-align:center">…</p>` (how aligned paragraphs are stored) back into blocks. */
 function alignedHtmlBlock(html: string): PMNode[] | null {
   const trimmed = html.trim();
   if (!/^<(p|h[1-6])\b[^>]*(text-align|align=)/i.test(trimmed)) return null;
-  const host = document.createElement('div');
-  host.innerHTML = trimmed;
-  const doc = PMDOMParser.fromSchema(schema).parse(host);
+  const doc = PMDOMParser.fromSchema(schema).parse(inertHtml(trimmed));
   const out: PMNode[] = [];
   doc.forEach(n => out.push(n));
   return out.length ? out : null;
@@ -466,9 +472,7 @@ export function blockMarkdown(node: PMNode): string {
 
 /** Rich clipboard HTML (web pages, Word, Docs) to Markdown. */
 export function htmlToMarkdown(html: string): string {
-  const host = document.createElement('div');
-  host.innerHTML = html.replace(/<meta[^>]*>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
-  const doc = PMDOMParser.fromSchema(schema).parse(host);
+  const doc = PMDOMParser.fromSchema(schema).parse(inertHtml(html.replace(/<meta[^>]*>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '')));
   return serializeMarkdown(doc);
 }
 

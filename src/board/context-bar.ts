@@ -383,21 +383,6 @@ export class ContextBar {
     });
   }
 
-  /** Icon grid (alignment, pushing): icons that show what they do, names on hover. */
-  private arrangeGrid(pop: HTMLElement, close: () => void, groups: ArrangeDef['group'][], cols: number): void {
-    pop.addClass('is-grid');
-    const grid = pop.createDiv('vc-ctx-grid');
-    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-    for (const g of groups) {
-      for (const d of ARRANGE.filter(x => x.group === g)) {
-        const cell = grid.createDiv({ cls: 'vc-ctx-cell', attr: { role: 'button', 'aria-label': t(d.label) } });
-        setIconSafe(cell, iconFor(d.icon));
-        { const k = shortcutLabel(`arrange-${d.id}`, this.board.settings.hotkeys); setTooltip(cell, k ? `${t(d.label)}  ${k}` : t(d.label), { placement: 'bottom' }); }
-        cell.addEventListener('click', () => { runArrange(this.board, d.id); close(); });
-      }
-    }
-  }
-
   /** Width and height for the selection, with the proportions lock. */
   private sizePanel(pop: HTMLElement, close: () => void): void {
     void close;

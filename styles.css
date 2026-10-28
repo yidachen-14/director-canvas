@@ -210,18 +210,6 @@
   pointer-events: none;
   z-index: 2;
 }
-.vc-media-desc-input {
-  width: 100%;
-  resize: none;
-  overflow: hidden;
-  border: none;
-  background: transparent;
-  padding: 0;
-  font: inherit;
-  color: var(--text-normal);
-  box-shadow: none !important;
-  min-height: 1.45em;
-}
 .vc-video video { background: #000; }
 .vc-audio-wrap {
   height: 100%;
@@ -324,23 +312,6 @@
 .vc-bookmark-ask input { flex: 1; min-width: 0; height: 30px; border: none; background: transparent; box-shadow: none; padding: 0 4px; }
 .vc-bookmark-ask-icon svg { width: 16px; height: 16px; }
 
-/* Link */
-.vc-link { height: 100%; }
-.vc-link-box {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  box-sizing: border-box;
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
-}
-.vc-link-icon { color: var(--text-faint); display: flex; }
-.vc-link-text { min-width: 0; }
-.vc-link-host { font-weight: 600; }
-.vc-link-url { font-size: var(--font-ui-small); word-break: break-all; }
 
 .vc-fallback { height: 100%; background: var(--background-primary); border: 1px dashed var(--background-modifier-border); border-radius: 8px; box-sizing: border-box; }
 

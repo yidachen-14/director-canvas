@@ -3,7 +3,7 @@ import { swatchCard } from './swatch';
 import { calendarCard } from './calendar';
 import type { RawNode } from '../model/canvas-file';
 import type { CardContext, CardHandle, CardType } from './types';
-import { applyCardColor, vcGet } from './util';
+import { applyCardColor } from './util';
 import { commitNode } from './basic';
 import { t } from '../i18n';
 

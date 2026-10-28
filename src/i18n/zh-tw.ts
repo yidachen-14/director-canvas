@@ -7,7 +7,7 @@ export const ZH_TW: Record<string, string> = {
   'New Visual Canvas board': '新增 Visual Canvas 白板',
   'Open in Visual Canvas': '用 Visual Canvas 開啟',
   'Open in core Canvas': '用內建 Canvas 開啟',
-  'Open this board in Visual Canvas': '用 Visual Canvas 開啟這個白板',
+  'Open this board as a whiteboard': '以白板開啟這個 Canvas',
   'Open this board in core Canvas': '用內建 Canvas 開啟這個白板',
   'A file named "{name}" already exists.': '已經有名為「{name}」的檔案。',
   'Could not rename: {msg}': '無法改名：{msg}',

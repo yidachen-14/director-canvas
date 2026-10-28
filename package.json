@@ -1,6 +1,6 @@
 {
   "name": "visual-canvas",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Visual Canvas: an infinite whiteboard for Obsidian that reads and writes native .canvas files.",
   "scripts": {

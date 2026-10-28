@@ -3,7 +3,7 @@ import type { Board } from './board';
 import type { RawEdge, RawNode, Side } from '../model/canvas-file';
 import type { Point } from './viewport';
 import {
-  SIDES, edgeGeometry, nearestOnOutline, pinPoint, pinTs, rectOf, routeOf, vcOf,
+  SIDES, edgeGeometry, pinPoint, pinTs, rectOf, routeOf, vcOf,
   type EdgeVc, type Route,
 } from './connections';
 import { cssColor } from '../cards/util';
@@ -493,7 +493,7 @@ export class ConnectController {
     setTooltip(size, t('Label size'), { placement: 'top' });
     const sizeDown = size.createDiv({ cls: 'vc-ep-step clickable-icon', attr: { role: 'button' } });
     setIcon(sizeDown, 'minus');
-    const sizeVal = size.createDiv('vc-ep-size-val');
+    size.createDiv('vc-ep-size-val');
     const sizeUp = size.createDiv({ cls: 'vc-ep-step clickable-icon', attr: { role: 'button' } });
     setIcon(sizeUp, 'plus');
     const stepSize = (d: number) => {

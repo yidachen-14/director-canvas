@@ -39,8 +39,6 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
           this.display();
         }));
 
-    // ── General ──
-    new Setting(el).setName(t('General')).setHeading();
     new Setting(el)
       .setName(t('Open .canvas files with Visual Canvas'))
       .setDesc(t('Boards open here instead of the core Canvas. You can always switch a board back from its header.'))
