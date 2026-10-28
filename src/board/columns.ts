@@ -5,6 +5,8 @@ import { cardKindOf } from '../cards/util';
 export const COLUMN_HEADER = 44;
 export const COLUMN_PAD = 12;
 export const COLUMN_GAP = 10;
+/** Space between the title row's line and the first card. */
+export const COLUMN_TOP_GAP = 10;
 const MIN_HEIGHT = 120;
 
 /** Card kinds that keep their own width inside a column (their box follows their text). */
@@ -26,7 +28,7 @@ export function columnMembers(col: RawNode, nodes: RawNode[]): RawNode[] {
 /** Stack a column's cards under its header and fit its height to them. Cards being dragged are left out. */
 export function layoutColumn(col: RawNode, nodes: RawNode[], skip?: ReadonlySet<string>): RawNode[] {
   const changed: RawNode[] = [];
-  let y = col.y + COLUMN_HEADER;
+  let y = col.y + COLUMN_HEADER + COLUMN_TOP_GAP;
   for (const n of columnMembers(col, nodes)) {
     if (skip?.has(n.id)) continue;
     const own = OWN_WIDTH.has(cardKindOf(n));
@@ -67,5 +69,5 @@ export function columnDropAt(nodes: RawNode[], centre: { x: number; y: number },
   const next = members.find(n => n.y + n.height / 2 > centre.y);
   if (next) return { col, y: next.y - COLUMN_GAP / 2 };
   const last = members[members.length - 1];
-  return { col, y: last ? last.y + last.height + COLUMN_GAP / 2 : col.y + COLUMN_HEADER - COLUMN_GAP / 2 + 4 };
+  return { col, y: last ? last.y + last.height + COLUMN_GAP / 2 : col.y + COLUMN_HEADER + COLUMN_TOP_GAP / 2 };
 }

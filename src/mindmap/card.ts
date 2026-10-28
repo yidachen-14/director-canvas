@@ -203,6 +203,31 @@ export class MindMapCard implements CardHandle, MindMapControl {
     return false;
   }
 
+  /** Only the topics (and their buttons) are the map; the room between them is board. */
+  hitTest(wx: number, wy: number): boolean {
+    const x = wx - this.node.x - this.shift.x, y = wy - this.node.y - this.shift.y;
+    const m = 6;
+    for (const p of this.placed.values()) {
+      if (x >= p.x - m && x <= p.x + p.w + m && y >= p.y - m && y <= p.y + p.h + m) return true;
+    }
+    return false;
+  }
+
+  partsIn(r: { x: number; y: number; width: number; height: number }): { ids: string[]; all: boolean } {
+    const ox = this.node.x + this.shift.x, oy = this.node.y + this.shift.y;
+    const ids: string[] = [];
+    for (const [id, p] of this.placed) {
+      const x = p.x + ox, y = p.y + oy;
+      if (x < r.x + r.width && x + p.w > r.x && y < r.y + r.height && y + p.h > r.y) ids.push(id);
+    }
+    return { ids, all: ids.length === this.placed.size };
+  }
+
+  selectParts(ids: string[]): void {
+    const same = ids.length === this.sel.size && ids.every(id => this.sel.has(id));
+    if (!same) this.setSel(ids);
+  }
+
   barKey(): string { return `mm:${[...this.sel].join(',')}`; }
   barExclusive(): boolean { return this.sel.size > 0; }
   barAnchor(): { x: number; y: number; width: number; height: number } | null {

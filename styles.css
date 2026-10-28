@@ -838,7 +838,7 @@ body.vc-tool-dragging, body.vc-tool-dragging * { cursor: grabbing !important; }
 /* Callout: Obsidian's own callout look */
 .vc-rc-callout .vc-callout { height: 100%; box-sizing: border-box; margin: 0; display: flex; flex-direction: column; border-radius: 8px; }
 .vc-rc-callout .callout-content { flex: 1; min-height: 0; padding: 0; }
-.vc-rc-callout .vc-rich { padding: 4px 4px 8px 4px; }
+.vc-rc-callout .vc-rich { padding: 6px 4px 8px 4px; }
 .vc-rc-callout .callout-title { flex: none; }
 
 /* ⋮⋮ block handle */
@@ -1679,9 +1679,12 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-media-desc .vc-rich > :last-child { margin-bottom: 0; }
 .vc-media-desc .is-editing .vc-rich { color: var(--text-normal); }
 
-/* Callout colours by type: Info takes the soft green Tip used to have; Tip is a light yellow. */
-.vc-callout[data-callout='info'] { --callout-color: var(--callout-tip, 83, 223, 221); }
-.vc-callout[data-callout='tip'] { --callout-color: 236, 196, 52; }
+/* Callout colours by type (Obsidian 1.14 keeps them as hex colours): Info takes the soft
+   green Tip used to have; Tip is a light yellow. */
+.vc-callout[data-callout='info'] { --callout-color: var(--callout-tip, #53dfdd); }
+.vc-callout[data-callout='tip'] { --callout-color: #f2c94c; }
+/* Room between the callout's title and its first line. */
+.vc-rc-callout .callout-content { padding-top: 6px; }
 
 /* Column: a distinct title row, and where a dragged card will land */
 .vc-group.vc-column { position: relative; background-image: linear-gradient(to bottom, color-mix(in srgb, var(--background-modifier-hover) 70%, transparent) 0 44px, transparent 44px); }
@@ -1691,3 +1694,21 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-column .vc-group-label { font-weight: 600; }
 .vc-kind-column.is-drop-target .vc-group.vc-column { border-color: var(--interactive-accent); }
 .vc-column-drop { position: absolute; left: 0; top: 0; height: 3px; border-radius: 2px; background: var(--interactive-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 25%, transparent); pointer-events: none; z-index: 20; }
+
+/* Lists: the marker stays where the text would start (no indent unless Tab nests a list).
+   Obsidian's own Markdown styles indent lists (.markdown-rendered), so these are stronger. */
+.vc-board .vc-rich ul, .vc-board .vc-rich ol { padding-inline-start: 1.1em !important; margin-inline-start: 0 !important; }
+.vc-board .vc-rich ol { padding-inline-start: 1.5em !important; }
+.vc-board .vc-rich li { margin-inline-start: 0 !important; padding-inline-start: 0 !important; }
+.vc-board .vc-rich li > ul, .vc-board .vc-rich li > ol { padding-inline-start: 1.2em !important; }
+.vc-board .vc-rich ul:has(> li.vc-task) { padding-inline-start: 1.55em !important; }
+/* To-do box: centred on the first line of its text. */
+.vc-board .vc-rich li.vc-task > input.task-list-item-checkbox {
+  position: absolute !important;
+  left: -1.55em !important;
+  top: calc(0.5em * var(--line-height-normal, 1.5)) !important;
+  transform: translateY(-50%) !important;
+  width: 1.05em !important; height: 1.05em !important;
+  margin: 0 !important;
+  font-size: inherit !important;
+}

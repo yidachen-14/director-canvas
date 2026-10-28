@@ -62,6 +62,8 @@ export interface BlockDragHost {
   dropOnBoard(clientX: number, clientY: number, markdown: string): boolean;
   /** Screen-space layer the handle lives in (so it keeps its size at any zoom). */
   overlay(): HTMLElement;
+  /** Whether the handles may show now (the card is selected or being edited). */
+  active?(): boolean;
 }
 
 /** Adds the ⋮⋮ handle beside the block under the pointer, and dragging from it. */
@@ -85,6 +87,7 @@ export function attachBlockHandles(rich: RichText, host: HTMLElement, dragHost: 
 
   const onMove = (e: PointerEvent) => {
     if (e.buttons) return;
+    if (dragHost.active && !dragHost.active()) { handle.hide(); current = null; return; }
     const b = blockAtPoint(rich.view, e.clientX, e.clientY);
     if (!b) { handle.hide(); current = null; return; }
     current = b;

@@ -303,6 +303,9 @@ export class Board {
     const nodes = this.model.nodes;
     const hit = (n: RawNode) => {
       if (!(wx >= n.x - margin && wx <= n.x + n.width + margin && wy >= n.y - margin && wy <= n.y + n.height + margin)) return false;
+      // A card made of parts (mind map) is hit only on a part.
+      const h = this.cards.get(n.id)?.handle;
+      if (h?.hitTest && !h.hitTest(wx, wy)) return false;
       // A drawing is picked by its ink, not its whole box.
       return n.vc?.kind !== 'drawing' || drawingHit(n, wx, wy, 6 / this.vp.zoom + margin);
     };

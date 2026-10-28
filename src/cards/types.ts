@@ -41,6 +41,16 @@ export interface CardHandle {
   barAvoid?(): { x: number; y: number; width: number; height: number }[];
   /** Board rectangle the bar sits above, instead of the whole card. */
   barAnchor?(): { x: number; y: number; width: number; height: number } | null;
+  /**
+   * Whether a board point is on the card (world units). Cards made of separate parts (a mind map:
+   * its topics) answer false between the parts, so the board there is empty: clicks select nothing
+   * and a drag starts a selection box.
+   */
+  hitTest?(wx: number, wy: number): boolean;
+  /** Parts inside a board rectangle (a selection box over a mind map picks its topics). */
+  partsIn?(r: { x: number; y: number; width: number; height: number }): { ids: string[]; all: boolean };
+  /** Select those parts (after a selection box). */
+  selectParts?(ids: string[]): void;
   /** The content's own size right now (text cards: the box hugs the text). */
   measure?(): { width: number; height: number } | undefined;
   /** Card-specific entries for its right-click menu (only when it is the sole selection). */

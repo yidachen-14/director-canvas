@@ -269,14 +269,30 @@ export function attachInteractions(board: Board): void {
       box.style.transform = `translate(${a.x}px, ${a.y}px)`;
       box.style.width = `${r.width * board.vp.zoom}px`;
       box.style.height = `${r.height * board.vp.zoom}px`;
+      const parts = new Map<string, { ids: string[]; all: boolean }>();
       const hit = board.model.nodes.filter(n => {
         if (n.type === 'group') {
           // A group is picked only when the box covers it whole.
           return r.x <= n.x && r.y <= n.y && r.x + r.width >= n.x + n.width && r.y + r.height >= n.y + n.height;
         }
-        return rectsIntersect(r, nodeRect(n));
+        if (!rectsIntersect(r, nodeRect(n))) return false;
+        // A mind map counts only where the box touches its topics.
+        const h = board.cards.get(n.id)?.handle;
+        if (h?.partsIn) {
+          const p = h.partsIn(r);
+          if (!p.ids.length) return false;
+          parts.set(n.id, p);
+        }
+        return true;
       }).map(n => n.id);
-      board.select(additive ? [...before, ...hit] : hit);
+      // The box over one mind map only (not all of it): select those topics, like Boardmix.
+      const only = hit.length === 1 && !additive ? parts.get(hit[0]) : undefined;
+      if (only && !only.all) {
+        if (!(board.selection.size === 1 && board.selection.has(hit[0]))) board.select(hit);
+        board.cards.get(hit[0])?.handle.selectParts?.(only.ids);
+      } else {
+        board.select(additive ? [...before, ...hit] : hit);
+      }
       void rootRect;
     }, (_ev, moved) => {
       box.remove();
@@ -344,7 +360,8 @@ export function attachInteractions(board: Board): void {
         ? columnDropAt(board.model.nodes, { x: leadNode.x + leadNode.width / 2, y: leadNode.y + leadNode.height / 2 }, board.draggingIds)
         : null;
       showColumnDrop(spot);
-      if (mergeable && mergeEl) {
+      if (spot) { mergeDrop = null; dropLine?.hide(); mergeEl?.removeClass('is-merging'); }
+      else if (mergeable && mergeEl) {
         const target = richAt(ev.clientX, ev.clientY, mergeEl);
         const targetCard = target?.view.dom.closest<HTMLElement>('.vc-node');
         const ok = target && targetCard && MERGE_INTO.some(k => targetCard.hasClass(`vc-kind-${k}`));

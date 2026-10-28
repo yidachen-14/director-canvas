@@ -133,6 +133,8 @@ class RichCard implements CardHandle {
       batch: (fn) => ctx.board.model.transact(fn),
       overlay: () => ctx.board.overlayEl,
       dropOnBoard: (x, y, md) => this.dropOnBoard(x, y, md),
+      // Only on the card you are working on, so they don't get in the way elsewhere (columns, other cards).
+      active: () => this.rich.editing || (ctx.board.selection.size === 1 && ctx.board.selection.has(this.node.id)),
     });
     this.render();
   }
@@ -154,6 +156,11 @@ class RichCard implements CardHandle {
       }
       if (f.autoSize) { const sz = this.contentSize(); n.width = sz.width; n.height = sz.height; }
     });
+    // Its text dragged out to elsewhere: an empty Text card is not kept.
+    if (f.dropWhenEmpty && !this.rich.editing && !md.trim()) {
+      const m = ctx.board.model;
+      if (m.node(this.node.id)) m.transact(() => m.removeNodes([this.node.id]), ctx.board.mergeKeyFor(this.node.id));
+    }
   }
 
   private editEnded(): void {

@@ -5,7 +5,7 @@ vi.mock('obsidian', () => ({ moment: () => ({}), Menu: class {}, Notice: class {
 import { parseKanban, serializeKanban } from '../src/cards/widgets';
 import { nearestColorName, inkOn } from '../src/cards/named-colors';
 import { datedTasks, moveTaskDate, toggleTaskDone, addDays, weekStart } from '../src/cards/calendar';
-import { layoutColumn, COLUMN_HEADER, COLUMN_PAD } from '../src/board/columns';
+import { layoutColumn, COLUMN_HEADER, COLUMN_PAD, COLUMN_TOP_GAP } from '../src/board/columns';
 import type { RawNode } from '../src/model/canvas-file';
 
 describe('kanban', () => {
@@ -51,10 +51,11 @@ describe('columns', () => {
     const b: RawNode = { id: 'b', type: 'text', x: 10, y: 60, width: 200, height: 80 };
     const out: RawNode = { id: 'o', type: 'text', x: 500, y: 0, width: 100, height: 50 };
     layoutColumn(col, [col, a, b, out]);
-    expect(b.y).toBe(COLUMN_HEADER);
-    expect(a.y).toBe(COLUMN_HEADER + 80 + 10);
+    // A gap under the title row's line, then the cards.
+    expect(b.y).toBe(COLUMN_HEADER + COLUMN_TOP_GAP);
+    expect(a.y).toBe(COLUMN_HEADER + COLUMN_TOP_GAP + 80 + 10);
     expect(a.width).toBe(300 - COLUMN_PAD * 2);
     expect(out.x).toBe(500);
-    expect(col.height).toBe(COLUMN_HEADER + 80 + 10 + 50 + COLUMN_PAD);
+    expect(col.height).toBe(COLUMN_HEADER + COLUMN_TOP_GAP + 80 + 10 + 50 + COLUMN_PAD);
   });
 });
