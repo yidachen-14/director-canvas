@@ -27,7 +27,7 @@ const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
 /** Write an end into an edge. */
 export function setEnd(e: RawEdge, which: 'from' | 'to', end: EndSpec): void {
-  const vc: EdgeVc & Record<string, unknown> = { ...(e.vc ?? {}) } as EdgeVc & Record<string, unknown>;
+  const vc: EdgeVc & Record<string, unknown> = { ...(e.vc ?? {}) };
   const nodeKey = which === 'from' ? 'fromNode' : 'toNode';
   const sideKey = which === 'from' ? 'fromSide' : 'toSide';
   const tKey = which === 'from' ? 'fromT' : 'toT';
@@ -210,7 +210,7 @@ export class ConnectController {
         if (from.kind === 'free') this.create(from, { kind: 'free', p: { x: start.x + 160, y: start.y } });
         return;
       }
-      const end = to as EndSpec | null;
+      const end = to;
       if (!end) return;
       const dist = Math.hypot(ev.clientX - sx, ev.clientY - sy);
       // A short drag off a card onto empty board is a slip, not a line.

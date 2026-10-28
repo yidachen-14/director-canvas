@@ -90,7 +90,7 @@ export class CanvasView extends TextFileView {
     if (clear) {
       this.board.clearSelection();
       this.needsInitialView = true;
-      requestAnimationFrame(() => this.tryInitialView());
+      window.requestAnimationFrame(() => this.tryInitialView());
     }
   }
 

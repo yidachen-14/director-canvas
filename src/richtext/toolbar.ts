@@ -142,7 +142,7 @@ export class SelectionToolbar {
     p.style.top = `${r.bottom + 6}px`;
     this.popup = p;
     // Keep inside the window.
-    requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
       const pr = p.getBoundingClientRect();
       if (pr.right > window.innerWidth - 4) p.style.left = `${window.innerWidth - pr.width - 4}px`;
       if (pr.bottom > window.innerHeight - 4) p.style.top = `${r.top - pr.height - 6}px`;

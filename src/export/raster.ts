@@ -21,7 +21,7 @@ export async function renderCanvas(board: Board, scope: Scope, opts: { scale: nu
       width, height, pixelRatio: scale, skipFonts: true, cacheBust: false,
       backgroundColor: opts.background ? stage.el.style.background || undefined : undefined,
       // Board styles are already inline or in the document's sheets.
-      filter: (n) => !(n instanceof HTMLElement && n.classList.contains('vc-mm-overlay') && !n.childElementCount),
+      filter: (n) => !(n.instanceOf(HTMLElement) && n.classList.contains('vc-mm-overlay') && !n.childElementCount),
     });
     return { canvas, scale, width, height };
   } finally {

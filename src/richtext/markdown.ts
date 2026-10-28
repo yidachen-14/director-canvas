@@ -371,7 +371,7 @@ const serializer = new MarkdownSerializer({
   },
   heading: (state, node) => {
     if (node.attrs.align) { alignedBlock(state, node); return; }
-    state.write(state.repeat('#', node.attrs.level) + ' ');
+    state.write(state.repeat('#', node.attrs.level as number) + ' ');
     state.renderInline(node, false);
     state.closeBlock(node);
   },
@@ -388,7 +388,7 @@ const serializer = new MarkdownSerializer({
   horizontal_rule: (state, node) => { state.write('---'); state.closeBlock(node); },
   bullet_list: (state, node) => state.renderList(node, '  ', () => '- '),
   ordered_list: (state, node) => {
-    const start = node.attrs.order || 1;
+    const start = (node.attrs.order as number) || 1;
     const maxW = String(start + node.childCount - 1).length;
     const space = state.repeat(' ', maxW + 2);
     state.renderList(node, space, (i) => {
@@ -401,7 +401,7 @@ const serializer = new MarkdownSerializer({
     if (prefix) state.write(prefix);
     state.renderContent(node);
   },
-  raw_block: (state, node) => { state.text(node.attrs.source, false); state.closeBlock(node); },
+  raw_block: (state, node) => { state.text(node.attrs.source as string, false); state.closeBlock(node); },
   text: (state, node) => state.text(node.text ?? ''),
   hard_break: (state, node, parent, index) => {
     for (let i = index + 1; i < parent.childCount; i++) {
@@ -409,10 +409,10 @@ const serializer = new MarkdownSerializer({
     }
   },
   wikilink: (state, node) => {
-    const a = node.attrs;
+    const a = node.attrs as { embed?: boolean; target: string; alias?: string | null };
     state.write(`${a.embed ? '!' : ''}[[${a.target}${a.alias ? '|' + a.alias : ''}]]`);
   },
-  raw_inline: (state, node) => state.write(node.attrs.source),
+  raw_inline: (state, node) => state.write(node.attrs.source as string),
 }, {
   em: { open: '*', close: '*', mixable: true, expelEnclosingWhitespace: true },
   strong: { open: '**', close: '**', mixable: true, expelEnclosingWhitespace: true },
@@ -478,7 +478,7 @@ export function htmlToMarkdown(html: string): string {
 
 /** Plain text of a document, for search. */
 export function plainText(doc: PMNode): string {
-  return doc.textBetween(0, doc.content.size, '\n', (leaf) => leaf.attrs.source ?? leaf.attrs.alias ?? leaf.attrs.target ?? '');
+  return doc.textBetween(0, doc.content.size, '\n', (leaf) => String(leaf.attrs.source ?? leaf.attrs.alias ?? leaf.attrs.target ?? ''));
 }
 
 export type { Align };

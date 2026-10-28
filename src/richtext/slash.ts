@@ -36,7 +36,7 @@ export function slashMenu(): Plugin<SlashState> {
       apply(tr, prev, _old, state): SlashState {
         const meta = tr.getMeta(key) as Partial<SlashState> | 'close' | undefined;
         if (meta === 'close') return { active: false, from: 0, query: '' };
-        if (meta) return { ...prev, ...meta, active: true } as SlashState;
+        if (meta) return { ...prev, ...meta, active: true };
         if (!prev.active) return prev;
         const from = tr.mapping.map(prev.from);
         const { $from, empty } = state.selection;
@@ -55,7 +55,7 @@ export function slashMenu(): Plugin<SlashState> {
         const before = $pos.parent.textBetween(0, $pos.parentOffset, '\n', '\n');
         if (before && !/\s$/.test(before)) return false;
         // Let the "/" be typed, then open the menu at it.
-        setTimeout(() => view.dispatch(view.state.tr.setMeta(key, { from, query: '' })), 0);
+        window.setTimeout(() => view.dispatch(view.state.tr.setMeta(key, { from, query: '' })), 0);
         return false;
       },
       handleKeyDown(view, e) {
@@ -112,7 +112,7 @@ class SlashMenu {
     this.el.style.left = `${c.left}px`;
     this.el.style.top = `${c.bottom + 6}px`;
     this.shown = true;
-    requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
       const r = this.el.getBoundingClientRect();
       if (r.bottom > window.innerHeight - 8) this.el.style.top = `${c.top - r.height - 6}px`;
     });

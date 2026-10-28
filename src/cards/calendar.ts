@@ -173,8 +173,8 @@ class CalendarCard implements CardHandle {
   // ── state ─────────────────────────────────────────────
 
   private notes(): CalNote[] { return (vcGet(this.node, 'notes', []) as CalNote[]).filter(n => n && isISO(n.date)); }
-  private days(): Record<string, DayStyle> { return (vcGet(this.node, 'days', {}) as Record<string, DayStyle>) ?? {}; }
-  private title(): string { return (vcGet(this.node, 'title', '') as string) || t('Calendar'); }
+  private days(): Record<string, DayStyle> { return (vcGet(this.node, 'days', {})) ?? {}; }
+  private title(): string { return (vcGet(this.node, 'title', '')) || t('Calendar'); }
   private anchor(): string { const a = vcGet(this.node, 'anchor', '') as string; return isISO(a) ? a : todayISO(); }
   private mode(): 'month' | 'week' { return vcGet<string>(this.node, 'mode', 'month') === 'week' ? 'week' : 'month'; }
   private locked(): boolean { return !!vcGet(this.node, 'locked', false); }
@@ -380,7 +380,7 @@ class CalendarCard implements CardHandle {
 
   private editTitle(titleEl: HTMLElement): void {
     titleEl.empty();
-    this.inlineInput(titleEl, (vcGet(this.node, 'title', '') as string), (v) => {
+    this.inlineInput(titleEl, (vcGet(this.node, 'title', '')), (v) => {
       if (v !== null) this.change(vc => { if (v) vc.title = v; else delete vc.title; });
       else this.render();
     });
@@ -462,7 +462,7 @@ class CalendarCard implements CardHandle {
       doc.removeEventListener('pointerup', up, true);
       over?.removeClass('is-drop');
       if (!ghost) return;
-      (ghost as HTMLElement).remove();
+      (ghost).remove();
       chip.removeClass('is-dragging');
       const date = over?.dataset.date;
       if (date) this.moveItem(it, date);

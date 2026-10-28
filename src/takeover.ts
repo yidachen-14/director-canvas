@@ -20,7 +20,7 @@ export function installCanvasTakeover(isEnabled: (path: string | undefined) => b
   const original = proto.setViewState;
   const patched: SetViewState = function (this: WorkspaceLeaf, viewState, eState) {
     if (viewState && viewState.type === NATIVE_TYPE) {
-      const state = (viewState.state ?? {}) as Record<string, unknown>;
+      const state = (viewState.state ?? {});
       if (state[NATIVE_FLAG]) {
         const { [NATIVE_FLAG]: _drop, ...rest } = state;
         viewState = { ...viewState, state: rest };
@@ -39,7 +39,7 @@ export function installCanvasTakeover(isEnabled: (path: string | undefined) => b
 /** Re-open the file shown in a leaf with the other canvas view. */
 export async function switchCanvasView(leaf: WorkspaceLeaf, to: 'native' | 'visual'): Promise<void> {
   const current = leaf.getViewState();
-  const file = (current.state as Record<string, unknown> | undefined)?.file;
+  const file = (current.state)?.file;
   if (typeof file !== 'string') return;
   // Write what the open view still holds before another view reads the file.
   const view = leaf.view as { save?: () => Promise<void>; getViewType(): string };

@@ -69,7 +69,7 @@ export function buildStage(board: Board, nodes: RawNode[], opts: { padding: numb
   }
   const own = root.style;
   for (let i = 0; i < own.length; i++) el.style.setProperty(own[i], own.getPropertyValue(own[i]));
-  el.style.setProperty('--vc-zoom', '1');
+  el.setCssProps({ '--vc-zoom': '1' });
   Object.assign(el.style, { position: 'relative', left: '0', top: '0', width: `${bounds.width}px`, height: `${bounds.height}px`, overflow: 'hidden' });
   el.style.background = opts.background ? getComputedStyle(root).backgroundColor || 'var(--background-primary)' : 'transparent';
 

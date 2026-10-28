@@ -65,7 +65,7 @@ export function colorPicker(parent: HTMLElement, initial: string | undefined, op
   const live = () => {
     const hex = paint();
     cancelAnimationFrame(frame);
-    frame = requestAnimationFrame(() => opts.onInput(hex));
+    frame = window.requestAnimationFrame(() => opts.onInput(hex));
   };
   const drag = (el: HTMLElement, set: (fx: number, fy: number) => void) => {
     el.addEventListener('pointerdown', (e) => {

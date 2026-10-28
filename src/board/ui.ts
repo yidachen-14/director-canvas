@@ -478,7 +478,7 @@ class Minimap {
     this.canvas = this.el.createEl('canvas');
     this.canvas.width = 220 * devicePixelRatio;
     this.canvas.height = 150 * devicePixelRatio;
-    const schedule = () => { cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(() => this.draw()); };
+    const schedule = () => { cancelAnimationFrame(this.raf); this.raf = window.requestAnimationFrame(() => this.draw()); };
     this.offs.push(this.board.on('viewport', schedule), this.board.onChange(schedule));
     const nav = (e: PointerEvent) => {
       const m = this.mapping();

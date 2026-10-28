@@ -152,7 +152,7 @@ class KanbanCard implements CardHandle {
     ta.value = this.cols()[ci]?.items[ii]?.text ?? '';
     textEl.replaceWith(ta);
     this.editing = ta;
-    const grow = () => { ta.style.height = 'auto'; ta.style.height = `${ta.scrollHeight}px`; };
+    const grow = () => { ta.setCssStyles({ height: 'auto' }); ta.setCssStyles({ height: `${ta.scrollHeight}px` }); };
     grow();
     ta.focus();
     ta.setSelectionRange(ta.value.length, ta.value.length);
@@ -264,9 +264,9 @@ class KanbanCard implements CardHandle {
       doc.removeEventListener('pointerup', up, true);
       line.remove();
       if (!ghost) return;
-      (ghost as HTMLElement).remove();
+      (ghost).remove();
       card.removeClass('is-dragging');
-      const tgt = target as { col: number; index: number } | null;
+      const tgt = target;
       if (!tgt) return;
       const next = this.cols();
       const [item] = next[ci].items.splice(ii, 1);

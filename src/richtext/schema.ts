@@ -14,7 +14,7 @@ const alignAttr = { align: { default: null as Align } };
 
 function getAlign(dom: HTMLElement): Align {
   const a = (dom.style.textAlign || dom.getAttribute('align') || '').toLowerCase();
-  return a === 'center' || a === 'right' || a === 'left' ? (a as Align) : null;
+  return a === 'center' || a === 'right' || a === 'left' ? (a) : null;
 }
 
 function alignStyle(node: PMNode): Record<string, string> {
@@ -29,7 +29,7 @@ export const schema = new Schema({
       group: 'block',
       content: 'inline*',
       attrs: alignAttr,
-      parseDOM: [{ tag: 'p', getAttrs: (d) => ({ align: getAlign(d as HTMLElement) }) }],
+      parseDOM: [{ tag: 'p', getAttrs: (d) => ({ align: getAlign(d) }) }],
       toDOM: (node): DOMOutputSpec => ['p', alignStyle(node), 0],
     },
 
@@ -64,7 +64,7 @@ export const schema = new Schema({
         tag: 'pre',
         preserveWhitespace: 'full',
         getAttrs: (d) => {
-          const code = (d as HTMLElement).querySelector('code');
+          const code = (d).querySelector('code');
           const m = /language-(\S+)/.exec(code?.className ?? '');
           return { language: m ? m[1] : '' };
         },
@@ -82,7 +82,7 @@ export const schema = new Schema({
       group: 'block',
       content: 'list_item+',
       attrs: { tight: { default: true } },
-      parseDOM: [{ tag: 'ul', getAttrs: (d) => ({ tight: !(d as HTMLElement).querySelector('li > p + p') }) }],
+      parseDOM: [{ tag: 'ul', getAttrs: (d) => ({ tight: !(d).querySelector('li > p + p') }) }],
       toDOM: (): DOMOutputSpec => ['ul', 0],
     },
 
@@ -92,9 +92,9 @@ export const schema = new Schema({
       attrs: { order: { default: 1 }, tight: { default: true } },
       parseDOM: [{
         tag: 'ol',
-        getAttrs: (d) => ({ order: (d as HTMLElement).hasAttribute('start') ? Number((d as HTMLElement).getAttribute('start')) : 1 }),
+        getAttrs: (d) => ({ order: (d).hasAttribute('start') ? Number((d).getAttribute('start')) : 1 }),
       }],
-      toDOM: (node): DOMOutputSpec => ['ol', node.attrs.order === 1 ? {} : { start: node.attrs.order }, 0],
+      toDOM: (node): DOMOutputSpec => ['ol', node.attrs.order === 1 ? {} : { start: node.attrs.order as number }, 0],
     },
 
     list_item: {
@@ -105,15 +105,16 @@ export const schema = new Schema({
       parseDOM: [{
         tag: 'li',
         getAttrs: (d) => {
-          const el = d as HTMLElement;
+          const el = d;
           if (el.dataset.task !== undefined) return { checked: el.dataset.task || ' ' };
-          const box = el.querySelector(':scope > input[type=checkbox], :scope > p > input[type=checkbox]') as HTMLInputElement | null;
+          const box = el.querySelector<HTMLInputElement>(':scope > input[type=checkbox], :scope > p > input[type=checkbox]');
           return { checked: box ? (box.checked ? 'x' : ' ') : null };
         },
       }],
-      toDOM: (node): DOMOutputSpec => node.attrs.checked === null
-        ? ['li', 0]
-        : ['li', { class: `vc-task${isDone(node.attrs.checked) ? ' is-checked' : ''}`, 'data-task': node.attrs.checked }, 0],
+      toDOM: (node): DOMOutputSpec => {
+        const checked = node.attrs.checked as string | null;
+        return checked === null ? ['li', 0] : ['li', { class: `vc-task${isDone(checked) ? ' is-checked' : ''}`, 'data-task': checked }, 0];
+      },
     },
 
     /** Markdown this editor keeps but does not edit (tables, math, HTML…). */
@@ -122,8 +123,8 @@ export const schema = new Schema({
       atom: true,
       selectable: true,
       attrs: { source: { default: '' } },
-      parseDOM: [{ tag: 'div[data-raw-block]', getAttrs: (d) => ({ source: (d as HTMLElement).dataset.rawBlock ?? '' }) }],
-      toDOM: (node): DOMOutputSpec => ['div', { 'data-raw-block': node.attrs.source, class: 'vc-raw-block' }],
+      parseDOM: [{ tag: 'div[data-raw-block]', getAttrs: (d) => ({ source: (d).dataset.rawBlock ?? '' }) }],
+      toDOM: (node): DOMOutputSpec => ['div', { 'data-raw-block': node.attrs.source as string, class: 'vc-raw-block' }],
     },
 
     text: { group: 'inline' },
@@ -145,16 +146,19 @@ export const schema = new Schema({
       parseDOM: [{
         tag: 'span[data-wikilink]',
         getAttrs: (d) => {
-          const el = d as HTMLElement;
+          const el = d;
           return { target: el.dataset.wikilink ?? '', alias: el.dataset.alias ?? null, embed: el.dataset.embed === '1' };
         },
       }],
-      toDOM: (node): DOMOutputSpec => ['span', {
-        'data-wikilink': node.attrs.target,
-        ...(node.attrs.alias ? { 'data-alias': node.attrs.alias } : {}),
-        ...(node.attrs.embed ? { 'data-embed': '1' } : {}),
-        class: 'vc-wikilink internal-link',
-      }, node.attrs.alias || node.attrs.target],
+      toDOM: (node): DOMOutputSpec => {
+        const a = node.attrs as { target: string; alias?: string | null; embed?: boolean };
+        return ['span', {
+          'data-wikilink': a.target,
+          ...(a.alias ? { 'data-alias': a.alias } : {}),
+          ...(a.embed ? { 'data-embed': '1' } : {}),
+          class: 'vc-wikilink internal-link',
+        }, a.alias || a.target];
+      },
     },
 
     /** Inline Markdown kept verbatim ($math$, %%comments%%, unknown HTML). */
@@ -163,8 +167,8 @@ export const schema = new Schema({
       group: 'inline',
       atom: true,
       attrs: { source: { default: '' } },
-      parseDOM: [{ tag: 'span[data-raw-inline]', getAttrs: (d) => ({ source: (d as HTMLElement).dataset.rawInline ?? '' }) }],
-      toDOM: (node): DOMOutputSpec => ['span', { 'data-raw-inline': node.attrs.source, class: 'vc-raw-inline' }, node.attrs.source],
+      parseDOM: [{ tag: 'span[data-raw-inline]', getAttrs: (d) => ({ source: (d).dataset.rawInline ?? '' }) }],
+      toDOM: (node): DOMOutputSpec => ['span', { 'data-raw-inline': node.attrs.source as string, class: 'vc-raw-inline' }, node.attrs.source as string],
     },
   },
 
@@ -172,14 +176,14 @@ export const schema = new Schema({
     link: {
       attrs: { href: {}, title: { default: null } },
       inclusive: false,
-      parseDOM: [{ tag: 'a[href]', getAttrs: (d) => ({ href: (d as HTMLElement).getAttribute('href'), title: (d as HTMLElement).getAttribute('title') }) }],
-      toDOM: (mark): DOMOutputSpec => ['a', { href: mark.attrs.href, title: mark.attrs.title, class: 'external-link' }, 0],
+      parseDOM: [{ tag: 'a[href]', getAttrs: (d) => ({ href: (d).getAttribute('href'), title: (d).getAttribute('title') }) }],
+      toDOM: (mark): DOMOutputSpec => ['a', { href: mark.attrs.href as string, title: mark.attrs.title as string | null, class: 'external-link' }, 0],
     },
     strong: {
       parseDOM: [
         { tag: 'strong' },
-        { tag: 'b', getAttrs: (d) => (d as HTMLElement).style.fontWeight !== 'normal' && null },
-        { style: 'font-weight', getAttrs: (v) => /^(bold(er)?|[6-9]\d{2,})$/.test(v as string) && null },
+        { tag: 'b', getAttrs: (d) => (d).style.fontWeight !== 'normal' && null },
+        { style: 'font-weight', getAttrs: (v) => /^(bold(er)?|[6-9]\d{2,})$/.test(v) && null },
       ],
       toDOM: (): DOMOutputSpec => ['strong', 0],
     },
@@ -188,18 +192,18 @@ export const schema = new Schema({
       toDOM: (): DOMOutputSpec => ['em', 0],
     },
     underline: {
-      parseDOM: [{ tag: 'u' }, { tag: 'ins' }, { style: 'text-decoration', getAttrs: (v) => /underline/.test(v as string) && null }],
+      parseDOM: [{ tag: 'u' }, { tag: 'ins' }, { style: 'text-decoration', getAttrs: (v) => /underline/.test(v) && null }],
       toDOM: (): DOMOutputSpec => ['u', 0],
     },
     strike: {
-      parseDOM: [{ tag: 's' }, { tag: 'del' }, { tag: 'strike' }, { style: 'text-decoration', getAttrs: (v) => /line-through/.test(v as string) && null }],
+      parseDOM: [{ tag: 's' }, { tag: 'del' }, { tag: 'strike' }, { style: 'text-decoration', getAttrs: (v) => /line-through/.test(v) && null }],
       toDOM: (): DOMOutputSpec => ['del', 0],
     },
     highlight: {
       attrs: { color: { default: null as string | null } },
       parseDOM: [{
         tag: 'mark',
-        getAttrs: (d) => ({ color: (d as HTMLElement).style.backgroundColor || null }),
+        getAttrs: (d) => ({ color: (d).style.backgroundColor || null }),
       }],
       toDOM: (mark): DOMOutputSpec => ['mark', mark.attrs.color ? { style: `background-color: ${mark.attrs.color}` } : {}, 0],
     },
@@ -207,15 +211,15 @@ export const schema = new Schema({
       attrs: { color: {} },
       parseDOM: [
         // Greys and black/white are page text colours, not a choice: drop them.
-        { style: 'color', getAttrs: (v) => (isMeaningfulColor(v as string) ? { color: v } : false) },
-        { tag: 'font[color]', getAttrs: (d) => (isMeaningfulColor((d as HTMLElement).getAttribute('color') ?? '') ? { color: (d as HTMLElement).getAttribute('color') } : false) },
+        { style: 'color', getAttrs: (v) => (isMeaningfulColor(v) ? { color: v } : false) },
+        { tag: 'font[color]', getAttrs: (d) => (isMeaningfulColor((d).getAttribute('color') ?? '') ? { color: (d).getAttribute('color') } : false) },
       ],
       toDOM: (mark): DOMOutputSpec => ['span', { style: `color: ${mark.attrs.color}` }, 0],
     },
     size: {
       attrs: { size: {} },
       // Only sizes this editor set (data-size); pasted pages bring their own sizes.
-      parseDOM: [{ tag: 'span[data-size]', getAttrs: (d) => ({ size: Number((d as HTMLElement).dataset.size) || 16 }) }],
+      parseDOM: [{ tag: 'span[data-size]', getAttrs: (d) => ({ size: Number((d).dataset.size) || 16 }) }],
       toDOM: (mark): DOMOutputSpec => ['span', { 'data-size': String(mark.attrs.size), style: `font-size: ${mark.attrs.size}px` }, 0],
     },
     code: {
@@ -236,7 +240,7 @@ export function isDone(c: string | null): boolean {
 /** A colour worth keeping from pasted content: not black, white or grey. */
 export function isMeaningfulColor(v: string): boolean {
   if (!v) return false;
-  const probe = document.createElement('span');
+  const probe = createSpan();
   probe.style.color = v;
   if (!probe.style.color) return false;
   if (/^(black|white|gr[ae]y|silver|dimgr[ae]y|darkgr[ae]y|lightgr[ae]y|gainsboro|whitesmoke|inherit|currentcolor|initial)$/i.test(probe.style.color)) return false;

@@ -55,11 +55,11 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
         chip.createSpan({ text: f });
         const x = chip.createSpan({ cls: 'vc-folder-chip-x', attr: { 'aria-label': t('Remove') } });
         setIcon(x, 'x');
-        x.addEventListener('click', async () => {
+        x.addEventListener('click', () => void (async () => {
           s.takeoverFolders = s.takeoverFolders.filter(v => v !== f);
           await this.save(false);
           paintChips();
-        });
+        })());
       }
     };
     paintChips();
@@ -135,7 +135,7 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
     new Setting(el)
       .setName(t('Corner radius'))
       .setDesc(t('Rounding of image and video corners. 0 turns rounding off.'))
-      .addSlider(sl => sl.setLimits(0, 24, 1).setValue(s.imageRadius).setDynamicTooltip().onChange(async (v) => { s.imageRadius = v; await this.save(); }));
+      .addSlider(sl => sl.setLimits(0, 24, 1).setValue(s.imageRadius).onChange(async (v) => { s.imageRadius = v; await this.save(); }));
     new Setting(el)
       .setName(t('Shadow'))
       .setDesc(t('A soft shadow under images and videos.'))
@@ -174,7 +174,7 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
     new Setting(el)
       .setName(t('Dot size'))
       .setDesc(t('0 hides the grid.'))
-      .addSlider(sl => sl.setLimits(0, 4, 0.5).setValue(s.dotSize).setDynamicTooltip().onChange(async (v) => { s.dotSize = v; await this.save(); }));
+      .addSlider(sl => sl.setLimits(0, 4, 0.5).setValue(s.dotSize).onChange(async (v) => { s.dotSize = v; await this.save(); }));
     this.colorSetting(el, t('Dot colour'), 'dotColor');
     this.colorSetting(el, t('Background colour'), 'backgroundColor');
     new Setting(el)
@@ -182,14 +182,14 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
       .addToggle(tg => tg.setValue(s.snapToGrid).onChange(async (v) => { s.snapToGrid = v; await this.save(); }));
     new Setting(el)
       .setName(t('Grid size'))
-      .addSlider(sl => sl.setLimits(10, 80, 5).setValue(s.gridSize).setDynamicTooltip().onChange(async (v) => { s.gridSize = v; await this.save(); }));
+      .addSlider(sl => sl.setLimits(10, 80, 5).setValue(s.gridSize).onChange(async (v) => { s.gridSize = v; await this.save(); }));
 
     // ── Arranging ──
     new Setting(el).setName(t('Arranging')).setHeading();
     new Setting(el)
       .setName(t('Gap between arranged cards'))
       .setDesc(t('Used by pushing, rows, columns and the automatic arrangements (px).'))
-      .addSlider(sl => sl.setLimits(0, 80, 2).setValue(s.arrangeGap).setDynamicTooltip().onChange(async (v) => { s.arrangeGap = v; await this.save(false); }));
+      .addSlider(sl => sl.setLimits(0, 80, 2).setValue(s.arrangeGap).onChange(async (v) => { s.arrangeGap = v; await this.save(false); }));
     new Setting(el)
       .setName(t('Same size: measure from'))
       .addDropdown(d => d
@@ -221,12 +221,12 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
     const field = (dim: 'width' | 'height', min: number) => {
       const input = box.createEl('input', { type: 'number', attr: { min: String(min), max: '2000', step: '10' } });
       input.value = String(s[key][dim]);
-      input.addEventListener('change', async () => {
+      input.addEventListener('change', () => void (async () => {
         const n = Math.round(Number(input.value));
         if (!Number.isFinite(n) || n < min) { input.value = String(s[key][dim]); return; }
         s[key] = { ...s[key], [dim]: Math.min(2000, n) };
         await this.save(false);
-      });
+      })());
     };
     field('width', 60);
     box.createSpan({ cls: 'vc-size-x', text: '×' });
@@ -271,34 +271,34 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
         cb.checked = shown.includes(tool.id);
         setIcon(row.createSpan('vc-tool-row-icon'), tool.icon);
         row.createSpan({ cls: 'vc-tool-row-name', text: t(tool.label) });
-        cb.addEventListener('change', async () => {
+        cb.addEventListener('change', () => void (async () => {
           if (cb.checked) s.toolbarTools = [...shown, tool.id];
           else s.toolbarTools = shown.filter(id => id !== tool.id);
           await this.save();
           render();
-        });
+        })());
         if (cb.checked) {
           const i = shown.indexOf(tool.id);
           const up = row.createDiv({ cls: 'clickable-icon', attr: { 'aria-label': t('Move up') } });
           setIcon(up, 'chevron-up');
           up.toggleClass('is-disabled', i === 0);
-          up.addEventListener('click', async () => {
+          up.addEventListener('click', () => void (async () => {
             if (i === 0) return;
             const arr = [...shown];
             [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]];
             s.toolbarTools = arr;
             await this.save(); render();
-          });
+          })());
           const down = row.createDiv({ cls: 'clickable-icon', attr: { 'aria-label': t('Move down') } });
           setIcon(down, 'chevron-down');
           down.toggleClass('is-disabled', i === shown.length - 1);
-          down.addEventListener('click', async () => {
+          down.addEventListener('click', () => void (async () => {
             if (i >= shown.length - 1) return;
             const arr = [...shown];
             [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]];
             s.toolbarTools = arr;
             await this.save(); render();
-          });
+          })());
         }
       });
     };

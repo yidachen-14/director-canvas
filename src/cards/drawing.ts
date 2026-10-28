@@ -142,7 +142,7 @@ export function strokesOf(n: RawNode): Stroke[] {
     const flat = (x.p as number[]) ?? [];
     const p: number[] = [];
     for (let i = 0; i + 1 < flat.length; i += 2) p.push(flat[i], flat[i + 1], 0);
-    return { c: String(x.c ?? 'currentColor'), s: Number(x.w ?? 3) * 1.6, p };
+    return { c: typeof x.c === 'string' ? x.c : 'currentColor', s: Number(x.w ?? 3) * 1.6, p };
   });
 }
 
@@ -225,7 +225,7 @@ class DrawingCard implements CardHandle {
       const p = document.createElementNS(SVG_NS, 'path');
       p.setAttribute('d', strokeOutline(s));
       p.style.fill = s.c;
-      if (s.h) { p.style.fillOpacity = '0.45'; p.classList.add('is-highlight'); }
+      if (s.h) p.classList.add('is-highlight');
       this.svg.appendChild(p);
     }
   }

@@ -10,7 +10,7 @@ export class FolderPickModal extends Modal {
   private filter = '';
   private expanded = new Set<string>();
 
-  constructor(app: App, initial: string[], private done: (folders: string[]) => void) {
+  constructor(app: App, initial: string[], private done: (folders: string[]) => void | Promise<void>) {
     super(app);
     this.chosen = new Set(initial);
     // Open the way down to every chosen folder.
@@ -26,7 +26,7 @@ export class FolderPickModal extends Modal {
     this.renderTree();
     new Setting(this.contentEl)
       .addButton(b => b.setButtonText(t('Cancel')).onClick(() => this.close()))
-      .addButton(b => b.setButtonText(t('Done')).setCta().onClick(() => { this.close(); this.done(this.result()); }));
+      .addButton(b => b.setButtonText(t('Done')).setCta().onClick(() => { this.close(); void this.done(this.result()); }));
   }
 
   onClose(): void { this.contentEl.empty(); }

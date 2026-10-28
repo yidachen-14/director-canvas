@@ -153,7 +153,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
       if (at) return false;
       id = this.data.root.id;
     }
-    return this.beginEdit(id, !!at ? at : null);
+    return this.beginEdit(id, at ? at : null);
   }
 
   stopEditing(): void {
@@ -162,7 +162,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
     const el = this.topicEls.get(id);
     this.editingId = null;
     if (!el) return;
-    const text = (el.innerText ?? '').replace(/\n+$/, '').replace(/ /g, ' ');
+    const text = (el.innerText ?? '').replace(/\n+$/, '').replace(/\u00a0/g, ' ');
     el.removeAttribute('contenteditable');
     el.removeClass('is-editing');
     const cur = anyTopic(this.data, id);

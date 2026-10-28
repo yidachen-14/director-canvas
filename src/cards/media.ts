@@ -41,8 +41,8 @@ class LinkModal extends Modal {
     let input: HTMLInputElement | null = null;
     new Setting(this.contentEl).setName(t('Address')).addText(tx => {
       input = tx.inputEl;
-      tx.inputEl.style.width = '100%';
-      tx.setPlaceholder('https://…').setValue(v).onChange(x => { v = x; });
+      tx.inputEl.addClass('vc-link-input');
+      tx.setPlaceholder('example.com').setValue(v).onChange(x => { v = x; });
       tx.inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); this.finish(v); } });
     });
     const buttons = new Setting(this.contentEl);
@@ -102,7 +102,7 @@ class MediaCard implements CardHandle {
     this.render();
   }
 
-  private descText(n = this.node): string { return vcGet(n, 'desc', '') as string; }
+  private descText(n = this.node): string { return vcGet(n, 'desc', ''); }
 
   private render(): void {
     const n = this.node;
@@ -141,7 +141,7 @@ class MediaCard implements CardHandle {
     card?.toggleClass('has-media-extras', !!this.linkText() || !!this.descText() || editing);
   }
 
-  private linkText(n = this.node): string { return vcGet(n, 'link', '') as string; }
+  private linkText(n = this.node): string { return vcGet(n, 'link', ''); }
 
   /** The frame around the whole card: on when chosen, or by default when the card has a colour. */
   private hasFrame(n = this.node): boolean {
@@ -356,7 +356,7 @@ async function cacheImage(ctx: CardContext, url: string): Promise<string | undef
 /** Save local copies of a bookmark's picture and icon (once), and remember where they are. */
 async function cachePreview(ctx: CardContext, id: string): Promise<void> {
   const n = ctx.board.model.node(id);
-  const meta = (n?.vc?.meta ?? null) as LinkMeta | null;
+  const meta = n ? vcGet<LinkMeta | null>(n, 'meta', null) : null;
   if (!n || !meta) return;
   const key = `cache:${id}`;
   if (inflight.has(key)) return;

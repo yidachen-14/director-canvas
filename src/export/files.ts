@@ -1,20 +1,35 @@
 import { FileSystemAdapter, Notice, normalizePath, type App } from 'obsidian';
 import { t } from '../i18n';
 
-/* eslint-disable @typescript-eslint/no-var-requires */
+ 
 type NodeFs = typeof import('fs');
 type NodePath = typeof import('path');
-const nodeFs = (): NodeFs | null => { try { return require('fs') as NodeFs; } catch { return null; } };
-const nodePath = (): NodePath | null => { try { return require('path') as NodePath; } catch { return null; } };
+type NodeOs = typeof import('os');
+
+/** Node and Electron modules, reached through the desktop app's own require (absent on mobile). */
+function nodeModule<T>(name: string): T | null {
+  const req = (window as unknown as { require?: (id: string) => unknown }).require;
+  try { return req ? (req(name) as T) : null; } catch { return null; }
+}
+const nodeFs = (): NodeFs | null => nodeModule<NodeFs>('fs');
+const nodePath = (): NodePath | null => nodeModule<NodePath>('path');
+
+export interface FileFilter { name: string; extensions: string[] }
+interface ElectronDialog {
+  showSaveDialog(o: { defaultPath?: string; filters?: FileFilter[] }): Promise<{ canceled: boolean; filePath?: string }>;
+  showOpenDialog(o: { title?: string; properties?: string[] }): Promise<{ canceled: boolean; filePaths?: string[] }>;
+}
+export interface ElectronWebContents {
+  printToPDF(o: Record<string, unknown>): Promise<Uint8Array>;
+}
+export interface ElectronRemote {
+  dialog?: ElectronDialog;
+  getCurrentWebContents?(): ElectronWebContents | undefined;
+}
 
 /** Electron's remote module, when Obsidian provides it (desktop). */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function electronRemote(): any | null {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const e = require('electron') as any;
-    return e?.remote ?? null;
-  } catch { return null; }
+export function electronRemote(): ElectronRemote | null {
+  return nodeModule<{ remote?: ElectronRemote }>('electron')?.remote ?? null;
 }
 
 const MIME: Record<string, string> = {
@@ -77,7 +92,7 @@ export interface OutFile { path: string; data: Uint8Array | string }
 const enc = new TextEncoder();
 const bytesOf = (d: Uint8Array | string) => (typeof d === 'string' ? enc.encode(d) : d);
 const isAbsolute = (p: string) => /^(\/|~|[A-Za-z]:[\\/])/.test(p);
-const expandHome = (p: string) => (p.startsWith('~') ? (require('os') as typeof import('os')).homedir() + p.slice(1) : p);
+const expandHome = (p: string) => (p.startsWith('~') ? (nodeModule<NodeOs>('os')?.homedir() ?? '~') + p.slice(1) : p);
 
 /** A name that doesn't overwrite: "name (2).ext". */
 function freeName(exists: (p: string) => boolean, dir: string, name: string, join: (a: string, b: string) => string): string {
@@ -136,7 +151,7 @@ function download(name: string, data: Uint8Array | string, mime: string): void {
  * Save one file: into the export folder from the settings, or where the user picks.
  * Returns where it went (null when cancelled).
  */
-export async function saveFile(app: App, exportFolder: string, name: string, data: Uint8Array | string, filter: { name: string; extensions: string[] }): Promise<string | null> {
+export async function saveFile(app: App, exportFolder: string, name: string, data: Uint8Array | string, filter: FileFilter): Promise<string | null> {
   if (exportFolder.trim()) return writeToFolder(app, exportFolder.trim(), name, (top) => [{ path: top, data }]);
   const remote = electronRemote();
   const fs = nodeFs();
@@ -144,7 +159,7 @@ export async function saveFile(app: App, exportFolder: string, name: string, dat
     const res = await remote.dialog.showSaveDialog({ defaultPath: name, filters: [filter] });
     if (res.canceled || !res.filePath) return null;
     fs.writeFileSync(res.filePath, bytesOf(data));
-    return res.filePath as string;
+    return res.filePath;
   }
   download(name, data, filter.extensions[0] === 'pdf' ? 'application/pdf' : 'application/octet-stream');
   return name;

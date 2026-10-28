@@ -10,7 +10,7 @@ export interface VideoData {
 
 export function videoData(n: RawNode): VideoData {
   const v = n.vc?.video;
-  return v && typeof v === 'object' ? (v as VideoData) : {};
+  return v && typeof v === 'object' ? (v) : {};
 }
 
 /** 1:05.24 (or 1:02:05.24) */

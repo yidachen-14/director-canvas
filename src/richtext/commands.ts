@@ -48,7 +48,7 @@ export function blockKind(state: EditorState): string {
 /** Turn the selected textblocks into a paragraph or heading, keeping alignment. */
 export function setTextBlock(kind: string): Command {
   return (state, dispatch) => {
-    const align = state.selection.$from.parent.attrs.align ?? null;
+    const align = (state.selection.$from.parent.attrs.align as string | null | undefined) ?? null;
     if (kind === 'paragraph') return setBlockType(schema.nodes.paragraph, { align })(state, dispatch);
     if (kind === 'code') return setBlockType(schema.nodes.code_block)(state, dispatch);
     const level = Number(kind.slice(1));
@@ -105,7 +105,7 @@ export function listKind(state: EditorState): 'bullet' | 'ordered' | 'task' | nu
 function setTaskAttr(state: EditorState, tr: Transaction, task: boolean): Transaction {
   const { from, to } = state.selection;
   tr.doc.nodesBetween(tr.mapping.map(from), tr.mapping.map(to), (node, pos) => {
-    if (node.type === schema.nodes.list_item) tr = tr.setNodeMarkup(pos, undefined, { checked: task ? (node.attrs.checked ?? ' ') : null });
+    if (node.type === schema.nodes.list_item) tr = tr.setNodeMarkup(pos, undefined, { checked: task ? ((node.attrs.checked as string | null) ?? ' ') : null });
   });
   return tr;
 }
@@ -166,7 +166,7 @@ export const allToTasks: Command = (state, dispatch) => {
       const item = n.list_item.create({ checked: ' ' }, node);
       tr.replaceWith(pos, pos + node.nodeSize, n.bullet_list.create({ tight: true }, item));
     } else if (node.type === n.bullet_list || node.type === n.ordered_list) {
-      if (node.type === n.ordered_list) tr.setNodeMarkup(pos, n.bullet_list, { tight: node.attrs.tight });
+      if (node.type === n.ordered_list) tr.setNodeMarkup(pos, n.bullet_list, { tight: node.attrs.tight as boolean });
       node.forEach((li, off) => { if (li.attrs.checked === null) tr.setNodeMarkup(pos + 1 + off, undefined, { ...li.attrs, checked: ' ' }); });
     }
   }
@@ -215,7 +215,7 @@ export function toggleList(kind: 'bullet' | 'ordered' | 'task'): Command {
       for (let d = $from.depth; d > 0; d--) {
         const n = $from.node(d);
         if (n.type === schema.nodes.bullet_list || n.type === schema.nodes.ordered_list) {
-          if (n.type !== listType) tr = tr.setNodeMarkup($from.before(d), listType, listType === schema.nodes.ordered_list ? { order: 1, tight: n.attrs.tight } : { tight: n.attrs.tight });
+          if (n.type !== listType) tr = tr.setNodeMarkup($from.before(d), listType, listType === schema.nodes.ordered_list ? { order: 1, tight: n.attrs.tight as boolean } : { tight: n.attrs.tight as boolean });
           break;
         }
       }

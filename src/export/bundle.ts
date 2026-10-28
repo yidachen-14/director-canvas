@@ -34,7 +34,7 @@ export function filesUsed(app: App, board: Board, withEmbeds: boolean): TFile[] 
   const add = (f: TFile | null | undefined) => { if (f instanceof TFile && !found.has(f.path)) found.set(f.path, f); };
   const from = board.sourcePath;
   for (const n of board.model.nodes) {
-    if (n.type === 'file' && n.file) add(app.vault.getAbstractFileByPath(n.file) as TFile);
+    if (n.type === 'file' && n.file) { const af = app.vault.getAbstractFileByPath(n.file); if (af instanceof TFile) add(af); }
     if (n.text) for (const f of linksIn(app, n.text, from)) add(f);
     for (const s of strings(n.vc)) {
       if (s.length < 3 || s.length > 400 || !/\.[a-z0-9]{1,5}$/i.test(s)) continue;

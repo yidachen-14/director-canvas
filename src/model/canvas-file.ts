@@ -12,7 +12,7 @@ export type NodeKind = 'text' | 'file' | 'link' | 'group';
 
 export interface RawNode {
   id: string;
-  type: NodeKind | string;
+  type: NodeKind | (string & Record<never, never>);
   x: number;
   y: number;
   width: number;
@@ -86,7 +86,7 @@ export function parseCanvas(text: string): CanvasFile {
       y: num(r.y, 0),
       width: Math.max(1, num(r.width, 250)),
       height: Math.max(1, num(r.height, 60)),
-    } as RawNode);
+    });
   }
   const edges: RawEdge[] = [];
   for (const e of Array.isArray(obj.edges) ? obj.edges : []) {
@@ -125,7 +125,7 @@ export function serializeCanvas(data: CanvasFile, prepareEdges?: (edges: RawEdge
   const prepared = prepareEdges ? prepareEdges(allEdges, nodes) : allEdges;
   const edges = prepared.filter(e => e.fromNode && e.toNode);
   const freeLines = prepared.filter(e => !e.fromNode || !e.toNode);
-  const vc = { ...((rest.vc as Record<string, unknown> | undefined) ?? {}) };
+  const vc = { ...((rest.vc) ?? {}) };
   if (freeLines.length) vc.lines = freeLines.map(cleanEdge); else delete vc.lines;
   if (Object.keys(vc).length) rest.vc = vc; else delete rest.vc;
   const lines: string[] = ['{'];

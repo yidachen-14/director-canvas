@@ -11,7 +11,9 @@ export function swatchColor(n: RawNode): string {
   if (typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)) return c.toUpperCase();
   // Swatches from the first version held a list; keep its first colour.
   const list = n.vc?.colors;
-  if (Array.isArray(list) && list[0] && typeof list[0].hex === 'string') return String(list[0].hex).toUpperCase();
+  const first: unknown = Array.isArray(list) ? list[0] : null;
+  const hex = first && typeof first === 'object' ? (first as { hex?: unknown }).hex : null;
+  if (typeof hex === 'string') return hex.toUpperCase();
   return '#888888';
 }
 

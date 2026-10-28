@@ -181,7 +181,7 @@ export class VideoPlayer {
         }
       }
       last = { t: meta.mediaTime, n: meta.presentedFrames };
-      v.requestVideoFrameCallback!(cb);
+      v.requestVideoFrameCallback(cb);
     };
     v.requestVideoFrameCallback(cb);
   }
@@ -192,9 +192,9 @@ export class VideoPlayer {
       const v = this.video;
       if (this.loop && v.currentTime >= this.loop.out) v.currentTime = this.loop.in;
       this.renderTime();
-      if (!v.paused && !v.ended && v.isConnected) this.raf = requestAnimationFrame(loop);
+      if (!v.paused && !v.ended && v.isConnected) this.raf = window.requestAnimationFrame(loop);
     };
-    this.raf = requestAnimationFrame(loop);
+    this.raf = window.requestAnimationFrame(loop);
   }
 
   private unsupported(): void {
@@ -270,9 +270,9 @@ export class VideoPlayer {
         v.currentTime = target;
         this.renderTime();
       }
-      requestAnimationFrame(tick);
+      window.requestAnimationFrame(tick);
     };
-    requestAnimationFrame(tick);
+    window.requestAnimationFrame(tick);
   }
 
   private stopReverseBound = () => this.stopReverse();
@@ -334,7 +334,7 @@ export class VideoPlayer {
       fn(d);
       if (d.marks && !d.marks.length) delete d.marks;
       n.vc = { ...(n.vc ?? {}) };
-      if (d.cover || d.marks) n.vc.video = d as Record<string, unknown>; else delete n.vc.video;
+      if (d.cover || d.marks) n.vc.video = d; else delete n.vc.video;
     });
   }
 
@@ -569,7 +569,7 @@ export class VideoPlayer {
     let image: string | undefined;
     try {
       const scale = Math.min(1, 1280 / v.videoWidth);
-      const c = document.createElement('canvas');
+      const c = createEl('canvas');
       c.width = Math.round(v.videoWidth * scale);
       c.height = Math.round(v.videoHeight * scale);
       c.getContext('2d')!.drawImage(v, 0, 0, c.width, c.height);

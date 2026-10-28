@@ -47,7 +47,7 @@ export const NORMAL: Record<Side, Point> = {
 export const SIDES: Side[] = ['top', 'right', 'bottom', 'left'];
 
 export function vcOf(e: RawEdge): EdgeVc {
-  return (e.vc ?? {}) as EdgeVc;
+  return (e.vc ?? {});
 }
 
 /** Edges imported from the core Canvas have no route: they keep its curved look. */

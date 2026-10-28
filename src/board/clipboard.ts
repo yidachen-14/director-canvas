@@ -66,12 +66,12 @@ export function pasteNodes(board: Board, payload: ClipPayload, at: Point): void 
   const map = new Map<string, string>();
   board.model.transact(() => {
     for (const n of payload.nodes) {
-      const copy = board.model.addNode({ ...structuredClone(n), id: undefined, x: n.x + dx, y: n.y + dy } as unknown as RawNode);
+      const copy = board.model.addNode({ ...structuredClone(n), id: undefined, x: n.x + dx, y: n.y + dy });
       map.set(n.id, copy.id);
     }
     for (const e of payload.edges) {
       const a = map.get(e.fromNode), b = map.get(e.toNode);
-      if (a && b) board.model.addEdge({ ...structuredClone(e), id: undefined, fromNode: a, toNode: b } as never);
+      if (a && b) board.model.addEdge({ ...structuredClone(e), id: undefined, fromNode: a, toNode: b });
     }
   });
   board.select([...map.values()]);
@@ -128,7 +128,7 @@ async function mediaSize(app: App, file: TFile): Promise<{ width: number; height
   }
   if (kind === 'video') {
     return new Promise(resolve => {
-      const v = document.createElement('video');
+      const v = createEl('video');
       v.preload = 'metadata';
       v.onloadedmetadata = () => resolve(fit(v.videoWidth, v.videoHeight));
       v.onerror = () => resolve(null);

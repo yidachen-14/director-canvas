@@ -328,14 +328,14 @@ export function attachInteractions(board: Board): void {
           // ⌥-drag leaves the originals and moves copies.
           const map = new Map<string, string>();
           moving = nodes.map(n => {
-            const copy = board.model.addNode({ ...structuredClone(n), id: undefined } as unknown as RawNode);
+            const copy = board.model.addNode({ ...structuredClone(n), id: undefined });
             map.set(n.id, copy.id);
             origin.set(copy.id, { x: n.x, y: n.y });
             return copy;
           });
           for (const ed of [...board.model.edges]) {
             const a = map.get(ed.fromNode), b = map.get(ed.toNode);
-            if (a && b) board.model.addEdge({ ...structuredClone(ed), id: undefined, fromNode: a, toNode: b } as never);
+            if (a && b) board.model.addEdge({ ...structuredClone(ed), id: undefined, fromNode: a, toNode: b });
           }
           board.select(nodes.filter(n => board.selection.has(n.id)).map(n => map.get(n.id)!));
         }
@@ -457,7 +457,7 @@ export function attachInteractions(board: Board): void {
         return;
       }
       const r = rect;
-      const g = board.model.transact(() => board.model.addNode({ type: 'group', label: tr('Group'), x: r.x, y: r.y, width: r.width, height: r.height } as RawNode));
+      const g = board.model.transact(() => board.model.addNode({ type: 'group', label: tr('Group'), x: r.x, y: r.y, width: r.width, height: r.height }));
       board.select([g.id]);
     });
   }
@@ -510,7 +510,7 @@ export function attachInteractions(board: Board): void {
     };
     track(e, 'resize', (ev) => {
       last = ev;
-      if (!frame) frame = requestAnimationFrame(apply);
+      if (!frame) frame = window.requestAnimationFrame(apply);
     }, () => {
       if (frame) { cancelAnimationFrame(frame); apply(); }
       tip.remove();
@@ -700,12 +700,12 @@ export function duplicateSelection(board: Board, offset = 30): void {
   const map = new Map<string, string>();
   board.model.transact(() => {
     for (const n of nodes) {
-      const copy = board.model.addNode({ ...structuredClone(n), id: undefined, x: n.x + offset, y: n.y + offset } as unknown as RawNode);
+      const copy = board.model.addNode({ ...structuredClone(n), id: undefined, x: n.x + offset, y: n.y + offset });
       map.set(n.id, copy.id);
     }
     for (const e of [...board.model.edges]) {
       if (ids.has(e.fromNode) && ids.has(e.toNode)) {
-        board.model.addEdge({ ...structuredClone(e), id: undefined, fromNode: map.get(e.fromNode)!, toNode: map.get(e.toNode)! } as never);
+        board.model.addEdge({ ...structuredClone(e), id: undefined, fromNode: map.get(e.fromNode)!, toNode: map.get(e.toNode)! });
       }
     }
   });

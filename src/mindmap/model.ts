@@ -330,7 +330,7 @@ export function normalizeData(raw: unknown, fallbackText: string): MMData {
     ...(t ?? {}),
     id: typeof t?.id === 'string' && t.id ? t.id : rid(),
     text: typeof t?.text === 'string' ? t.text : text,
-    children: Array.isArray(t?.children) ? t!.children.map(c => fix(c, '')) : [],
+    children: Array.isArray(t?.children) ? t.children.map(c => fix(c, '')) : [],
   });
   const root = d.root ? fix(d.root, fallbackText) : (fromMarkdown(fallbackText) ?? newTopic(fallbackText || 'Central topic'));
   const layouts: MMLayout[] = ['right', 'both', 'down', 'timeline', 'list'];
@@ -855,13 +855,13 @@ export function layoutExtras(d: MMData, sizes: Map<string, Size>, placed: Map<st
     const keep = (b: Bounds) => done.push({ parent: r.parent.id, lo: indexIn(r.parent, first.id), hi: indexIn(r.parent, r.run[r.run.length - 1].id), box: b });
     if (it.kind === 'b') {
       const b = { x: box.x - PADB, y: box.y - PADB, w: box.w + PADB * 2, h: box.h + PADB * 2 };
-      const label = (it.x as MMBoundary).label;
+      const label = (it.x).label;
       out.boundaries.push({ id: it.x.id, from: first.id, label, ...b });
       // A label tab sits above the frame.
       keep(label ? { x: b.x, y: b.y - 24, w: b.w, h: b.h + 24 } : b);
       continue;
     }
-    const sm = it.x as MMSummary;
+    const sm = it.x;
     const depth = r.depth + 1;
     // A frame that only partly overlaps the run still pushes the brace out past it.
     {

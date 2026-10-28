@@ -1772,3 +1772,13 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 .vc-vc-volume::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--interactive-accent); border: none; box-shadow: none; }
 .vc-node.is-join-target { z-index: 100000 !important; }
 .vc-node.is-joining { opacity: 0.35; }
+.vc-board path.is-highlight, .vc-pen-live.is-highlight { fill-opacity: 0.45; }
+.vc-link-input { width: 100%; }
+/* PDF export: while printing, only the stage shows. */
+@media print {
+  html:has(> body.vc-printing), body.vc-printing { height: auto !important; overflow: visible !important; background: transparent !important; }
+  body.vc-printing.vc-print-bg { background: var(--background-primary) !important; }
+  body.vc-printing > *:not(.vc-print-host) { display: none !important; }
+  body.vc-printing > .vc-print-host { display: block !important; position: relative !important; left: 0 !important; top: 0 !important; }
+  body.vc-printing .vc-print-host * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}

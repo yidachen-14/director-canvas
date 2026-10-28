@@ -62,11 +62,11 @@ export class ShortcutsModal extends Modal {
     const clear = row.controlEl.createDiv({ cls: 'clickable-icon', attr: { 'aria-label': t('Remove') } });
     setIcon(clear, 'x');
     clear.toggleClass('is-hidden', !keys.length);
-    clear.addEventListener('click', async () => { this.custom[s.id] = ''; await this.save(); this.renderList(); });
+    clear.addEventListener('click', () => { void (async () => { this.custom[s.id] = ''; await this.save(); this.renderList(); })(); });
     const reset = row.controlEl.createDiv({ cls: 'clickable-icon', attr: { 'aria-label': t('Restore default') } });
     setIcon(reset, 'rotate-ccw');
     reset.toggleClass('is-hidden', !changed);
-    reset.addEventListener('click', async () => { delete this.custom[s.id]; await this.save(); this.renderList(); });
+    reset.addEventListener('click', () => { void (async () => {delete this.custom[s.id]; await this.save(); this.renderList(); })(); });
   }
 
   private startRecording(id: string): void {

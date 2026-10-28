@@ -76,7 +76,7 @@ export class RichText {
       transformPastedHTML: (html) => html.replace(/<meta[^>]*>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, ''),
       handleDOMEvents: {
         blur: (_v, e) => {
-          const next = (e as FocusEvent).relatedTarget as HTMLElement | null;
+          const next = (e).relatedTarget as HTMLElement | null;
           // Focus moving into our own floating UI is not leaving the editor.
           if (next && next.closest('.vc-format-bar, .vc-fb-popup, .vc-slash-menu')) return false;
           window.setTimeout(() => {
@@ -243,7 +243,7 @@ export class RichText {
   alignment(): 'left' | 'center' | 'right' {
     let a: string | null = null;
     this.view.state.doc.descendants((n) => { if (a === null && n.isTextblock) { a = (n.attrs.align as string) || 'left'; } return a === null; });
-    return (a ?? 'left') as 'left' | 'center' | 'right';
+    return (a ?? 'left');
   }
 
   /** Whether every top-level block is a to-do list. */

@@ -87,7 +87,7 @@ function richCard(f: Flavor): CardType {
     label: f.label,
     icon: f.icon,
     defaultSize: f.defaultSize,
-    sizeFor: f.sizeFor,
+    sizeFor: f.sizeFor ? (settings) => f.sizeFor!(settings) : undefined,
     noColor: f.noColor,
     create: ({ settings }) => f.create(settings),
     mount(node, el, ctx) {

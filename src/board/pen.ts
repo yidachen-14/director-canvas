@@ -1,6 +1,5 @@
 import { setIcon, setTooltip } from 'obsidian';
 import type { Board } from './board';
-import type { RawNode } from '../model/canvas-file';
 import {
   DEFAULT_PEN_SHAPE, distanceToStroke, drawingHit, penShape, rerenderDrawings, strokeOutline, strokesOnBoard, writeDrawing,
   type PenShape, type Stroke,
@@ -179,7 +178,7 @@ export class PenController {
     const live = document.createElementNS(SVG_NS, 'path');
     live.classList.add('vc-pen-live');
     live.style.fill = stroke.c;
-    if (hl) live.style.fillOpacity = '0.45';
+    if (hl) live.classList.add('is-highlight');
     board.edgeLayer.appendChild(live);
     let raf = 0;
     const redraw = () => { raf = 0; live.setAttribute('d', strokeOutline(stroke, true)); };
@@ -197,7 +196,7 @@ export class PenController {
         const evs = typeof ev.getCoalescedEvents === 'function' ? ev.getCoalescedEvents() : [];
         for (const ce of evs.length ? evs : [ev]) add(ce.clientX, ce.clientY, ce.pressure);
       }
-      if (!raf) raf = requestAnimationFrame(redraw);
+      if (!raf) raf = window.requestAnimationFrame(redraw);
     };
     const up = (ev: PointerEvent) => {
       if (ev.pointerId !== pid) return;
@@ -230,7 +229,7 @@ export class PenController {
         writeDrawing(current, [...strokesOnBoard(current), stroke]);
         board.model.touch(current.id);
       } else {
-        const node = board.model.addNode({ type: 'text', text: '', x: 0, y: 0, width: 1, height: 1, vc: { kind: 'drawing' } } as unknown as RawNode);
+        const node = board.model.addNode({ type: 'text', text: '', x: 0, y: 0, width: 1, height: 1, vc: { kind: 'drawing' } });
         writeDrawing(node, [stroke]);
         board.model.touch(node.id);
         // Highlighter swipes stay separate; pen strokes gather into one sketch.

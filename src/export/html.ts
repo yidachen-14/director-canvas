@@ -113,7 +113,7 @@ export async function exportHtml(board: Board, scope: Scope, name: string, singl
     const stage = buildStage(board, nodes, { padding: 0, background: false, host });
     const world = stage.world;
     world.id = 'vc-world';
-    world.style.transform = '';
+    world.setCssStyles({ transform: '' });
     const assets: { rel: string; data: Uint8Array }[] = [];
     const used = new Map<string, string>();
     for (const el of mediaElements(world)) {
@@ -124,7 +124,7 @@ export async function exportHtml(board: Board, scope: Scope, name: string, singl
       if (single) { el.setAttribute('src', dataUrl(bytes, mimeOf(path))); continue; }
       let rel = used.get(path);
       if (!rel) {
-        const base = (path.split(/[\\/]/).pop() ?? 'file').replace(/[^\w.\-　-鿿]+/g, '_');
+        const base = (path.split(/[\\/]/).pop() ?? 'file').replace(/[^\w.\-\u3000-\u9fff]+/g, '_');
         rel = `assets/${used.size}-${base}`;
         used.set(path, rel);
         assets.push({ rel, data: bytes });

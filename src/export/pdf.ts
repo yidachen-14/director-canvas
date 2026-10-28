@@ -1,6 +1,6 @@
 import type { Board } from '../board/board';
 import { buildStage, imagesReady, type Scope, scopeNodes } from './stage';
-import { electronRemote } from './files';
+import { electronRemote, type ElectronWebContents } from './files';
 import { canvasBytes, imagePdf, renderCanvas } from './raster';
 
 export type PageSize = 'content' | 'A4' | 'A3' | 'Letter';
@@ -35,31 +35,29 @@ function pageFor(w: number, h: number, page: PageSize): { pw: number; ph: number
   return { pw: a, ph: b, scale, ox: (a - w * scale) / 2, oy: (b - h * scale) / 2 };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function printPdf(board: Board, scope: Scope, opts: { page: PageSize; background: boolean }, wc: any): Promise<Uint8Array> {
+async function printPdf(board: Board, scope: Scope, opts: { page: PageSize; background: boolean }, wc: ElectronWebContents): Promise<Uint8Array> {
   const host = document.body.createDiv('vc-print-host');
-  const style = document.head.createEl('style');
+  // Printing shows only the stage (rules in styles.css); the page size goes to Electron.
+  document.body.addClass('vc-printing');
+  document.body.toggleClass('vc-print-bg', opts.background);
   try {
     const stage = buildStage(board, scopeNodes(board, scope), { padding: opts.page === 'content' ? 24 : 0, background: opts.background, host });
     const { width, height } = stage.bounds;
     const pg = pageFor(width, height, opts.page);
-    Object.assign(stage.el.style, { position: 'absolute', left: `${pg.ox}px`, top: `${pg.oy}px`, transformOrigin: '0 0', transform: `scale(${pg.scale})` });
-    Object.assign(host.style, { position: 'fixed', left: '-100000px', top: '0', width: `${pg.pw}px`, height: `${pg.ph}px`, overflow: 'hidden' });
-    style.textContent = `
-      @page { size: ${pg.pw.toFixed(2)}px ${pg.ph.toFixed(2)}px; margin: 0; }
-      @media print {
-        html, body { height: auto !important; overflow: visible !important; background: ${opts.background ? 'var(--background-primary)' : 'transparent'} !important; }
-        body > *:not(.vc-print-host) { display: none !important; }
-        body > .vc-print-host { display: block !important; position: relative !important; left: 0 !important; top: 0 !important; }
-        .vc-print-host * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-      }`;
+    stage.el.setCssStyles({ position: 'absolute', left: `${pg.ox}px`, top: `${pg.oy}px`, transformOrigin: '0 0', transform: `scale(${pg.scale})` });
+    host.setCssStyles({ position: 'fixed', left: '-100000px', top: '0', width: `${pg.pw}px`, height: `${pg.ph}px`, overflow: 'hidden' });
     await imagesReady(stage.el);
     await new Promise(r => window.setTimeout(r, 120));
-    const data = await wc.printToPDF({ printBackground: true, preferCSSPageSize: true, margins: { top: 0, bottom: 0, left: 0, right: 0 }, displayHeaderFooter: false });
+    const data = await wc.printToPDF({
+      printBackground: true,
+      pageSize: { width: pg.pw / 96, height: pg.ph / 96 },
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      displayHeaderFooter: false,
+    });
     return new Uint8Array(data);
   } finally {
     host.remove();
-    style.remove();
+    document.body.removeClass('vc-printing', 'vc-print-bg');
   }
 }
 

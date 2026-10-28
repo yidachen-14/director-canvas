@@ -21,8 +21,8 @@ export class TaskItemView implements NodeView {
   private box: HTMLInputElement | null = null;
 
   constructor(private node: PMNode, private view: EditorView, private getPos: () => number | undefined, private ctx: RichContext) {
-    this.dom = document.createElement('li');
-    this.contentDOM = document.createElement('div');
+    this.dom = createEl('li');
+    this.contentDOM = createDiv();
     this.contentDOM.className = 'vc-task-body';
     this.render();
   }
@@ -37,7 +37,7 @@ export class TaskItemView implements NodeView {
       return;
     }
     if (!this.box) {
-      this.box = document.createElement('input');
+      this.box = createEl('input');
       this.box.type = 'checkbox';
       this.box.className = 'task-list-item-checkbox vc-interactive';
       this.box.contentEditable = 'false';
@@ -47,7 +47,7 @@ export class TaskItemView implements NodeView {
         e.stopPropagation();
         const pos = this.getPos();
         if (pos === undefined) return;
-        const next = isDone(this.node.attrs.checked) ? ' ' : 'x';
+        const next = isDone(this.node.attrs.checked as string | null) ? ' ' : 'x';
         this.view.dispatch(this.view.state.tr.setNodeMarkup(pos, undefined, { ...this.node.attrs, checked: next }));
         if (!this.ctx.editing()) this.ctx.commitNow();
       });
@@ -65,7 +65,7 @@ export class TaskItemView implements NodeView {
   }
 
   ignoreMutation(m: MutationRecord | { type: 'selection'; target: Node }): boolean {
-    return m.type !== 'selection' && !!this.box && (m.target === this.box || this.box.contains(m.target as Node));
+    return m.type !== 'selection' && !!this.box && (m.target === this.box || this.box.contains(m.target));
   }
 }
 
@@ -75,7 +75,7 @@ export class RawBlockView implements NodeView {
   private child = new Component();
 
   constructor(private node: PMNode, private ctx: RichContext) {
-    this.dom = document.createElement('div');
+    this.dom = createDiv();
     this.dom.className = 'vc-raw-block';
     this.dom.contentEditable = 'false';
     ctx.component.addChild(this.child);
@@ -85,7 +85,7 @@ export class RawBlockView implements NodeView {
   private render(): void {
     this.dom.empty();
     const inner = this.dom.createDiv('vc-raw-render');
-    void MarkdownRenderer.render(this.ctx.app, this.node.attrs.source, inner, this.ctx.sourcePath, this.child);
+    void MarkdownRenderer.render(this.ctx.app, this.node.attrs.source as string, inner, this.ctx.sourcePath, this.child);
   }
 
   update(node: PMNode): boolean {
@@ -104,7 +104,7 @@ export class WikilinkView implements NodeView {
   dom: HTMLElement;
 
   constructor(private node: PMNode, private ctx: RichContext) {
-    this.dom = document.createElement('span');
+    this.dom = createSpan();
     this.render();
   }
 

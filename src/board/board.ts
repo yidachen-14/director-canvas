@@ -281,10 +281,10 @@ export class Board {
       if (k >= 1) { this.vp.x = target.x; this.vp.y = target.y; this.vp.zoom = target.zoom; }
       anim.last = { x: this.vp.x, y: this.vp.y, zoom: this.vp.zoom };
       this.applyViewport();
-      if (k < 1) anim.raf = requestAnimationFrame(step);
+      if (k < 1) anim.raf = window.requestAnimationFrame(step);
       else this.viewAnim = null;
     };
-    anim.raf = requestAnimationFrame(step);
+    anim.raf = window.requestAnimationFrame(step);
   }
 
   /** Scroll so the world rect is visible, without changing zoom when it already fits. */
@@ -577,7 +577,7 @@ export class Board {
     const node = this.model.transact(() => this.model.addNode({
       type: 'text', ...base, ...opts.data,
       id, x, y, width: size.width, height: size.height,
-    } as RawNode), `!create:${id}`);
+    }), `!create:${id}`);
     this.select([node.id]);
     if (opts.edit) {
       this.freshCardId = node.id;

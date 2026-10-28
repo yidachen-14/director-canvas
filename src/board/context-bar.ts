@@ -56,7 +56,7 @@ export class ContextBar {
     this.el.addEventListener('pointerdown', e => e.stopPropagation());
     this.el.addEventListener('dblclick', e => e.stopPropagation());
     this.el.addEventListener('wheel', e => e.stopPropagation());
-    const schedule = () => { cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(() => this.refresh()); };
+    const schedule = () => { cancelAnimationFrame(this.raf); this.raf = window.requestAnimationFrame(() => this.refresh()); };
     board.on('selection', schedule);
     board.on('viewport', () => this.place());
     board.on('tool', schedule);
@@ -319,7 +319,7 @@ export class ContextBar {
     const root = this.board.root.getBoundingClientRect();
     const ar = anchor.getBoundingClientRect();
     const br = this.el.getBoundingClientRect();
-    pop.style.maxHeight = '';
+    pop.setCssStyles({ maxHeight: '' });
     const pw = pop.offsetWidth;
     let ph = pop.offsetHeight;
     const W = root.width, H = root.height;

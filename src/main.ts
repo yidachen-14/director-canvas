@@ -37,7 +37,7 @@ export default class VisualCanvasPlugin extends Plugin {
       },
     });
     this.addCommand({
-      id: 'open-in-visual-canvas',
+      id: 'open-as-whiteboard',
       name: t('Open this board as a whiteboard'),
       checkCallback: (checking) => {
         const leaf = this.app.workspace.getMostRecentLeaf();
