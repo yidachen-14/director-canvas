@@ -23,7 +23,7 @@ Director Canvas 是 Obsidian 的無限白板插件，直接開啟並編輯你現
   - **打包**：白板連同用到的筆記與附件放進一個資料夾或 ZIP，內部路徑自動改好。
   - 範圍可以是整個白板、選取範圍或單一物件（從右鍵選單進入）。
 - **改名同步**：檔案或資料夾改名、搬移時，所有白板（包含沒開啟的）裡的路徑一起更新。
-- **介面語言**：繁體中文（預設）與 English，在設定頁切換。
+- **介面語言**：18 種語言（繁體中文、简体中文、English、日本語、한국어、Deutsch、Español、Français、Italiano、Português (Brasil)、Русский、Українська、Nederlands、Polski、Türkçe、Bahasa Indonesia、Tiếng Việt、ไทย），預設跟隨 Obsidian，可在設定頁切換。
 
 ### 安裝
 
@@ -76,7 +76,7 @@ Director Canvas is an infinite whiteboard for Obsidian that opens and edits your
   - **Bundle**: the board plus the notes and attachments it uses, in a folder or ZIP, with paths rewritten.
   - Export the whole board, the selection, or one object (from its right-click menu).
 - **Rename sync**: when files or folders are renamed or moved, paths in every board update, including boards that are closed.
-- **Languages**: Traditional Chinese (default) and English, set in Settings.
+- **Languages**: 18 interface languages (English, Traditional and Simplified Chinese, Japanese, Korean, German, Spanish, French, Italian, Brazilian Portuguese, Russian, Ukrainian, Dutch, Polish, Turkish, Indonesian, Vietnamese, Thai). Follows Obsidian by default; change it in Settings.
 
 ### Install
 
