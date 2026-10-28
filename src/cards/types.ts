@@ -53,6 +53,8 @@ export interface CardType {
   icon: string;
   /** Size of a newly placed card, in board units. */
   defaultSize: { width: number; height: number };
+  /** Size of a new card chosen in the settings (overrides defaultSize). */
+  sizeFor?(settings: import('../settings').VisualCanvasSettings): { width: number; height: number };
   /** The card sizes itself: no resize handles. */
   fixedSize?: boolean;
   /** The card colours itself (no card colour in the bar). */

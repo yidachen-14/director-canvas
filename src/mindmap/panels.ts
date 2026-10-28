@@ -3,7 +3,7 @@ import type { BarItem } from '../cards/types';
 import { t } from '../i18n';
 import {
   type MMDash, type MMData, type MMLayout, type MMLine, type MMShape, type MMSize, type MMTopic, type MMStyle,
-  MM_THEMES, branchSideways, eachTopic, findTopic, resolveStyles, themeById,
+  MM_THEMES, anyTopic, branchSideways, eachTopic, findTopic, resolveStyles, themeById,
 } from './model';
 import type { MindMapControl } from './card';
 import { colorPicker } from '../ui/color-picker';
@@ -15,6 +15,9 @@ const R = (x: number, y: number, w: number, h: number, rx: number, sw = 7, fill 
   `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${fill}" stroke="currentColor" style="stroke-width:${sw}px"/>`;
 
 const ICONS: Record<string, string> = {
+  'vc-mm-summary': R(6, 12, 34, 18, 6, 6) + R(6, 41, 34, 18, 6, 6) + R(6, 70, 34, 18, 6, 6)
+    + S('M48 14 Q56 14 56 22 V42 Q56 50 64 50 Q56 50 56 58 V78 Q56 86 48 86', 6) + R(70, 41, 26, 18, 6, 6),
+  'vc-mm-boundary': `<rect x="8" y="16" width="84" height="68" rx="14" fill="none" stroke="currentColor" stroke-width="6" stroke-dasharray="12 9"/>` + R(24, 32, 52, 14, 5, 6) + R(24, 56, 52, 14, 5, 6),
   'vc-mm-icon': R(6, 40, 30, 20, 10) + S('M36 50 C50 50 48 22 62 22 M36 50 H62 M36 50 C50 50 48 78 62 78') + S('M64 22 H92 M64 50 H92 M64 78 H92', 6),
   'vc-mm-theme': R(6, 40, 28, 20, 10) + S('M34 50 C48 50 46 22 60 22 M34 50 H60 M34 50 C48 50 46 78 60 78') + R(62, 14, 30, 16, 6, 6) + R(62, 42, 30, 16, 6, 6) + R(62, 70, 30, 16, 6, 6),
   'vc-mm-border': R(12, 24, 76, 52, 14, 9),
@@ -95,7 +98,7 @@ function primaryOf(ctl: MindMapControl): string {
 }
 
 function rawStyle(ctl: MindMapControl): MMStyle {
-  return findTopic(ctl.mapData().root, primaryOf(ctl))?.topic.style ?? {};
+  return anyTopic(ctl.mapData(), primaryOf(ctl))?.style ?? {};
 }
 
 function resolved(ctl: MindMapControl) {
@@ -107,12 +110,12 @@ function styleSelected(ctl: MindMapControl, fn: (s: MMStyle) => void, preview = 
   const ids = ctl.selected();
   const change = (d: MMData) => {
     for (const id of ids) {
-      const f = findTopic(d.root, id);
-      if (!f) continue;
-      const s = { ...(f.topic.style ?? {}) };
+      const tp = anyTopic(d, id);
+      if (!tp) continue;
+      const s = { ...(tp.style ?? {}) };
       fn(s);
       for (const k of Object.keys(s) as (keyof MMStyle)[]) if (s[k] === undefined) delete s[k];
-      f.topic.style = Object.keys(s).length ? s : undefined;
+      tp.style = Object.keys(s).length ? s : undefined;
     }
   };
   if (preview) ctl.preview(change); else ctl.apply(change);
@@ -368,6 +371,10 @@ export function mindMapBarItems(ctl: MindMapControl): BarItem[] {
     { id: 'mm-shape', icon: `vc-mm-s-${res.shape}`, label: t('Topic shape'), dropdown: (pop) => shapePanel(pop, ctl) },
     { id: 'mm-line', icon: `vc-mm-ln-${res.line}`, label: t('Branch lines'), dropdown: (pop) => linePanel(pop, ctl) },
     { id: 'mm-branch', icon: 'vc-mm-branch', label: t('Branch colour'), swatch: res.branchColor, dropdown: (pop) => branchColorPanel(pop, ctl) },
+    ...(ctl.canWrap() ? [
+      { id: 'mm-summary', icon: 'vc-mm-summary', label: t('Add summary'), run: () => ctl.addSummary() },
+      { id: 'mm-boundary', icon: 'vc-mm-boundary', label: t('Add boundary'), run: () => ctl.addBoundary() },
+    ] : []),
   ];
 }
 

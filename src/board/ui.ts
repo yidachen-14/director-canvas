@@ -2,7 +2,7 @@ import { Menu, setIcon, setTooltip } from 'obsidian';
 import type { Board } from './board';
 import { availableTools, FIXED_TOOLS, toolById, type Tool } from './tools';
 import { ZOOM_STEPS } from './board';
-import { shortcutLabel } from './shortcuts';
+import { shortcutLabel, toolTip } from './shortcuts';
 import { getCardType } from '../cards/registry';
 import type { Point } from './viewport';
 import { nodeRect, unionRect } from '../model/board-model';
@@ -129,7 +129,7 @@ export function attachToolbar(board: Board): void {
       const b = bar.createDiv({ cls: 'vc-tool', attr: { 'data-tool': tool.id, role: 'button', 'aria-label': t(tool.label) } });
       setIcon(b.createDiv('vc-tool-icon'), tool.icon);
       if (s.toolbarSize !== 'S') b.createDiv({ cls: 'vc-tool-label', text: t(tool.label) });
-      setTooltip(b, t(tool.label), tip);
+      setTooltip(b, toolTip(tool.id, t(tool.label), s.hotkeys), tip);
       b.toggleClass('is-active', board.tool === tool.id);
       bindToolPress(board, b, tool, () => activate(tool));
     };
@@ -185,6 +185,8 @@ class OverflowPanel {
 
     for (const tool of tools) {
       const r = row(tool.icon, t(tool.label));
+      const k = shortcutLabel(`tool-${tool.id}`, board.settings.hotkeys);
+      if (k) r.createDiv({ cls: 'vc-more-row-keys', text: k });
       r.toggleClass('is-active', board.tool === tool.id);
       bindToolPress(board, r, tool, () => activate(tool), () => this.close());
     }

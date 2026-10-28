@@ -17,6 +17,8 @@ export interface Stroke {
   s: number;
   /** A highlighter swipe (translucent, chisel-edged). */
   h?: boolean;
+  /** A monoline stroke: one even width all along, no pressure or tapering (like Apple's monoline pen). */
+  m?: boolean;
 }
 
 export interface PenShape {
@@ -47,7 +49,16 @@ const hasPressure = (p: number[]) => { for (let i = 2; i < p.length; i += 3) if 
 export function penOutline(st: Stroke, shape: PenShape = penShape, live = false): string {
   const pts = triples(st.p);
   if (!pts.length) return '';
-  const outline = getStroke(pts, {
+  const outline = getStroke(pts, st.m ? {
+    size: st.s,
+    thinning: 0,
+    streamline: shape.streamline,
+    smoothing: shape.smoothing,
+    simulatePressure: false,
+    last: !live,
+    start: { taper: 0, cap: true },
+    end: { taper: 0, cap: true },
+  } : {
     size: st.s,
     thinning: shape.thinning,
     streamline: shape.streamline,

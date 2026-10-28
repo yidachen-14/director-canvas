@@ -24,6 +24,10 @@ export interface VisualCanvasSettings {
   dragOutKind: TextCardKind;
   defaultTextSize: number;
   defaultStickyColor: string;
+  /** Size of new Note, Sticky note and Callout cards. */
+  noteSize: { width: number; height: number };
+  stickySize: { width: number; height: number };
+  calloutSize: { width: number; height: number };
 
   /** Corner radius of pictures (0 = square corners). */
   imageRadius: number;
@@ -74,6 +78,9 @@ export const DEFAULT_SETTINGS: VisualCanvasSettings = {
   dragOutKind: 'text',
   defaultTextSize: 16,
   defaultStickyColor: '#F4D81E',
+  noteSize: { width: 320, height: 200 },
+  stickySize: { width: 220, height: 220 },
+  calloutSize: { width: 340, height: 140 },
 
   imageRadius: 4,
   imageShadow: true,
@@ -135,6 +142,12 @@ export function normalizeSettings(raw: unknown): VisualCanvasSettings {
   s.defaultTextSize = Math.min(96, Math.max(8, s.defaultTextSize));
   s.gridSize = Math.min(200, Math.max(4, s.gridSize));
   s.imageRadius = Math.min(40, Math.max(0, s.imageRadius));
+  for (const k of ['noteSize', 'stickySize', 'calloutSize'] as const) {
+    const v = r[k] as { width?: unknown; height?: unknown } | undefined;
+    const d = DEFAULT_SETTINGS[k];
+    const num = (x: unknown, def: number, min: number) => (typeof x === 'number' && isFinite(x) ? Math.min(2000, Math.max(min, Math.round(x))) : def);
+    s[k] = { width: num(v?.width, d.width, 60), height: num(v?.height, d.height, 40) };
+  }
   const ps = s.penShape as unknown as Record<string, unknown>;
   const dp = DEFAULT_SETTINGS.penShape as unknown as Record<string, number>;
   s.penShape = Object.fromEntries(Object.keys(dp).map(k => [k, typeof ps?.[k] === 'number' ? ps[k] : dp[k]])) as VisualCanvasSettings['penShape'];

@@ -1,4 +1,4 @@
-import { Component, MarkdownRenderer, TFile, setIcon } from 'obsidian';
+import { Component, MarkdownRenderer, TFile, addIcon, setIcon } from 'obsidian';
 import type { RawNode } from '../model/canvas-file';
 import type { BarItem, CardContext, CardHandle, CardType } from './types';
 import { barRow } from './bar';
@@ -45,6 +45,8 @@ export const groupCard: CardType = {
     let current = node;
     el.addClass('vc-group');
     const label = el.createDiv('vc-group-label');
+    // Double-click the name to rename the group right there.
+    label.addEventListener('dblclick', (e) => { e.stopPropagation(); e.preventDefault(); ctx.board.select([current.id]); ctx.board.startEditing(current.id); });
     let input: HTMLInputElement | null = null;
     const render = () => {
       applyCardColor(el.parentElement ?? el, current.color);
@@ -88,13 +90,16 @@ export const groupCard: CardType = {
       barItems: () => [
         { id: 'rename', icon: 'pencil', label: t('Rename'), text: current.label || '', run: () => ctx.board.startEditing(current.id) },
         borderBarItem(ctx, current),
+        { id: 'ungroup', icon: 'ungroup', label: t('Ungroup'), run: () => ctx.board.ungroupSelection() },
       ],
     };
   },
 };
 
 export type BorderStyle = 'none' | 'solid' | 'dashed';
-const BORDER_ICON: Record<BorderStyle, string> = { none: 'square-dashed', solid: 'square', dashed: 'square-dashed-bottom' };
+// A dashed square with a line across: no border.
+addIcon('vc-border-none', '<rect x="14" y="14" width="72" height="72" rx="10" fill="none" stroke="currentColor" stroke-width="8" stroke-dasharray="14 12"/><line x1="8" y1="50" x2="92" y2="50" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>');
+const BORDER_ICON: Record<BorderStyle, string> = { solid: 'square', dashed: 'square-dashed', none: 'vc-border-none' };
 
 /**
  * A group's or column's frame. Groups: no colour → fully clear (just a way to gather cards),
@@ -112,7 +117,7 @@ function borderBarItem(ctx: CardContext, n: RawNode): BarItem {
   return {
     id: 'border', icon: BORDER_ICON[cur], label: t('Border'),
     dropdown: (pop, close) => {
-      for (const [v, label] of [['none', 'No border'], ['solid', 'Solid'], ['dashed', 'Dashed']] as [BorderStyle, string][]) {
+      for (const [v, label] of [['solid', 'Solid'], ['dashed', 'Dashed'], ['none', 'No border']] as [BorderStyle, string][]) {
         barRow(pop, BORDER_ICON[v], t(label), v === cur, () => {
           close();
           commitNode(ctx, n.id, x => { x.vc = { ...(x.vc ?? {}), border: v }; });

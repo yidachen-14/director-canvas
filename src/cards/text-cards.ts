@@ -16,7 +16,7 @@ import { t } from '../i18n';
 export const CALLOUT_TYPES: { id: string; label: string; icon: string }[] = [
   { id: 'note', label: 'Note', icon: 'pencil' },
   { id: 'info', label: 'Info', icon: 'info' },
-  { id: 'tip', label: 'Tip', icon: 'flame' },
+  { id: 'tip', label: 'Tip', icon: 'lightbulb' },
   { id: 'success', label: 'Success', icon: 'check' },
   { id: 'question', label: 'Question', icon: 'help-circle' },
   { id: 'warning', label: 'Warning', icon: 'alert-triangle' },
@@ -48,6 +48,8 @@ interface Flavor {
   label: string;
   icon: string;
   defaultSize: { width: number; height: number };
+  /** Size of a new card from the settings, when the user can choose it. */
+  sizeFor?(settings: VisualCanvasSettings): { width: number; height: number };
   create(settings: VisualCanvasSettings): Partial<RawNode>;
   /** The box always fits the text, in both directions (Text). */
   autoSize?: boolean;
@@ -61,7 +63,7 @@ export function textCardData(kind: string, markdown: string, settings: VisualCan
   switch (kind) {
     case 'text': return { type: 'text', text: markdown, vc: { kind: 'text', fontSize: settings.defaultTextSize } };
     case 'sticky': return { type: 'text', text: markdown, color: settings.defaultStickyColor, vc: { kind: 'sticky' } };
-    case 'callout': return { type: 'text', text: joinCallout('note', '', markdown), vc: { kind: 'callout' } };
+    case 'callout': return { type: 'text', text: joinCallout('tip', '', markdown), vc: { kind: 'callout' } };
     default: return { type: 'text', text: markdown };
   }
 }
@@ -83,6 +85,7 @@ function richCard(f: Flavor): CardType {
     label: f.label,
     icon: f.icon,
     defaultSize: f.defaultSize,
+    sizeFor: f.sizeFor,
     create: ({ settings }) => f.create(settings),
     mount(node, el, ctx) {
       return new RichCard(f, node, el, ctx);
@@ -104,6 +107,8 @@ class RichCard implements CardHandle {
       // Obsidian's own callout styling: .callout[data-callout=type]
       const box = el.createDiv('callout vc-callout');
       this.calloutHead = box.createDiv('callout-title');
+      // Double-click the title to rename it right on the board.
+      this.calloutHead.addEventListener('dblclick', (e) => { e.stopPropagation(); e.preventDefault(); this.editTitle(); });
       body = box.createDiv('callout-content');
     }
     this.host = body.createDiv('vc-rich-host');
@@ -183,7 +188,7 @@ class RichCard implements CardHandle {
     const card = this.el.parentElement ?? this.el;
     applyCardColor(card, n.color);
     if (this.f.id === 'text') this.host.style.fontSize = `${vcGet(n, 'fontSize', this.ctx.board.settings.defaultTextSize)}px`;
-    if (this.f.id === 'callout' && this.calloutHead) {
+    if (this.f.id === 'callout' && this.calloutHead && !this.titleInput) {
       const c = splitCallout(n.text ?? '');
       const type = vcGet(n, 'calloutType', c.type);
       const def = CALLOUT_TYPES.find(x => x.id === type) ?? CALLOUT_TYPES[0];
@@ -193,6 +198,44 @@ class RichCard implements CardHandle {
       setIcon(this.calloutHead.createDiv('callout-icon'), def.icon);
       this.calloutHead.createDiv({ cls: 'callout-title-inner', text: c.title || t(def.label) });
     }
+  }
+
+  private titleInput: HTMLInputElement | null = null;
+
+  /** Rename a callout in place: its title becomes an input until Enter / Escape / clicking away. */
+  private editTitle(): void {
+    const head = this.calloutHead;
+    if (!head || this.titleInput) return;
+    if (this.rich.editing) this.rich.stopEditing();
+    const inner = head.querySelector<HTMLElement>('.callout-title-inner');
+    const c = splitCallout(this.node.text ?? '');
+    const input = createEl('input', { type: 'text', cls: 'vc-callout-title-input' });
+    input.value = c.title;
+    input.placeholder = inner?.textContent ?? '';
+    if (inner) inner.replaceWith(input); else head.appendChild(input);
+    this.titleInput = input;
+    let done = false;
+    const finish = (save: boolean) => {
+      if (done) return;
+      done = true;
+      this.titleInput = null;
+      const v = input.value.trim();
+      if (save && v !== c.title) {
+        commitNode(this.ctx, this.node.id, (n) => {
+          const cur = splitCallout(n.text ?? '');
+          n.text = joinCallout(vcGet(n, 'calloutType', cur.type), v, cur.body);
+        });
+      } else this.render();
+    };
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); finish(true); }
+      if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    });
+    input.addEventListener('blur', () => finish(true));
+    input.addEventListener('pointerdown', e => e.stopPropagation());
+    input.addEventListener('dblclick', e => e.stopPropagation());
+    window.setTimeout(() => { input.focus(); input.select(); }, 0);
   }
 
   // ── CardHandle ────────────────────────────────────────────
@@ -226,7 +269,7 @@ class RichCard implements CardHandle {
     const { ctx, f } = this;
     const items: BarItem[] = [];
     const kinds: [TextCardKind, string, string][] = [
-      ['text', 'Text', 'type'], ['note', 'Note', 'notebook-text'], ['sticky', 'Sticky note', 'sticky-note'], ['callout', 'Callout', 'message-square-warning'],
+      ['text', 'Text', 'type'], ['note', 'Note', 'file-text'], ['sticky', 'Sticky note', 'sticky-note'], ['callout', 'Callout', 'lightbulb'],
     ];
     const cur = kinds.find(k => k[0] === f.id) ?? kinds[1];
     items.push({
@@ -374,19 +417,22 @@ export const textCard = richCard({
 export const noteCard = richCard({
   id: 'note', label: 'Note', icon: 'file-text', placeholder: 'Type "/" for blocks…',
   defaultSize: { width: 320, height: 200 },
+  sizeFor: s => s.noteSize,
   create: () => ({ type: 'text', text: '' }),
 });
 
 export const stickyCard = richCard({
   id: 'sticky', label: 'Sticky note', icon: 'sticky-note', placeholder: 'Write a note…',
   defaultSize: { width: 220, height: 220 },
+  sizeFor: s => s.stickySize,
   create: (s) => ({ type: 'text', text: '', color: s.defaultStickyColor, vc: { kind: 'sticky' } }),
 });
 
 export const calloutCard = richCard({
-  id: 'callout', label: 'Callout', icon: 'message-square-warning', placeholder: 'Write…',
+  id: 'callout', label: 'Callout', icon: 'lightbulb', placeholder: 'Write…',
   defaultSize: { width: 340, height: 140 },
-  create: () => ({ type: 'text', text: '> [!note]', vc: { kind: 'callout' } }),
+  sizeFor: s => s.calloutSize,
+  create: () => ({ type: 'text', text: '> [!tip]', vc: { kind: 'callout' } }),
 });
 
 export const checklistCard = richCard({

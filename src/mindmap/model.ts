@@ -34,7 +34,17 @@ export interface MMTopic {
   line?: MMLine;
 }
 
+/**
+ * A summary (Boardmix 概要): a brace beside a run of sibling topics, pointing to a topic of
+ * its own that sums them up. `from` and `to` are the first and last sibling of the run.
+ */
+export interface MMSummary { id: string; parent: string; from: string; to: string; topic: MMTopic }
+/** A boundary (Boardmix 外框): a frame drawn around a run of sibling topics and their subtrees. */
+export interface MMBoundary { id: string; parent: string; from: string; to: string }
+
 export interface MMData {
+  summaries?: MMSummary[];
+  boundaries?: MMBoundary[];
   root: MMTopic;
   layout: MMLayout;
   theme: string;
@@ -200,7 +210,89 @@ export function cloneTopic(t: MMTopic, freshIds = false): MMTopic {
 }
 
 export function cloneData(d: MMData): MMData {
-  return { ...d, root: cloneTopic(d.root) };
+  return {
+    ...d,
+    root: cloneTopic(d.root),
+    summaries: d.summaries?.map(x => ({ ...x, topic: cloneTopic(x.topic) })),
+    boundaries: d.boundaries?.map(x => ({ ...x })),
+  };
+}
+
+// ── Summaries and boundaries ──────────────────────────────────────────
+
+/** The run of siblings covering `ids`: they must all share one parent (not the central topic). */
+export function siblingRange(d: MMData, ids: string[]): { parent: MMTopic; from: number; to: number } | null {
+  let parent: MMTopic | null = null;
+  let lo = Infinity, hi = -Infinity;
+  for (const id of ids) {
+    const f = findTopic(d.root, id);
+    if (!f || !f.parent) return null;
+    if (parent && parent !== f.parent) return null;
+    parent = f.parent;
+    lo = Math.min(lo, f.index); hi = Math.max(hi, f.index);
+  }
+  if (!parent || !Number.isFinite(lo)) return null;
+  // Two-sided maps: a run must stay on one side of the central topic.
+  if (parent === d.root && d.layout === 'both') {
+    const sides = sidesOf(d);
+    const s0 = sides.get(parent.children[lo].id);
+    for (let i = lo; i <= hi; i++) if (sides.get(parent.children[i].id) !== s0) return null;
+  }
+  return { parent, from: lo, to: hi };
+}
+
+export function addSummary(d: MMData, ids: string[], text: string): MMTopic | null {
+  const r = siblingRange(d, ids);
+  if (!r) return null;
+  const topic = newTopic(text);
+  const s: MMSummary = { id: rid(), parent: r.parent.id, from: r.parent.children[r.from].id, to: r.parent.children[r.to].id, topic };
+  d.summaries = [...(d.summaries ?? []), s];
+  return topic;
+}
+
+export function addBoundary(d: MMData, ids: string[]): MMBoundary | null {
+  const r = siblingRange(d, ids);
+  if (!r) return null;
+  const b: MMBoundary = { id: rid(), parent: r.parent.id, from: r.parent.children[r.from].id, to: r.parent.children[r.to].id };
+  d.boundaries = [...(d.boundaries ?? []), b];
+  return b;
+}
+
+/** The summary whose own topic has this id. */
+export function summaryOfTopic(d: MMData, topicId: string): MMSummary | undefined {
+  return d.summaries?.find(s => s.topic.id === topicId);
+}
+
+/** A topic anywhere: in the tree or a summary's. */
+export function anyTopic(d: MMData, id: string): MMTopic | null {
+  return findTopic(d.root, id)?.topic ?? summaryOfTopic(d, id)?.topic ?? null;
+}
+
+/** Summaries and boundaries touching any of these topics (as one of the run). */
+export function extrasCovering(d: MMData, ids: string[]): { summaries: MMSummary[]; boundaries: MMBoundary[] } {
+  const want = new Set(ids);
+  const covers = (x: { parent: string; from: string; to: string }) => {
+    const p = findTopic(d.root, x.parent)?.topic;
+    if (!p) return false;
+    const a = p.children.findIndex(c => c.id === x.from), b = p.children.findIndex(c => c.id === x.to);
+    for (let i = Math.min(a, b); i <= Math.max(a, b); i++) if (p.children[i] && want.has(p.children[i].id)) return true;
+    return false;
+  };
+  return { summaries: (d.summaries ?? []).filter(covers), boundaries: (d.boundaries ?? []).filter(covers) };
+}
+
+/** Drop summaries and boundaries whose topics are gone or no longer siblings; keep runs in order. */
+export function pruneExtras(d: MMData): void {
+  const fix = <T extends { parent: string; from: string; to: string }>(x: T): T | null => {
+    const p = findTopic(d.root, x.parent)?.topic;
+    if (!p) return null;
+    const a = p.children.findIndex(c => c.id === x.from), b = p.children.findIndex(c => c.id === x.to);
+    if (a < 0 && b < 0) return null;
+    const lo = a < 0 ? b : b < 0 ? a : Math.min(a, b), hi = a < 0 ? b : b < 0 ? a : Math.max(a, b);
+    return { ...x, from: p.children[lo].id, to: p.children[hi].id };
+  };
+  if (d.summaries) { d.summaries = d.summaries.map(fix).filter((x): x is MMSummary => !!x); if (!d.summaries.length) delete d.summaries; }
+  if (d.boundaries) { d.boundaries = d.boundaries.map(fix).filter((x): x is MMBoundary => !!x); if (!d.boundaries.length) delete d.boundaries; }
 }
 
 /** Read a node's mind map, filling in anything missing. */
@@ -223,6 +315,14 @@ export function normalizeData(raw: unknown, fallbackText: string): MMData {
     align: !!d.align,
     line: d.line,
     branchColor: d.branchColor,
+    summaries: Array.isArray(d.summaries)
+      ? d.summaries.filter(x => x && typeof x.parent === 'string' && typeof x.from === 'string' && typeof x.to === 'string')
+        .map(x => ({ id: typeof x.id === 'string' ? x.id : rid(), parent: x.parent, from: x.from, to: x.to, topic: fix(x.topic, '') }))
+      : undefined,
+    boundaries: Array.isArray(d.boundaries)
+      ? d.boundaries.filter(x => x && typeof x.parent === 'string' && typeof x.from === 'string' && typeof x.to === 'string')
+        .map(x => ({ id: typeof x.id === 'string' ? x.id : rid(), parent: x.parent, from: x.from, to: x.to }))
+      : undefined,
   };
 }
 
@@ -279,13 +379,32 @@ export function addSibling(d: MMData, id: string, text: string): MMTopic | null 
 /** Remove topics (never the central one). Returns the topic to select afterwards. */
 export function removeTopics(d: MMData, ids: string[]): string | null {
   let next: string | null = null;
+  // A summary's topic or a boundary goes on its own.
+  const gone = new Set(ids);
+  if (d.summaries?.some(s => gone.has(s.topic.id)) || d.boundaries?.some(b => gone.has(b.id))) {
+    const s0 = d.summaries?.find(s => gone.has(s.topic.id));
+    if (s0) next = s0.from;
+    d.summaries = d.summaries?.filter(s => !gone.has(s.topic.id));
+    d.boundaries = d.boundaries?.filter(b => !gone.has(b.id));
+  }
   for (const id of ids) {
     const f = findTopic(d.root, id);
     if (!f || !f.parent) continue;
+    // A run that starts or ends at this topic now starts / ends at its neighbour inside the run.
+    const kids = f.parent.children;
+    const shrink = <T extends { parent: string; from: string; to: string }>(x: T): T | null => {
+      if (x.parent !== f.parent!.id || (x.from !== id && x.to !== id)) return x;
+      if (x.from === id && x.to === id) return null;
+      if (x.from === id) return { ...x, from: kids[f.index + 1]?.id ?? x.to };
+      return { ...x, to: kids[f.index - 1]?.id ?? x.from };
+    };
+    if (d.summaries) d.summaries = d.summaries.map(shrink).filter((x): x is MMSummary => !!x);
+    if (d.boundaries) d.boundaries = d.boundaries.map(shrink).filter((x): x is MMBoundary => !!x);
     f.parent.children.splice(f.index, 1);
     const sib = f.parent.children[f.index] ?? f.parent.children[f.index - 1];
     next = sib?.id ?? f.parent.id;
   }
+  pruneExtras(d);
   return next && findTopic(d.root, next) ? next : d.root.id;
 }
 
@@ -398,7 +517,29 @@ export function resolveStyles(d: MMData): Map<string, Resolved> {
     t.children.forEach((c, i) => walk(c, res, depth + 1, depth === 0 ? i : branch));
   };
   walk(d.root, null, 0, 0);
+  for (const sm of d.summaries ?? []) {
+    const base = out.get(sm.from);
+    if (base) out.set(sm.topic.id, { ...base, ...summaryLook(theme, base, sm.topic, scale) });
+  }
   return out;
+}
+
+/** A summary topic: the look of a first-level topic, in its run's branch colour, own overrides on top. */
+function summaryLook(theme: MMTheme, base: Resolved, t: MMTopic, scale: number): Partial<Resolved> {
+  const level = theme.l1;
+  const st = t.style ?? {};
+  const shape = st.shape ?? (level.shape === 'underline' ? 'rounded' : level.shape);
+  const fill = withAlpha(st.fill ?? (level.fillFromBranch ? base.branchColor : level.fill === 'none' ? 'var(--background-primary)' : level.fill), st.fillOpacity);
+  return {
+    fill,
+    text: st.fill && hexRgb(st.fill) ? (isDark(st.fill) ? '#ffffff' : '#1f1f1f') : level.fillFromBranch ? '#ffffff' : 'var(--text-normal)',
+    border: st.border ?? true,
+    borderColor: withAlpha(st.borderColor ?? base.branchColor, st.borderOpacity),
+    borderWidth: st.borderWidth ?? 1.5,
+    borderDash: st.borderDash ?? 'solid',
+    shape,
+    fontSize: Math.round(level.fontSize * scale * 10) / 10,
+  };
 }
 
 // ── Layout ────────────────────────────────────────────────────────────
@@ -561,6 +702,105 @@ export function layoutMindMap(d: MMData, sizes: Map<string, Size>): Map<string, 
 }
 
 export interface Bounds { x: number; y: number; w: number; h: number }
+
+/** Where a boundary frame and a summary brace go (the summary's topic is added to `placed`). */
+export interface ExtrasLayout {
+  boundaries: { id: string; from: string; x: number; y: number; w: number; h: number }[];
+  /** `vertical`: a brace standing beside the run (sideways maps); else lying under it (org chart). */
+  braces: { id: string; from: string; vertical: boolean; dir: 1 | -1; at: number; a: number; b: number; mid: number }[];
+}
+
+/** Layouts with room beside or under a run of siblings for summaries and boundaries. */
+export const extrasSupported = (layout: MMLayout) => layout === 'right' || layout === 'both' || layout === 'down';
+
+/**
+ * Place boundaries around runs of siblings and summaries beside them, after the topics are
+ * laid out. Summary topics go into `placed`; nested extras grow outwards in order.
+ */
+export function layoutExtras(d: MMData, sizes: Map<string, Size>, placed: Map<string, Placed>): ExtrasLayout {
+  const out: ExtrasLayout = { boundaries: [], braces: [] };
+  if (!extrasSupported(d.layout)) return out;
+  const down = d.layout === 'down';
+  const PADB = 8, BRACE = 14, GAPT = 10;
+  // Box of a topic and everything shown under it (plus extras already placed inside it).
+  const extraBoxes = new Map<string, Bounds[]>();
+  const subtreeBox = (t: MMTopic): Bounds | null => {
+    const parts: Bounds[] = [];
+    const walk = (x: MMTopic) => {
+      const p = placed.get(x.id);
+      if (!p) return;
+      parts.push(p);
+      for (const e of extraBoxes.get(x.id) ?? []) parts.push(e);
+      if (!x.collapsed) x.children.forEach(walk);
+    };
+    walk(t);
+    if (!parts.length) return null;
+    const x0 = Math.min(...parts.map(q => q.x)), y0 = Math.min(...parts.map(q => q.y));
+    const x1 = Math.max(...parts.map(q => q.x + q.w)), y1 = Math.max(...parts.map(q => q.y + q.h));
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  };
+  const runOf = (x: { parent: string; from: string; to: string }) => {
+    const f = findTopic(d.root, x.parent);
+    if (!f || f.topic.collapsed) return null;
+    const kids = f.topic.children;
+    const a = kids.findIndex(c => c.id === x.from), b = kids.findIndex(c => c.id === x.to);
+    if (a < 0 || b < 0) return null;
+    return { parent: f.topic, depth: f.depth, run: kids.slice(Math.min(a, b), Math.max(a, b) + 1) };
+  };
+  const unionOf = (list: MMTopic[]): Bounds | null => {
+    const boxes = list.map(subtreeBox).filter((q): q is Bounds => !!q);
+    if (!boxes.length) return null;
+    const x0 = Math.min(...boxes.map(q => q.x)), y0 = Math.min(...boxes.map(q => q.y));
+    const x1 = Math.max(...boxes.map(q => q.x + q.w)), y1 = Math.max(...boxes.map(q => q.y + q.h));
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  };
+  // Deepest runs first, so outer ones wrap what is inside them.
+  type Item = { kind: 'b'; x: MMBoundary } | { kind: 's'; x: MMSummary };
+  const items: (Item & { depth: number })[] = [];
+  for (const x of d.boundaries ?? []) { const r = runOf(x); if (r) items.push({ kind: 'b', x, depth: r.depth }); }
+  for (const x of d.summaries ?? []) { const r = runOf(x); if (r) items.push({ kind: 's', x, depth: r.depth }); }
+  items.sort((p, q) => q.depth - p.depth || (p.kind === 'b' ? -1 : 1) - (q.kind === 'b' ? -1 : 1));
+  for (const it of items) {
+    const r = runOf(it.x)!;
+    const box = unionOf(r.run);
+    if (!box) continue;
+    const first = r.run[0];
+    const side = placed.get(first.id)?.side ?? 'right';
+    const keep = (b: Bounds) => { const l = extraBoxes.get(first.id) ?? []; l.push(b); extraBoxes.set(first.id, l); };
+    if (it.kind === 'b') {
+      const b = { x: box.x - PADB, y: box.y - PADB, w: box.w + PADB * 2, h: box.h + PADB * 2 };
+      out.boundaries.push({ id: it.x.id, from: first.id, ...b });
+      keep(b);
+      continue;
+    }
+    const sm = it.x as MMSummary;
+    const sz = sizes.get(sm.topic.id) ?? { w: 80, h: 30 };
+    if (down) {
+      const at = box.y + box.h + 6, mid = box.x + box.w / 2;
+      const ty = at + BRACE + GAPT;
+      placed.set(sm.topic.id, { x: mid - sz.w / 2, y: ty, w: sz.w, h: sz.h, depth: r.depth + 1, side: 'right' });
+      out.braces.push({ id: sm.id, from: first.id, vertical: false, dir: 1, at, a: box.x, b: box.x + box.w, mid });
+      keep({ x: Math.min(box.x, mid - sz.w / 2), y: box.y, w: Math.max(box.w, sz.w), h: ty + sz.h - box.y });
+    } else {
+      const dir: 1 | -1 = side === 'left' ? -1 : 1;
+      const at = dir === 1 ? box.x + box.w + 6 : box.x - 6;
+      const mid = box.y + box.h / 2;
+      const tx = dir === 1 ? at + BRACE + GAPT : at - BRACE - GAPT - sz.w;
+      placed.set(sm.topic.id, { x: tx, y: mid - sz.h / 2, w: sz.w, h: sz.h, depth: r.depth + 1, side });
+      out.braces.push({ id: sm.id, from: first.id, vertical: true, dir, at, a: box.y, b: box.y + box.h, mid });
+      const x0 = Math.min(box.x, tx), x1 = Math.max(box.x + box.w, tx + sz.w);
+      keep({ x: x0, y: Math.min(box.y, mid - sz.h / 2), w: x1 - x0, h: Math.max(box.h, sz.h) });
+    }
+  }
+  return out;
+}
+
+/** A curly brace lying under a run (org chart), from x0 to x1 at y, its tip pointing down at mid. */
+export function braceDownPath(y: number, x0: number, x1: number, mid: number): string {
+  const d = 6;
+  const q = Math.max(2, Math.min(8, (x1 - x0) / 4));
+  return `M${r1(x0)},${r1(y - d)} Q${r1(x0)},${r1(y)} ${r1(x0 + q)},${r1(y)} H${r1(mid - q)} Q${r1(mid)},${r1(y)} ${r1(mid)},${r1(y + d)} Q${r1(mid)},${r1(y)} ${r1(mid + q)},${r1(y)} H${r1(x1 - q)} Q${r1(x1)},${r1(y)} ${r1(x1)},${r1(y - d)}`;
+}
 
 export function boundsOf(placed: Map<string, Placed>): Bounds {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;

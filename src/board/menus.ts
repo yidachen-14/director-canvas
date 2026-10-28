@@ -133,6 +133,7 @@ function cardMenu(menu: Menu, board: Board, at: Point): void {
   menu.addItem(i => i.setTitle(t('Bring to front')).setIcon('bring-to-front').setSection('order').onClick(() => board.reorderSelection('front')));
   menu.addItem(i => i.setTitle(t('Send to back')).setIcon('send-to-back').setSection('order').onClick(() => board.reorderSelection('back')));
   menu.addItem(i => i.setTitle(t('Create group from selection')).setIcon('box-select').setSection('order').onClick(() => board.groupSelection()));
+  if (board.selectedNodes().some(n => n.type === 'group')) menu.addItem(i => i.setTitle(t('Ungroup')).setIcon('ungroup').setSection('order').onClick(() => board.ungroupSelection()));
   if (multi) addArrangeMenu(menu, board, (title, icon, section, build) => submenu(menu, title, icon, section, build), true);
   for (const c of contributions) if (c.where === 'card' || (multi && c.where === 'multi')) c.add(menu, board, at);
   menu.addItem(i => i.setTitle(t('Zoom to selection')).setIcon('scan-search').setSection('view').onClick(() => board.zoomToFit([...board.selection], true)));

@@ -5,9 +5,10 @@ import { commitNode } from '../cards/basic';
 import { t } from '../i18n';
 import {
   type DropMode, type MMData, type MMTopic, type Placed, type Resolved, type Size,
-  addChild, addSibling, boundsOf, bracePath, branchDown, branchSideways, cloneData, countTopics,
-  findTopic, gapsFor, isInside, layoutMindMap, moveTopic, newMindMap, normalizeData, removeTopics,
-  resolveStyles, SIZE_SCALE, toMarkdown,
+  addBoundary, addChild, addSibling, addSummary, anyTopic, boundsOf, braceDownPath, bracePath, branchDown, branchSideways,
+  cloneData, countTopics, extrasCovering, extrasSupported, findTopic, gapsFor, isInside, layoutExtras, layoutMindMap,
+  moveTopic, newMindMap, normalizeData, pruneExtras, removeTopics, resolveStyles, siblingRange, SIZE_SCALE, summaryOfTopic,
+  toMarkdown, type ExtrasLayout,
 } from './model';
 import { mindMapBarItems, themeItem } from './panels';
 
@@ -41,6 +42,10 @@ export interface MindMapControl {
   apply(fn: (d: MMData) => void): void;
   /** Show a change without storing it (live colour picking). */
   preview(fn: (d: MMData) => void): void;
+  /** Whether the selected topics can get a summary or a boundary (siblings, not the central topic). */
+  canWrap(): boolean;
+  addSummary(): void;
+  addBoundary(): void;
 }
 
 export class MindMapCard implements CardHandle, MindMapControl {
@@ -51,6 +56,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
   private overlay: HTMLElement;
   private topicEls = new Map<string, HTMLElement>();
   private placed = new Map<string, Placed>();
+  private extras: ExtrasLayout = { boundaries: [], braces: [] };
   private styles = new Map<string, Resolved>();
   private shift = { x: PAD, y: PAD };
   private sel = new Set<string>();
@@ -123,6 +129,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
     const out: string[] = [];
     const walk = (tp: MMTopic) => { out.push(tp.text); tp.children.forEach(walk); };
     walk(this.data.root);
+    for (const sm of this.data.summaries ?? []) out.push(sm.topic.text);
     return out.join('\n');
   }
 
@@ -146,8 +153,8 @@ export class MindMapCard implements CardHandle, MindMapControl {
     const text = (el.innerText ?? '').replace(/\n+$/, '').replace(/ /g, ' ');
     el.removeAttribute('contenteditable');
     el.removeClass('is-editing');
-    const f = findTopic(this.data.root, id);
-    if (f && f.topic.text !== text) this.apply(d => { const g = findTopic(d.root, id); if (g) g.topic.text = text; });
+    const cur = anyTopic(this.data, id);
+    if (cur && cur.text !== text) this.apply(d => { const g = anyTopic(d, id); if (g) g.text = text; });
     else this.renderNow();
   }
 
@@ -159,6 +166,8 @@ export class MindMapCard implements CardHandle, MindMapControl {
       return false;
     }
     const cur = this.primary ?? [...this.sel][0];
+    const onSummary = !!summaryOfTopic(this.data, cur);
+    if ((key === 'Tab' || key === 'Enter') && onSummary && !e.shiftKey) return true;
     if (key === 'Tab' && !e.shiftKey) { this.addChildTo(cur); return true; }
     if (key === 'Enter' && !e.shiftKey && !e.isComposing) { this.addSiblingTo(cur); return true; }
     if (key === 'F2') { this.ctx.board.startEditing(this.node.id); return true; }
@@ -228,12 +237,34 @@ export class MindMapCard implements CardHandle, MindMapControl {
   menu(menu: Menu): void {
     if (!this.sel.size) return;
     const cur = this.primary ?? [...this.sel][0];
+    if (summaryOfTopic(this.data, cur)) {
+      menu.addItem(i => i.setTitle(t('Edit text')).setIcon('pencil').onClick(() => this.ctx.board.startEditing(this.node.id)));
+      menu.addItem(i => i.setTitle(t('Remove summary')).setIcon('trash-2').onClick(() => this.removeSummaryTopic(cur)));
+      return;
+    }
     const f = findTopic(this.data.root, cur);
     menu.addItem(i => i.setTitle(t('Add subtopic')).setIcon('corner-down-right').onClick(() => this.addChildTo(cur)));
     if (f?.parent) menu.addItem(i => i.setTitle(t('Add sibling topic')).setIcon('plus').onClick(() => this.addSiblingTo(cur)));
     menu.addItem(i => i.setTitle(t('Edit text')).setIcon('pencil').onClick(() => this.ctx.board.startEditing(this.node.id)));
     if (f?.topic.children.length) {
       menu.addItem(i => i.setTitle(f.topic.collapsed ? t('Expand') : t('Collapse')).setIcon(f.topic.collapsed ? 'chevrons-up-down' : 'chevrons-down-up').onClick(() => this.toggleFold(cur)));
+    }
+    if (this.canWrap()) {
+      menu.addItem(i => i.setTitle(t('Add summary')).setIcon('vc-mm-summary').setSection('wrap').onClick(() => this.addSummary()));
+      menu.addItem(i => i.setTitle(t('Add boundary')).setIcon('vc-mm-boundary').setSection('wrap').onClick(() => this.addBoundary()));
+    }
+    const around = extrasCovering(this.data, [...this.sel]);
+    if (around.boundaries.length) {
+      menu.addItem(i => i.setTitle(t('Remove boundary')).setIcon('x').setSection('wrap').onClick(() => {
+        const ids = new Set(around.boundaries.map(b => b.id));
+        this.apply(d => { d.boundaries = d.boundaries?.filter(b => !ids.has(b.id)); });
+      }));
+    }
+    if (around.summaries.length) {
+      menu.addItem(i => i.setTitle(t('Remove summary')).setIcon('x').setSection('wrap').onClick(() => {
+        const ids = new Set(around.summaries.map(x => x.id));
+        this.apply(d => { d.summaries = d.summaries?.filter(x => !ids.has(x.id)); });
+      }));
     }
     if (f?.parent) menu.addItem(i => i.setTitle(t('Delete topic')).setIcon('trash-2').onClick(() => {
       let next: string | null = null;
@@ -245,6 +276,31 @@ export class MindMapCard implements CardHandle, MindMapControl {
   // ── MindMapControl (bar panels) ───────────────────────────
 
   selected(): string[] { return [...this.sel]; }
+
+  canWrap(): boolean {
+    return this.sel.size > 0 && extrasSupported(this.data.layout) && !!siblingRange(this.data, [...this.sel]);
+  }
+
+  /** A summary of the selected sibling topics; its new topic is selected for typing. */
+  addSummary(): void {
+    if (!this.canWrap()) return;
+    const ids = [...this.sel];
+    let made: MMTopic | null = null;
+    this.apply(d => { made = addSummary(d, ids, t('Summary')); });
+    if (made) this.setSel([(made as MMTopic).id]);
+  }
+
+  addBoundary(): void {
+    if (!this.canWrap()) return;
+    const ids = [...this.sel];
+    this.apply(d => { addBoundary(d, ids); });
+  }
+
+  private removeSummaryTopic(id: string): void {
+    let next: string | null = null;
+    this.apply(d => { next = removeTopics(d, [id]); });
+    this.setSel(next ? [next] : []);
+  }
   rootSelected(): boolean { return this.sel.has(this.data.root.id); }
   mapData(): MMData { return this.data; }
 
@@ -260,6 +316,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
   apply(fn: (d: MMData) => void): void {
     const d = cloneData(this.data);
     fn(d);
+    pruneExtras(d);
     this.data = d;
     this.committed = d;
     this.pruneSelection();
@@ -333,7 +390,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
   }
 
   private pruneSelection(): void {
-    for (const id of [...this.sel]) if (!findTopic(this.data.root, id)) this.sel.delete(id);
+    for (const id of [...this.sel]) if (!anyTopic(this.data, id)) this.sel.delete(id);
     if (this.primary && !this.sel.has(this.primary)) this.primary = [...this.sel][0] ?? null;
   }
 
@@ -352,8 +409,16 @@ export class MindMapCard implements CardHandle, MindMapControl {
 
   private visibleTopics(): MMTopic[] {
     const out: MMTopic[] = [];
-    const walk = (tp: MMTopic) => { out.push(tp); if (!tp.collapsed) tp.children.forEach(walk); };
+    const shown = new Set<string>();
+    const walk = (tp: MMTopic) => { out.push(tp); shown.add(tp.id); if (!tp.collapsed) tp.children.forEach(walk); };
     walk(this.data.root);
+    // Summary topics of runs that are showing.
+    if (extrasSupported(this.data.layout)) {
+      for (const sm of this.data.summaries ?? []) {
+        const parent = findTopic(this.data.root, sm.parent)?.topic;
+        if (parent && shown.has(parent.id) && !parent.collapsed && shown.has(sm.from)) out.push(sm.topic);
+      }
+    }
     return out;
   }
 
@@ -408,7 +473,18 @@ export class MindMapCard implements CardHandle, MindMapControl {
     const sizes = new Map<string, Size>();
     for (const [id, el] of this.topicEls) sizes.set(id, { w: el.offsetWidth, h: el.offsetHeight });
     this.placed = layoutMindMap(d, sizes);
+    this.extras = layoutExtras(d, sizes, this.placed);
     const b = boundsOf(this.placed);
+    // Boundaries and braces can reach past the topics.
+    {
+      let x0 = b.x, y0 = b.y, x1 = b.x + b.w, y1 = b.y + b.h;
+      for (const q of this.extras.boundaries) { x0 = Math.min(x0, q.x); y0 = Math.min(y0, q.y); x1 = Math.max(x1, q.x + q.w); y1 = Math.max(y1, q.y + q.h); }
+      for (const q of this.extras.braces) {
+        if (q.vertical) { x0 = Math.min(x0, q.at - 8); x1 = Math.max(x1, q.at + 8); }
+        else { y1 = Math.max(y1, q.at + 8); }
+      }
+      b.x = x0; b.y = y0; b.w = x1 - x0; b.h = y1 - y0;
+    }
     this.shift = { x: Math.round(PAD - b.x), y: Math.round(PAD - b.y) };
     for (const [id, p] of this.placed) {
       const el = this.topicEls.get(id);
@@ -454,6 +530,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
     const d = this.data;
     const sv = this.svgEl;
     while (sv.firstChild) sv.removeChild(sv.firstChild);
+    const frames = svg('g', { class: 'vc-mm-boundaries' }, sv);
     const lines = svg('g', { class: 'vc-mm-lines', fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, sv);
     const shapes = svg('g', { class: 'vc-mm-shapes' }, sv);
     const g = gapsFor(d.size);
@@ -525,6 +602,23 @@ export class MindMapCard implements CardHandle, MindMapControl {
     };
     walk(d.root, 0);
 
+    // Boundaries: a soft dashed frame in the run's branch colour.
+    for (const q of this.extras.boundaries) {
+      const c = S(q.from)?.branchColor ?? 'var(--text-muted)';
+      svg('rect', {
+        x: q.x + sx, y: q.y + sy, width: q.w, height: q.h, rx: 12,
+        style: `fill:color-mix(in srgb, ${c} 7%, transparent);stroke:${c};stroke-width:1.5px`, 'stroke-dasharray': '6 4',
+      }, frames);
+    }
+    // Summaries: a brace beside the run, pointing at the summary topic.
+    for (const q of this.extras.braces) {
+      const cs = S(q.from);
+      const color = cs?.branchColor ?? 'var(--text-muted)';
+      const w = cs?.inWidth ?? 2;
+      const path = q.vertical ? bracePath(q.at + sx, q.a + sy, q.b + sy, q.mid + sy, q.dir) : braceDownPath(q.at + sy, q.a + sx, q.b + sx, q.mid + sx);
+      stroke(path, color, w);
+    }
+
     // Topic shapes, over the lines.
     for (const [id] of this.placed) {
       const p = P(id)!, st = S(id);
@@ -588,6 +682,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
     const p0 = this.placed.get(this.primary);
     if (!p0) return;
     const p = { ...p0, x: p0.x + sx, y: p0.y + sy };
+    if (summaryOfTopic(d, this.primary)) return; // a summary's topic takes no children or siblings
     const isRoot = this.primary === d.root.id;
     const hasKids = !!findTopic(d.root, this.primary)?.topic.children.length;
     const off = hasKids ? 30 : 12;
@@ -798,6 +893,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
     }
     if (!this.isSole()) b.select([this.node.id]);
     if (!(this.sel.size > 1 && this.sel.has(id))) this.setSel([id]);
+    if (summaryOfTopic(this.data, id)) { e.stopPropagation(); e.preventDefault(); return; } // stays beside its run
     // The central topic carries the whole map; other topics drag within it.
     if (id === this.data.root.id) {
       e.preventDefault(); // keep the waiting selection; the board still moves the map

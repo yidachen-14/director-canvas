@@ -9,7 +9,7 @@ import { t } from '../i18n';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-type Instrument = 'pen' | 'highlighter' | 'eraser';
+type Instrument = 'pen' | 'monoline' | 'highlighter' | 'eraser';
 
 /** Pen choices last the whole session, across boards. */
 const state = { tool: 'pen' as Instrument, color: 'currentColor', hlColor: '#ffeb3b', width: 1 };
@@ -74,7 +74,9 @@ export class PenController {
     p.addEventListener('dblclick', e => e.stopPropagation());
 
     const tools = p.createDiv('vc-pen-row');
-    const instruments: [Instrument, string, string][] = [['pen', 'pencil', 'Pen'], ['highlighter', 'highlighter', 'Highlighter'], ['eraser', 'eraser', 'Eraser']];
+    const instruments: [Instrument, string, string][] = [
+      ['pen', 'pencil', 'Pen (varying width)'], ['monoline', 'pen-line', 'Monoline (even width)'], ['highlighter', 'highlighter', 'Highlighter'], ['eraser', 'eraser', 'Eraser'],
+    ];
     for (const [tool, icon, label] of instruments) {
       const b = tools.createDiv({ cls: 'vc-pen-tool', attr: { role: 'button', 'aria-label': t(label) } });
       setIcon(b, icon);
@@ -162,7 +164,9 @@ export class PenController {
     const board = this.board;
     const hl = state.tool === 'highlighter';
     const width = WIDTHS[state.width][0];
-    const stroke: Stroke = { c: hl ? state.hlColor : state.color, s: hl ? width * 3.2 : width, p: [], h: hl || undefined };
+    const mono = state.tool === 'monoline';
+    // A monoline pen draws at the width a pressure pen reaches at medium pressure.
+    const stroke: Stroke = { c: hl ? state.hlColor : state.color, s: hl ? width * 3.2 : mono ? Math.max(2, width * 0.6) : width, p: [], h: hl || undefined, m: mono || undefined };
     const add = (cx: number, cy: number, pressure: number) => {
       const w = board.clientToWorld(cx, cy);
       // Mouse and touch report 0.5 or 0: no real pressure.

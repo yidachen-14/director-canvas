@@ -155,23 +155,40 @@ export class ContextBar {
       this.button({ id: 'shuffle', icon: 'shuffle', label: t('Arrange randomly'), run: () => runArrange(b, 'random') });
       this.button({ id: 'group', icon: 'box-select', label: t('Create group from selection'), run: () => b.groupSelection() });
       this.sep();
-    } else {
+    }
+    // Built-in controls; a card can place them among its own buttons with '@size', '@color',
+    // '@layer' and '@sep' items (pictures do: their tools, | frame, colour, size, layer, | …).
+    const placed = new Set<string>(multi ? ['@size'] : []);
+    const drawingOnly = nodes.every(n => cardKindOf(n) === 'drawing');
+    const builtIn = (id: string) => {
+      if (placed.has(id)) return;
+      placed.add(id);
+      if (id === '@size') {
+        const kind = cardKindOf(nodes[0]);
+        if (multi || (kind !== 'text' && !getCardType(kind)?.fixedSize)) this.dropdownButton('size', 'move-diagonal-2', t('Size'), (pop, close) => this.sizePanel(pop, close));
+      } else if (id === '@color') {
+        if (!nodes.every(n => getCardType(cardKindOf(n))?.noColor)) this.dropdownButton('color', 'palette', drawingOnly ? t('Ink colour') : nodes.every(n => ['image', 'video'].includes(cardKindOf(n))) ? t('Frame colour') : t('Colour'), (pop, close) => this.colorPanel(pop, close), true);
+      } else if (id === '@layer') {
+        this.dropdownButton('layer', 'layers', t('Layer'), (pop, close) => {
+          this.listItem(pop, 'bring-to-front', t('Bring to front'), () => { b.reorderSelection('front'); close(); });
+          this.listItem(pop, 'send-to-back', t('Send to back'), () => { b.reorderSelection('back'); close(); });
+        });
+      }
+    };
+    let custom = false;
+    if (!multi) {
       const card = b.cards.get(nodes[0].id);
       const items = card?.handle.barItems?.() ?? [];
-      for (const it of items) this.item(it);
+      for (const it of items) {
+        if (it.id === '@sep') { this.sep(); custom = true; }
+        else if (it.id.startsWith('@')) { builtIn(it.id); custom = true; }
+        else this.item(it);
+      }
       // A part of the card is selected (a mind map topic): only its own controls.
       if (card?.handle.barExclusive?.()) { this.updateActive(); return; }
-      if (items.length) this.sep();
-      const kind = cardKindOf(nodes[0]);
-      if (kind !== 'text' && !getCardType(kind)?.fixedSize) this.dropdownButton('size', 'move-diagonal-2', t('Size'), (pop, close) => this.sizePanel(pop, close));
+      if (items.length && !custom) this.sep();
     }
-
-    const drawingOnly = nodes.every(n => cardKindOf(n) === 'drawing');
-    if (!nodes.every(n => getCardType(cardKindOf(n))?.noColor)) this.dropdownButton('color', 'palette', drawingOnly ? t('Ink colour') : t('Colour'), (pop, close) => this.colorPanel(pop, close), true);
-    this.dropdownButton('layer', 'layers', t('Layer'), (pop, close) => {
-      this.listItem(pop, 'bring-to-front', t('Bring to front'), () => { b.reorderSelection('front'); close(); });
-      this.listItem(pop, 'send-to-back', t('Send to back'), () => { b.reorderSelection('back'); close(); });
-    });
+    builtIn('@size'); builtIn('@color'); builtIn('@layer');
     this.button({ id: 'dup', icon: 'copy-plus', label: t('Duplicate'), run: () => duplicateSelection(b) });
     const del = this.button({ id: 'del', icon: 'trash-2', label: t('Delete'), run: () => b.deleteSelection() });
     del.addClass('is-danger');

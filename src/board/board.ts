@@ -564,7 +564,7 @@ export class Board {
   createCard(kind: string, at: Point, opts: { edit?: boolean; data?: Partial<RawNode>; size?: { width: number; height: number }; topLeft?: boolean } = {}): RawNode | null {
     const type = getCardType(kind);
     if (!type) { new Notice(t('This card type is not available yet.')); return null; }
-    const size = opts.size ?? type.defaultSize;
+    const size = opts.size ?? type.sizeFor?.(this.settings) ?? type.defaultSize;
     const base = type.create?.({ settings: this.settings }) ?? {};
     let x = Math.round(opts.topLeft ? at.x : at.x - size.width / 2), y = Math.round(opts.topLeft ? at.y : at.y - size.height / 2);
     if (this.settings.snapToGrid) { x = snap(x, this.settings.gridSize); y = snap(y, this.settings.gridSize); }
@@ -597,6 +597,17 @@ export class Board {
     const r = nodeRect(group);
     return this.model.nodes.filter(n => n.id !== group.id && n.x >= r.x && n.y >= r.y
       && n.x + n.width <= r.x + r.width && n.y + n.height <= r.y + r.height);
+  }
+
+  /** Remove the selected groups (and columns), keeping the cards that were in them. */
+  ungroupSelection(): void {
+    const groups = this.selectedNodes().filter(n => n.type === 'group');
+    if (!groups.length) return;
+    const members = new Set<string>();
+    for (const g of groups) for (const m of this.groupMembers(g)) if (m.type !== 'group' || !groups.includes(m)) members.add(m.id);
+    this.stopEditing();
+    this.model.transact(() => this.model.removeNodes(groups.map(g => g.id)));
+    this.select([...members].filter(id => this.model.node(id)));
   }
 
   /** Wrap the selection in a new group. */

@@ -119,6 +119,9 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
           if (Number.isFinite(n) && n >= 8 && n <= 96) { s.defaultTextSize = Math.round(n); await this.save(false); }
         });
       });
+    this.sizeSetting(el, t('Default size of Notes'), 'noteSize');
+    this.sizeSetting(el, t('Default size of Sticky notes'), 'stickySize');
+    this.sizeSetting(el, t('Default size of Callouts'), 'calloutSize');
     let picker: ColorComponent | null = null;
     new Setting(el)
       .setName(t('Default sticky note colour'))
@@ -210,6 +213,31 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
       .setName(t('HTML export'))
       .addDropdown(d => d.addOptions({ folder: t('Folder (index.html + files)'), single: t('Single file') }).setValue(s.htmlMode)
         .onChange(async (v) => { s.htmlMode = v as typeof s.htmlMode; await this.save(false); }));
+  }
+
+  /** Width × height of new cards of a kind, in pixels. */
+  private sizeSetting(el: HTMLElement, name: string, key: 'noteSize' | 'stickySize' | 'calloutSize'): void {
+    const s = this.plugin.settings;
+    const setting = new Setting(el).setName(name).setDesc(t('Width × height of new cards, in pixels.'));
+    const box = setting.controlEl.createDiv('vc-size-inputs');
+    const field = (dim: 'width' | 'height', min: number) => {
+      const input = box.createEl('input', { type: 'number', attr: { min: String(min), max: '2000', step: '10' } });
+      input.value = String(s[key][dim]);
+      input.addEventListener('change', async () => {
+        const n = Math.round(Number(input.value));
+        if (!Number.isFinite(n) || n < min) { input.value = String(s[key][dim]); return; }
+        s[key] = { ...s[key], [dim]: Math.min(2000, n) };
+        await this.save(false);
+      });
+    };
+    field('width', 60);
+    box.createSpan({ cls: 'vc-size-x', text: '×' });
+    field('height', 40);
+    setting.addExtraButton(b => b.setIcon('rotate-ccw').setTooltip(t('Reset')).onClick(async () => {
+      s[key] = { ...DEFAULT_SETTINGS[key] };
+      await this.save(false);
+      this.display();
+    }));
   }
 
   /** An optional colour: a picker plus a button back to the theme's colour. */

@@ -266,14 +266,17 @@ class MediaCard implements CardHandle {
 
   barItems(): BarItem[] {
     const items: BarItem[] = [];
-    if (this.kind !== 'audio') {
-      items.push({ id: 'desc', icon: 'text', label: t(this.descText() ? 'Edit description' : 'Add description'), active: !!this.descText(), run: () => this.ctx.board.startEditing(this.node.id) });
-      items.push({ id: 'link', icon: 'link', label: t(this.linkText() ? 'Edit link' : 'Insert link'), active: !!this.linkText(), run: () => this.editLink() });
-      const on = this.hasFrame();
-      items.push({ id: 'frame', icon: 'square', label: t(on ? 'Hide the frame' : 'Show a frame'), active: on, run: () => this.setFrame(!on) });
-    }
     const file = resolveFile(this.ctx.app, this.node);
-    if (file) items.push({ id: 'open', icon: 'external-link', label: t('Open file'), run: () => void this.ctx.app.workspace.getLeaf('tab').openFile(file) });
+    const open: BarItem | null = file ? { id: 'open', icon: 'external-link', label: t('Open file'), run: () => void this.ctx.app.workspace.getLeaf('tab').openFile(file) } : null;
+    if (this.kind === 'audio') return open ? [open] : [];
+    // Its own tools | frame, frame colour, size, layer | (duplicate, delete, more follow).
+    items.push({ id: 'desc', icon: 'text', label: t(this.descText() ? 'Edit description' : 'Add description'), active: !!this.descText(), run: () => this.ctx.board.startEditing(this.node.id) });
+    items.push({ id: 'link', icon: 'link', label: t(this.linkText() ? 'Edit link' : 'Insert link'), active: !!this.linkText(), run: () => this.editLink() });
+    if (open) items.push(open);
+    items.push({ id: '@sep', icon: '', label: '' });
+    const on = this.hasFrame();
+    items.push({ id: 'frame', icon: 'square', label: t(on ? 'Hide the frame' : 'Show a frame'), active: on, run: () => this.setFrame(!on) });
+    items.push({ id: '@color', icon: '', label: '' }, { id: '@size', icon: '', label: '' }, { id: '@layer', icon: '', label: '' }, { id: '@sep', icon: '', label: '' });
     return items;
   }
 
@@ -312,7 +315,67 @@ export const audioCard = mediaType('audio', 'music', { width: 360, height: 96 })
 
 // ── bookmark (web link with a preview) ──────────────────────
 
-export interface LinkMeta { title?: string; description?: string; image?: string; icon?: string; site?: string; failed?: boolean; fetched?: number; }
+export interface LinkMeta {
+  title?: string; description?: string; image?: string; icon?: string; site?: string; failed?: boolean; fetched?: number;
+  /** Local copies of the picture and icon (paths for the vault adapter), so previews stay when offline. */
+  imageFile?: string; iconFile?: string;
+}
+
+const EXT_OF: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg', 'image/x-icon': 'ico', 'image/vnd.microsoft.icon': 'ico', 'image/avif': 'avif' };
+
+function hashOf(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h.toString(16).padStart(8, '0');
+}
+
+/** Keep a copy of a preview picture in the plugin's cache folder; returns its path, or undefined. */
+async function cacheImage(ctx: CardContext, url: string): Promise<string | undefined> {
+  const adapter = ctx.app.vault.adapter;
+  const dir = `${ctx.board.plugin.manifest.dir}/cache`;
+  try {
+    const res = await requestUrl({ url, method: 'GET', throw: false });
+    if (res.status >= 400 || !res.arrayBuffer.byteLength) return undefined;
+    const type = (res.headers['content-type'] ?? res.headers['Content-Type'] ?? '').split(';')[0].trim().toLowerCase();
+    const ext = EXT_OF[type] ?? (url.match(/\.(png|jpe?g|gif|webp|svg|ico|avif)(?:[?#]|$)/i)?.[1]?.toLowerCase().replace('jpeg', 'jpg'));
+    if (!ext) return undefined;
+    if (!(await adapter.exists(dir))) await adapter.mkdir(dir);
+    const path = `${dir}/${hashOf(url)}.${ext}`;
+    await adapter.writeBinary(path, res.arrayBuffer);
+    return path;
+  } catch { return undefined; }
+}
+
+/** Save local copies of a bookmark's picture and icon (once), and remember where they are. */
+async function cachePreview(ctx: CardContext, id: string): Promise<void> {
+  const n = ctx.board.model.node(id);
+  const meta = (n?.vc?.meta ?? null) as LinkMeta | null;
+  if (!n || !meta) return;
+  const key = `cache:${id}`;
+  if (inflight.has(key)) return;
+  inflight.add(key);
+  try {
+    const imageFile = meta.image && !meta.imageFile ? await cacheImage(ctx, meta.image) : undefined;
+    const iconFile = meta.icon && !meta.iconFile ? await cacheImage(ctx, meta.icon) : undefined;
+    if (!imageFile && !iconFile) return;
+    const m = ctx.board.model;
+    const cur = m.node(id);
+    if (!cur) return;
+    m.quiet(() => {
+      const mm = { ...((cur.vc?.meta ?? {}) as LinkMeta) };
+      if (imageFile) mm.imageFile = imageFile;
+      if (iconFile) mm.iconFile = iconFile;
+      cur.vc = { ...(cur.vc ?? {}), meta: mm };
+      m.touch(id);
+    });
+  } finally { inflight.delete(key); }
+}
+
+/** The picture to show: the local copy when there is one, else the web address. */
+function previewSrc(ctx: CardContext, file: string | undefined, web: string | undefined): string | undefined {
+  if (file) return ctx.app.vault.adapter.getResourcePath(file);
+  return web;
+}
 
 /** Read title, description, picture and icon from a page's HTML. */
 export function parseLinkMeta(html: string, pageUrl: string): LinkMeta {
@@ -360,9 +423,13 @@ async function fetchMeta(ctx: CardContext, id: string, url: string): Promise<voi
   m.quiet(() => {
     n.vc = { ...(n.vc ?? {}), meta };
     // A preview with a picture needs room for it.
-    if (meta.image && n.height < 200 && vcGet<string>(n, 'kind', '') === 'bookmark') n.height = 300;
+    if (vcGet<string>(n, 'kind', '') === 'bookmark') {
+      if (meta.image && n.height < 200) n.height = 300;
+      else if (n.height < 110) n.height = 120;
+    }
     m.touch(id);
   });
+  if (meta.image || meta.icon) void cachePreview(ctx, id);
 }
 
 class BookmarkCard implements CardHandle {
@@ -387,11 +454,13 @@ class BookmarkCard implements CardHandle {
     try { host = new URL(url).host.replace(/^www\./, ''); } catch { /* keep raw */ }
     const meta = this.meta();
     if (!meta.fetched) void fetchMeta(this.ctx, n.id, url);
+    else if ((meta.image && !meta.imageFile) || (meta.icon && !meta.iconFile)) void cachePreview(this.ctx, n.id);
 
     const box = this.el.createDiv('vc-bookmark-box');
-    if (meta.image) {
+    const imageSrc = previewSrc(this.ctx, meta.imageFile, meta.image);
+    if (imageSrc) {
       const pic = box.createDiv('vc-bookmark-image');
-      const img = pic.createEl('img', { attr: { src: meta.image, draggable: 'false', referrerpolicy: 'no-referrer' } });
+      const img = pic.createEl('img', { attr: { src: imageSrc, draggable: 'false', referrerpolicy: 'no-referrer' } });
       img.addEventListener('error', () => pic.remove());
     }
     const body = box.createDiv('vc-bookmark-body');
@@ -401,8 +470,9 @@ class BookmarkCard implements CardHandle {
     else if (!meta.fetched) body.createDiv({ cls: 'vc-bookmark-desc is-loading', text: t('Loading preview…') });
     else if (meta.failed) body.createDiv({ cls: 'vc-bookmark-desc', text: t('No preview available for this page.') });
     const foot = body.createDiv('vc-bookmark-foot');
-    if (meta.icon) {
-      const ic = foot.createEl('img', { cls: 'vc-bookmark-icon', attr: { src: meta.icon, referrerpolicy: 'no-referrer' } });
+    const iconSrc = previewSrc(this.ctx, meta.iconFile, meta.icon);
+    if (iconSrc) {
+      const ic = foot.createEl('img', { cls: 'vc-bookmark-icon', attr: { src: iconSrc, referrerpolicy: 'no-referrer' } });
       ic.addEventListener('error', () => { ic.remove(); setIcon(foot.createSpan({ cls: 'vc-bookmark-icon-fallback' }), 'globe'); });
     } else {
       setIcon(foot.createSpan({ cls: 'vc-bookmark-icon-fallback' }), 'globe');
@@ -478,7 +548,8 @@ export const bookmarkCard: CardType = {
   id: 'bookmark',
   label: 'Bookmark',
   icon: 'bookmark',
-  defaultSize: { width: 320, height: 120 },
+  // Starts as a slim address box; grows to fit the preview once it has one.
+  defaultSize: { width: 340, height: 48 },
   create: () => ({ type: 'link', url: '', vc: { kind: 'bookmark' } }),
   mount: (node, el, ctx) => new BookmarkCard(node, el, ctx),
 };

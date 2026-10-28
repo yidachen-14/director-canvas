@@ -313,15 +313,16 @@
   height: 100%;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 14px;
+  gap: 6px;
+  padding: 0 4px 0 10px;
   box-sizing: border-box;
   background: var(--background-primary);
   border: 1px dashed var(--background-modifier-border-hover, var(--background-modifier-border));
   border-radius: 10px;
 }
 .vc-bookmark-ask-icon { display: flex; color: var(--text-faint); }
-.vc-bookmark-ask input { flex: 1; min-width: 0; }
+.vc-bookmark-ask input { flex: 1; min-width: 0; height: 30px; border: none; background: transparent; box-shadow: none; padding: 0 4px; }
+.vc-bookmark-ask-icon svg { width: 16px; height: 16px; }
 
 /* Link */
 .vc-link { height: 100%; }
@@ -485,10 +486,6 @@
   box-shadow: var(--shadow-s);
   z-index: 10;
 }
-.vc-board[data-toolbar-pos='top'] .vc-edge-panel { bottom: auto; top: 84px; }
-.vc-board[data-toolbar-pos='left'] .vc-edge-panel, .vc-board[data-toolbar-pos='right'] .vc-edge-panel { bottom: 16px; }
-.vc-board[data-toolbar-size='S'] .vc-edge-panel { bottom: 64px; }
-.vc-board[data-toolbar-size='L'] .vc-edge-panel { bottom: 96px; }
 .vc-ep-group { display: flex; align-items: center; gap: 2px; padding: 0 4px; }
 .vc-ep-group + .vc-ep-group { border-left: 1px solid var(--background-modifier-border); }
 .vc-ep-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
@@ -1388,11 +1385,6 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
   border: 1px solid var(--background-modifier-border);
   box-shadow: var(--shadow-l);
 }
-.vc-board[data-toolbar-pos='top'] .vc-pen-picker, .vc-board[data-toolbar-pos='top'] .vc-pen-options { bottom: auto; top: 84px; }
-.vc-board[data-toolbar-size='S'] .vc-pen-options { bottom: 64px; }
-.vc-board[data-toolbar-size='L'] .vc-pen-options { bottom: 96px; }
-.vc-board[data-toolbar-size='S'] .vc-pen-picker { bottom: 64px; }
-.vc-board[data-toolbar-size='L'] .vc-pen-picker { bottom: 96px; }
 .vc-pen-row { display: flex; align-items: center; gap: 4px; }
 .vc-pen-tool { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--icon-color); cursor: pointer; }
 .vc-pen-tool:hover { background: var(--background-modifier-hover); }
@@ -1654,3 +1646,19 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-folder-icon svg { width: 14px; height: 14px; }
 .vc-folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vc-folder-empty { padding: 8px 12px; color: var(--text-faint); font-size: var(--font-ui-small); }
+.vc-size-inputs { display: flex; align-items: center; gap: 6px; }
+.vc-size-inputs input { width: 72px; }
+.vc-size-x { color: var(--text-muted); }
+.vc-callout-title-input { flex: 1; min-width: 0; height: 24px; font: inherit; font-weight: 600; padding: 0 4px; }
+
+/* Panels that sit next to the toolbar (pen, connection): just clear of it, on its side.
+   One rule per position, so a top and a bottom offset never apply together (that stretched them). */
+.vc-board { --vc-tb-clear: 90px; }
+.vc-board[data-toolbar-size='S'] { --vc-tb-clear: 66px; }
+.vc-board[data-toolbar-size='L'] { --vc-tb-clear: 100px; }
+.vc-pen-picker, .vc-pen-options, .vc-edge-panel { top: auto; bottom: var(--vc-tb-clear); }
+.vc-board[data-toolbar-pos='top'] :is(.vc-pen-picker, .vc-pen-options, .vc-edge-panel) { top: var(--vc-tb-clear); bottom: auto; }
+.vc-board[data-toolbar-pos='left'] :is(.vc-pen-picker, .vc-pen-options, .vc-edge-panel),
+.vc-board[data-toolbar-pos='right'] :is(.vc-pen-picker, .vc-pen-options, .vc-edge-panel) { top: auto; bottom: 16px; }
+/* The "Drawing" banner goes to the edge away from the toolbar. */
+.vc-board[data-toolbar-pos='top'] .vc-pen-banner { top: auto; bottom: 16px; }

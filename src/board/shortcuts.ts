@@ -33,7 +33,18 @@ const ARRANGE_DEFAULTS: Record<string, string> = {
   row: 'Mod+Alt+Shift+ArrowRight', column: 'Mod+Alt+Shift+ArrowDown',
 };
 
-const TOOL_DEFAULTS: Record<string, string> = { select: 'V', hand: 'H' };
+/** One letter per tool (Hand also works by holding the space bar). */
+const TOOL_DEFAULTS: Record<string, string> = {
+  select: 'V', hand: 'H', text: 'T', note: 'N', sticky: 'S', callout: 'C', kanban: 'K', column: 'U', group: 'G',
+  connect: 'L', pen: 'P', swatch: 'I', bookmark: 'B', mindmap: 'M', calendar: 'D',
+};
+
+/** "Select (V)": a tool's name with its key, for tooltips. Hand shows the space bar. */
+export function toolTip(id: string, label: string, custom: Record<string, string>): string {
+  if (id === 'hand') return `${label} (Space)`;
+  const k = shortcutLabel(`tool-${id}`, custom);
+  return k ? `${label} (${k})` : label;
+}
 
 export function allShortcuts(): Shortcut[] {
   const list: Shortcut[] = [
@@ -42,6 +53,7 @@ export function allShortcuts(): Shortcut[] {
     { id: 'select-all', label: 'Select all', group: 'edit', keys: ['Mod+A'], run: b => b.select(b.model.nodes.map(n => n.id)) },
     { id: 'duplicate', label: 'Duplicate', group: 'edit', keys: ['Mod+D'], run: b => duplicateSelection(b) },
     { id: 'group', label: 'Group the selection', group: 'edit', keys: ['Mod+G'], run: b => b.groupSelection() },
+    { id: 'ungroup', label: 'Ungroup', group: 'edit', keys: ['Mod+Shift+G'], run: b => b.ungroupSelection() },
     { id: 'zoom-in', label: 'Zoom in', group: 'view', keys: ['Mod+='], run: b => b.zoomStep(1) },
     { id: 'zoom-out', label: 'Zoom out', group: 'view', keys: ['Mod+-'], run: b => b.zoomStep(-1) },
     { id: 'zoom-100', label: 'Zoom to 100%', group: 'view', keys: ['Mod+0'], run: b => b.setZoom(1, true) },

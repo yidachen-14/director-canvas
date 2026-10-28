@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  addChild, addSibling, boundsOf, findTopic, fromMarkdown, layoutMindMap, moveTopic, newMindMap, normalizeData,
+  addBoundary, addChild, addSibling, addSummary, anyTopic, boundsOf, layoutExtras, siblingRange, findTopic, fromMarkdown, layoutMindMap, moveTopic, newMindMap, normalizeData,
   removeTopics, resolveStyles, sidesOf, toMarkdown, type MMData, type Size,
 } from '../src/mindmap/model';
 
@@ -166,5 +166,53 @@ describe('mind map markdown', () => {
     expect(d.root.text).toBe('Plan');
     expect(d.root.children.map(c => c.text)).toEqual(['Shoot', 'Edit']);
     expect(d.layout).toBe('right');
+  });
+});
+
+describe('summaries and boundaries', () => {
+  const build = () => {
+    const d = newMindMap('Root');
+    const a = addChild(d, d.root.id, 'A')!, b = addChild(d, d.root.id, 'B')!, c = addChild(d, d.root.id, 'C')!;
+    const a1 = addChild(d, a.id, 'A1')!;
+    return { d, a, b, c, a1 };
+  };
+
+  it('wraps only siblings, as one run from the first to the last', () => {
+    const { d, a, c, a1 } = build();
+    expect(siblingRange(d, [c.id, a.id])).toMatchObject({ from: 0, to: 2 });
+    expect(siblingRange(d, [a.id, a1.id])).toBeNull();
+    expect(siblingRange(d, [d.root.id])).toBeNull();
+    const t = addSummary(d, [c.id, a.id], 'Sum')!;
+    expect(d.summaries![0]).toMatchObject({ parent: d.root.id, from: a.id, to: c.id });
+    expect(anyTopic(d, t.id)?.text).toBe('Sum');
+  });
+
+  it('places a summary beside its run and a boundary around it', () => {
+    const { d, a, b } = build();
+    const t = addSummary(d, [a.id, b.id], 'Sum')!;
+    addBoundary(d, [a.id, b.id]);
+    const sizes = new Map<string, { w: number; h: number }>();
+    const placed = layoutMindMap(d, sizes);
+    const ex = layoutExtras(d, sizes, placed);
+    const pa = placed.get(a.id)!, pb = placed.get(b.id)!, ps = placed.get(t.id)!;
+    const bd = ex.boundaries[0];
+    expect(bd.y).toBeLessThan(pa.y);
+    expect(bd.y + bd.h).toBeGreaterThan(pb.y + pb.h);
+    // The summary sits right of the boundary, centred on the run.
+    expect(ps.x).toBeGreaterThan(bd.x + bd.w);
+    expect(ex.braces).toHaveLength(1);
+  });
+
+  it('follows deleted topics and drops runs that are gone', () => {
+    const { d, a, b, c } = build();
+    addSummary(d, [a.id, c.id], 'Sum');
+    addBoundary(d, [b.id]);
+    removeTopics(d, [a.id]);
+    expect(d.summaries![0]).toMatchObject({ from: b.id, to: c.id });
+    removeTopics(d, [b.id]);
+    expect(d.boundaries).toBeUndefined();
+    const sum = d.summaries![0].topic.id;
+    removeTopics(d, [sum]);
+    expect(d.summaries ?? []).toHaveLength(0);
   });
 });

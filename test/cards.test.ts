@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('obsidian', () => ({ moment: () => ({}), Menu: class {}, Notice: class {}, TFile: class {}, FuzzySuggestModal: class {}, Modal: class {}, Setting: class {}, normalizePath: (p: string) => p, setIcon: () => {}, setTooltip: () => {}, getIcon: () => null, requestUrl: async () => ({}) }));
+vi.mock('obsidian', () => ({ moment: () => ({}), Menu: class {}, Notice: class {}, TFile: class {}, FuzzySuggestModal: class {}, Modal: class {}, Setting: class {}, addIcon: () => {}, normalizePath: (p: string) => p, setIcon: () => {}, setTooltip: () => {}, getIcon: () => null, requestUrl: async () => ({}) }));
 
 import { parseKanban, serializeKanban } from '../src/cards/widgets';
 import { nearestColorName, inkOn } from '../src/cards/named-colors';

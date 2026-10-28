@@ -248,6 +248,9 @@ export class ConnectController {
       setEnd(ed, 'to', to);
       return ed;
     });
+    // One connection per use of the tool: back to selecting, with the new connection selected.
+    board.setTool('select');
+    this.showPins(null);
     board.selectEdges([edge.id]);
   }
 
