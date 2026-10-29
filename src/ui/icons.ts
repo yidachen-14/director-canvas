@@ -10,5 +10,6 @@ addIcon('vc-connect', lucideLike('<circle cx="5.5" cy="18.5" r="3"/><circle cx="
 /** Mind map: a central box branching to two. */
 addIcon('vc-mm-icon', lucideLike('<rect x="2.5" y="9.5" width="6" height="5" rx="1.2"/><rect x="15.5" y="3" width="6" height="5" rx="1.2"/><rect x="15.5" y="16" width="6" height="5" rx="1.2"/><path d="M8.5 12h3.5V5.5h3.5M12 12v6.5h3.5"/>'));
 
-/** Director Canvas itself (the ribbon button, "new board" menus). */
-export const BOARD_ICON = 'layout-dashboard';
+/** Director Canvas itself (the ribbon button, "new board" menus): a director's chair. */
+addIcon('vc-director', lucideLike('<path d="M6 4h12v6H6z"/><path d="M5 13h14"/><path d="M7 10v3M17 10v3"/><path d="M7 13l10 8M17 13 7 21"/>'));
+export const BOARD_ICON = 'vc-director';

@@ -1,3 +1,4 @@
+import { BOARD_ICON } from '../ui/icons';
 import { attachInsets } from '../board/insets';
 import { Notice, Scope, TextFileView, type TFile, type ViewStateResult, type WorkspaceLeaf } from 'obsidian';
 import type VisualCanvasPlugin from '../main';
@@ -30,7 +31,7 @@ export class CanvasView extends TextFileView {
 
   getViewType(): string { return VIEW_TYPE; }
   getDisplayText(): string { return this.file?.basename ?? 'Director Canvas'; }
-  getIcon(): string { return 'layout-dashboard'; }
+  getIcon(): string { return BOARD_ICON; }
 
   async onOpen(): Promise<void> {
     this.contentEl.addClass('vc-view');

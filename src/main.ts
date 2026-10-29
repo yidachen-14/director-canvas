@@ -80,7 +80,7 @@ export default class VisualCanvasPlugin extends Plugin {
     // Right-click a .canvas file: open it with the other view.
     this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
       if (!(file instanceof TFile) || file.extension !== 'canvas') return;
-      menu.addItem(i => i.setTitle(t('Open in Director Canvas')).setIcon('layout-dashboard').setSection('open').onClick(async () => {
+      menu.addItem(i => i.setTitle(t('Open in Director Canvas')).setIcon(BOARD_ICON).setSection('open').onClick(async () => {
         const leaf = this.app.workspace.getLeaf('tab');
         await leaf.setViewState({ type: VIEW_TYPE, state: { file: file.path }, active: true });
       }));
