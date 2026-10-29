@@ -1,7 +1,10 @@
 import { shortcutLabel } from './shortcuts';
 import { getIcon, setIcon, setTooltip } from 'obsidian';
 import type { Board } from './board';
-import type { BarItem } from '../cards/types';
+import type { BarItem, CardContext } from '../cards/types';
+import { barRow } from '../cards/bar';
+import { convertTextCard } from '../cards/text-cards';
+import type { TextCardKind } from '../settings';
 import { ARRANGE, runArrange, type ArrangeDef } from './arrange-commands';
 import { duplicateSelection } from './interactions';
 import { showSelectionMenu } from './menus';
@@ -42,6 +45,10 @@ const COLORS: { id: string | undefined; label: string }[] = [
  * A small bar floating above the selection (Boardmix-style): what the
  * selected card can do, and for several cards, aligning and arranging them.
  */
+const TEXT_KINDS: [TextCardKind, string, string][] = [
+  ['text', 'Text', 'type'], ['note', 'Note', 'file-text'], ['sticky', 'Sticky note', 'sticky-note'], ['callout', 'Callout', 'lightbulb'],
+];
+
 export class ContextBar {
   private el: HTMLElement;
   private pop: HTMLElement | null = null;
@@ -152,6 +159,17 @@ export class ContextBar {
       el.createDiv({ cls: 'vc-ctx-count', text: t('{n} selected', { n: nodes.length }) });
       this.sep();
       this.dropdownButton('size', 'move-diagonal-2', t('Size'), (pop, close) => this.sizePanel(pop, close));
+      // All text cards (text, note, sticky, callout): turn them all into one kind.
+      if (nodes.every(n => TEXT_KINDS.some(k => k[0] === cardKindOf(n)))) {
+        const kinds = new Set(nodes.map(n => cardKindOf(n)));
+        const cur = kinds.size === 1 ? TEXT_KINDS.find(k => k[0] === [...kinds][0]) : undefined;
+        this.dropdownButton('kind', cur?.[2] ?? 'repeat', t('Turn into'), (pop, close) => {
+          pop.addClass('is-list');
+          for (const [kind, label, icon] of TEXT_KINDS) {
+            barRow(pop, icon, t(label), kinds.size === 1 && kinds.has(kind), () => { close(); this.turnInto(kind); });
+          }
+        });
+      }
       this.dropdownButton('align', 'align-start-vertical', t('Align'), (pop) => this.alignPanel(pop, nodes.length));
       this.dropdownButton('arrange', 'layout-grid', t('Arrange'), (pop, close) => this.arrangePanel(pop, close));
       this.dropdownButton('same', 'maximize-2', t('Same size'), (pop, close) => this.arrangeList(pop, close, ['size']));
@@ -432,32 +450,51 @@ export class ContextBar {
       input.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { apply(which); input.select(); } });
       input.addEventListener('change', () => apply(which));
       input.addEventListener('pointerdown', e => e.stopPropagation());
-    }    // Pictures and videos: back to their own pixel size.
-    const handle = nodes.length === 1 ? b.cards.get(nodes[0].id)?.handle : undefined;
-    const orig = handle?.originalSize?.();
-    if (orig) {
-      const btn = pop.createEl('button', { cls: 'vc-ctx-size-orig', text: `${t('Original size')} · ${orig.media.width} × ${orig.media.height}` });
-      btn.addEventListener('click', () => {
-        const n = nodes[0];
-        b.model.transact(() => { n.width = orig.width; n.height = orig.height; b.model.touch(n.id); });
-        w.value = String(orig.width);
-        h.value = String(orig.height);
-      });
-      // A quarter, half or three quarters of the original (the description and controls keep their height).
-      const extra = orig.height - orig.media.height;
+    }
+    // Pictures and videos: back to their own pixel size, or a quarter, half or three quarters of it
+    // (each selected picture or video from its own size; descriptions and controls keep their height).
+    const media = nodes
+      .map(n => ({ n, orig: b.cards.get(n.id)?.handle.originalSize?.() ?? null }))
+      .filter((x): x is { n: typeof nodes[0]; orig: NonNullable<typeof x.orig> } => !!x.orig);
+    if (media.length) {
+      const sole = nodes.length === 1 ? media[0]?.orig : undefined;
+      const scaleTo = (pct: number) => {
+        b.model.transact(() => {
+          for (const { n, orig } of media) {
+            const extra = orig.height - orig.media.height;
+            n.width = Math.max(24, Math.round(orig.media.width * pct / 100));
+            n.height = Math.max(16, Math.round(orig.media.height * pct / 100)) + extra;
+            b.model.touch(n.id);
+          }
+        });
+        const now = b.selectedNodes();
+        const both = (f: (n: typeof now[0]) => number) => now.every(n => Math.round(f(n)) === Math.round(f(now[0]))) ? String(Math.round(f(now[0]))) : '';
+        w.value = both(n => n.width);
+        h.value = both(n => n.height);
+      };
+      const label = sole ? `${t('Original size')} · ${sole.media.width} × ${sole.media.height}` : t('Original size');
+      const btn = pop.createEl('button', { cls: 'vc-ctx-size-orig', text: label });
+      btn.addEventListener('click', () => scaleTo(100));
       const row = pop.createDiv('vc-ctx-size-pcts');
       for (const pct of [25, 50, 75]) {
-        const sw = Math.max(24, Math.round(orig.media.width * pct / 100));
-        const sh = Math.max(16, Math.round(orig.media.height * pct / 100)) + extra;
-        const pb = row.createEl('button', { text: `${pct}%`, attr: { 'aria-label': `${sw} × ${sh - extra}` } });
-        pb.addEventListener('click', () => {
-          const n = nodes[0];
-          b.model.transact(() => { n.width = sw; n.height = sh; b.model.touch(n.id); });
-          w.value = String(sw);
-          h.value = String(sh);
-        });
+        const attr: Record<string, string> = sole ? { 'aria-label': `${Math.round(sole.media.width * pct / 100)} × ${Math.round(sole.media.height * pct / 100)}` } : {};
+        row.createEl('button', { text: `${pct}%`, attr }).addEventListener('click', () => scaleTo(pct));
       }
     }
+  }
+
+  /** Turn every selected text card into one kind, as one undo step. */
+  private turnInto(kind: TextCardKind): void {
+    const b = this.board;
+    const todo = b.selectedNodes().filter(n => cardKindOf(n) !== kind);
+    if (!todo.length) return;
+    const ctx = { app: b.app, board: b, sourcePath: b.sourcePath } as CardContext;
+    b.model.transact(() => {
+      for (const n of todo) {
+        const md = b.cards.get(n.id)?.handle.contentMarkdown?.() ?? n.text ?? '';
+        convertTextCard(ctx, n.id, kind, md);
+      }
+    });
   }
 
   private sizeLocked = true;

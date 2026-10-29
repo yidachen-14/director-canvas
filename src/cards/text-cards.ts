@@ -242,6 +242,8 @@ class RichCard implements CardHandle {
 
   searchText(): string { return this.rich.plainText(); }
 
+  contentMarkdown(): string { return this.rich.markdown(); }
+
   barItems(): BarItem[] {
     const { ctx, f } = this;
     const items: BarItem[] = [];

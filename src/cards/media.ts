@@ -357,8 +357,8 @@ class MediaCard implements CardHandle {
     // Its own tools | frame, frame colour, size, layer | (duplicate, delete, more follow).
     items.push({ id: 'desc', icon: 'text', label: t(this.descText() ? 'Edit description' : 'Add description'), active: !!this.descText(), run: () => this.ctx.board.startEditing(this.node.id) });
     items.push({ id: 'link', icon: 'link', label: t(this.linkText() ? 'Edit link' : 'Insert link'), active: !!this.linkText(), run: () => this.editLink() });
-    if (open) items.push(open);
     if (this.kind === 'image' && file) items.push({ id: 'crop', icon: 'crop', label: t('Crop image'), active: isCropped(this.node), run: () => startCrop(this.ctx.board) });
+    if (open) items.push(open);
     items.push({ id: '@sep', icon: '', label: '' });
     const on = this.hasFrame();
     items.push({ id: 'frame', icon: 'square', label: t(on ? 'Hide the frame' : 'Show a frame'), active: on, run: () => this.setFrame(!on) });
