@@ -1886,3 +1886,5 @@ body.is-phone .vc-board[data-toolbar-pos='top'] .vc-toolbar { top: 8px; }
 .theme-light .vc-board[data-bg='pure'] { --vc-bg: #ffffff; }
 .theme-dark .vc-board[data-bg='pure'] { --vc-bg: #000000; }
 .vc-number-input { width: 80px; }
+/* Settings: a square colour well, so its round hover ring isn't cut off at the top and bottom. */
+.vc-settings .setting-item-control input[type='color'] { width: 26px; height: 26px; min-height: 26px; }
