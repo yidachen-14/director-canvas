@@ -22,7 +22,7 @@ export default class VisualCanvasPlugin extends Plugin {
    */
   syncRibbon(): void {
     const show = !this.settings.openCanvasByDefault || this.settings.showRibbon;
-    this.ribbonEl?.toggleClass('vc-hidden', !show);
+    this.ribbonEl?.toggle(show);
   }
 
   async onload(): Promise<void> {

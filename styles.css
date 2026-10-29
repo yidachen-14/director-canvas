@@ -1,7 +1,7 @@
 /* ── Director Canvas ─────────────────────────────────────────────── */
 
-.vc-view {
-  padding: 0 !important;
+.workspace-leaf-content .view-content.vc-view {
+  padding: 0;
   overflow: hidden;
   position: relative;
 }
@@ -112,12 +112,11 @@
 .vc-board.has-image-shadow .vc-kind-video > .vc-node-body {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.10), 0 3px 10px rgba(0, 0, 0, 0.12);
 }
-.vc-media img, .vc-media video { border-radius: 0 !important; }
+.vc-board .vc-media img, .vc-board .vc-media video { border-radius: 0; }
 .vc-node.is-search-hit .vc-node-body {
   box-shadow: 0 0 0 calc(3px / var(--vc-zoom)) color-mix(in srgb, var(--text-highlight-bg) 100%, transparent);
 }
 
-.vc-board.is-dragging, .vc-board.is-dragging * { cursor: grabbing !important; }
 
 /* Group */
 .vc-kind-group > .vc-node-body { overflow: visible; }
@@ -575,7 +574,6 @@
 .vc-tool-ghost.is-off { opacity: 0.35; }
 .vc-tool-ghost-icon svg { width: 20px; height: 20px; }
 .vc-tool-ghost-label { font-size: var(--font-ui-smaller); }
-body.vc-tool-dragging, body.vc-tool-dragging * { cursor: grabbing !important; }
 .vc-tool-more.is-active { background: var(--background-modifier-hover); }
 
 /* the "More" list */
@@ -835,7 +833,6 @@ body.vc-tool-dragging, body.vc-tool-dragging * { cursor: grabbing !important; }
 .vc-block-handle svg { width: 14px; height: 14px; }
 .vc-board.is-dragging .vc-block-handle, .vc-board.is-resizing .vc-block-handle { display: none; }
 .vc-block-dragging { opacity: 0.35; }
-body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !important; user-select: none !important; }
 .vc-block-ghost {
   position: fixed;
   left: 0;
@@ -1006,7 +1003,8 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-kb-item.is-done .vc-kb-text { color: var(--text-faint); text-decoration: line-through; }
 .vc-kb-item input.task-list-item-checkbox { margin: 2px 0 0; flex: none; cursor: pointer; }
 .vc-kb-text { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; }
-.vc-kb-input { flex: 1; min-width: 0; resize: none; overflow: hidden; border: none; padding: 0; font: inherit; background: transparent; box-shadow: none !important; }
+.vc-kb-input { flex: 1; min-width: 0; resize: none; overflow: hidden; border: none; padding: 0; font: inherit; background: transparent; }
+.vc-board textarea.vc-kb-input, .vc-board textarea.vc-kb-input:hover, .vc-board textarea.vc-kb-input:focus, .vc-board textarea.vc-kb-input:focus-visible { box-shadow: none; }
 .vc-kb-del { position: absolute; top: 6px; right: 5px; width: 16px; height: 16px; display: none; align-items: center; justify-content: center; color: var(--text-faint); border-radius: 4px; cursor: pointer; }
 .vc-kb-del svg { width: 12px; height: 12px; }
 .vc-node.is-selected .vc-kb-item:hover .vc-kb-del { display: flex; }
@@ -1327,7 +1325,6 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-drawing { height: 100%; color: var(--text-normal); }
 .vc-drawing svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .vc-pen-live { pointer-events: none; color: var(--text-normal); }
-.vc-board.is-erasing[data-tool='pen'], .vc-board.is-erasing[data-tool='pen'] * { cursor: cell !important; }
 .vc-board[data-tool='pen'] .vc-node { cursor: crosshair; }
 .vc-board[data-tool='pen'] .vc-edge-hit { pointer-events: none; }
 .vc-pen-banner {
@@ -1693,20 +1690,20 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 
 /* Lists: the marker stays where the text would start (no indent unless Tab nests a list).
    Obsidian's own Markdown styles indent lists (.markdown-rendered), so these are stronger. */
-.vc-board .vc-rich ul, .vc-board .vc-rich ol { padding-inline-start: 1.1em !important; margin-inline-start: 0 !important; }
-.vc-board .vc-rich ol { padding-inline-start: 1.5em !important; }
-.vc-board .vc-rich li { margin-inline-start: 0 !important; padding-inline-start: 0 !important; }
-.vc-board .vc-rich li > ul, .vc-board .vc-rich li > ol { padding-inline-start: 1.2em !important; }
-.vc-board .vc-rich ul:has(> li.vc-task) { padding-inline-start: 1.55em !important; }
+.vc-board .vc-rich.vc-rich ul, .vc-board .vc-rich.vc-rich ol { padding-inline-start: 1.1em; margin-inline-start: 0; }
+.vc-board .vc-rich.vc-rich ol { padding-inline-start: 1.5em; }
+.vc-board .vc-rich.vc-rich li { margin-inline-start: 0; padding-inline-start: 0; }
+.vc-board .vc-rich.vc-rich li > ul, .vc-board .vc-rich.vc-rich li > ol { padding-inline-start: 1.2em; }
+.vc-board .vc-rich.vc-rich ul:has(> li.vc-task) { padding-inline-start: 1.55em; }
 /* To-do box: centred on the first line of its text. */
-.vc-board .vc-rich li.vc-task > input.task-list-item-checkbox {
-  position: absolute !important;
-  left: -1.55em !important;
-  top: calc(0.5em * var(--line-height-normal, 1.5)) !important;
-  transform: translateY(-50%) !important;
-  width: 1.05em !important; height: 1.05em !important;
-  margin: 0 !important;
-  font-size: inherit !important;
+.vc-board .vc-rich.vc-rich li.vc-task > input.task-list-item-checkbox[type='checkbox'] {
+  position: absolute;
+  left: -1.55em;
+  top: calc(0.5em * var(--line-height-normal, 1.5));
+  transform: translateY(-50%);
+  width: 1.05em; height: 1.05em;
+  margin: 0;
+  font-size: inherit;
 }
 
 /* Mind map boundaries: a frame you can click (between the topics), resize and title */
@@ -1769,7 +1766,7 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 @container (max-width: 230px) { .vc-video-ctrl .vc-vc-xs { display: none; } }
 /* Notes on a range open above the bar, over the picture (the card clips what is below it). */
 .vc-video-ctrl .vc-vt-pop { top: auto; bottom: calc(100% + 6px); }
-.vc-video-ctrl.is-unsupported { display: none !important; }
+.vc-board .vc-video-ctrl.is-unsupported { display: none; }
 .vc-vt { position: relative; height: 22px; margin: 0 6px; cursor: pointer; touch-action: none; }
 .vc-vt-marks { position: absolute; left: 0; right: 0; top: 0; height: 10px; }
 .vc-vt-bar { position: absolute; left: 0; right: 0; top: 13px; height: 4px; border-radius: 2px; background: var(--background-modifier-border); overflow: hidden; }
@@ -1812,19 +1809,12 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 
 .vc-mm-row.is-wrap { flex-wrap: wrap; }
 .vc-node.is-joining { opacity: 0.45; }
-.vc-node.is-join-target { z-index: 100000 !important; }
+.vc-board .vc-node.is-join-target { z-index: 100000; }
 .vc-node.is-joining { opacity: 0.35; }
 .vc-board path.is-highlight, .vc-pen-live.is-highlight { fill-opacity: 0.45; }
 .vc-board path.is-pencil, .vc-pen-live.is-pencil { fill-opacity: 0.9; }
 .vc-link-input { width: 100%; }
 /* PDF export: while printing, only the stage shows. */
-@media print {
-  html:has(> body.vc-printing), body.vc-printing { height: auto !important; overflow: visible !important; background: transparent !important; }
-  body.vc-printing.vc-print-bg { background: var(--background-primary) !important; }
-  body.vc-printing > *:not(.vc-print-host) { display: none !important; }
-  body.vc-printing > .vc-print-host { display: block !important; position: relative !important; left: 0 !important; top: 0 !important; }
-  body.vc-printing .vc-print-host * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-}
 /* Mind map font size: a number field, then the sizes in a column (Boardmix). */
 .vc-mm-pop.is-font-size { width: 96px; padding: 6px; }
 .vc-mm-size-input { width: 100%; box-sizing: border-box; margin-bottom: 4px; text-align: center; }
@@ -1844,22 +1834,22 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 .vc-vc-volval { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-muted); }
 .vc-vc-volpop input[type='range'].vc-vc-volume {
   appearance: auto; writing-mode: vertical-lr; direction: rtl;
-  width: 18px !important; height: 96px !important; min-width: 0 !important; margin: 2px 0 !important; padding: 0 !important;
-  background: transparent !important; accent-color: var(--interactive-accent);
+  width: 18px; height: 96px; min-width: 0; margin: 2px 0; padding: 0;
+  background: transparent; accent-color: var(--interactive-accent);
 }
 .vc-vc-volpop input[type='range'].vc-vc-volume::-webkit-slider-runnable-track { width: 4px; border-radius: 2px; background: var(--background-modifier-border); }
 .vc-vc-volpop input[type='range'].vc-vc-volume::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 14px !important; height: 14px !important; margin: 0 0 0 -5px !important; border-radius: 50% !important;
-  background: var(--interactive-accent) !important; border: none !important; box-shadow: none !important;
+  -webkit-appearance: none; width: 14px; height: 14px; margin: 0 0 0 -5px; border-radius: 50%;
+  background: var(--interactive-accent); border: none; box-shadow: none;
 }
 .vc-vt-range.is-looping { box-shadow: 0 0 0 2px #34c759; }
 
 /* Full screen: the card fills the screen with the picture on top and its controls below. */
 .vc-node.vc-kind-video:fullscreen { display: flex; flex-direction: column; background: #000; }
 .vc-node.vc-kind-video:fullscreen::after,
-.vc-node.vc-kind-video:fullscreen > :not(.vc-node-body) { display: none !important; }
+.vc-node.vc-kind-video:fullscreen > :not(.vc-node-body) { display: none; }
 .vc-node.vc-kind-video:fullscreen > .vc-node-body { position: relative; inset: auto; flex: 1; min-height: 0; border-radius: 0; box-shadow: none; }
-.vc-node.vc-kind-video:fullscreen .vc-video-ctrl { display: flex !important; }
+.vc-node.vc-kind-video:fullscreen .vc-video-ctrl:not(.is-unsupported) { display: flex; }
 .vc-node.vc-kind-video:fullscreen .vc-vt-pop { top: auto; bottom: calc(100% + 6px); }
 .vc-node.vc-kind-video:fullscreen .vc-video-sub { font-size: 22px; bottom: 24px; }
 .vc-node.vc-kind-video:fullscreen .vc-media-desc, .vc-node.vc-kind-video:fullscreen .vc-media-link { display: none; }
@@ -1932,7 +1922,6 @@ body.is-phone .vc-board[data-toolbar-pos='top'] .vc-toolbar { top: 8px; }
 .vc-number-input { width: 80px; }
 /* Settings: a square colour well, so its round hover ring isn't cut off at the top and bottom. */
 .vc-settings .setting-item-control input[type='color'] { width: 26px; height: 26px; min-height: 26px; }
-.vc-hidden { display: none !important; }
 
 /* GIFs (PureRef-like): a canvas over the picture once paused or stepped, a small bar when selected. */
 .vc-gif-canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: none; pointer-events: none; }
@@ -1992,3 +1981,25 @@ body.is-phone .vc-board[data-toolbar-pos='top'] .vc-toolbar { top: 8px; }
 .vc-crop-handle.is-s { left: 50%; top: 100%; cursor: ns-resize; }
 .vc-crop-handle.is-sw { left: 0; top: 100%; cursor: nesw-resize; }
 .vc-crop-handle.is-w { left: 0; top: 50%; cursor: ew-resize; }
+
+/* Dragging: the grabbing hand everywhere (last in the file, and specific enough to win over the
+   cursors of the things it passes over). */
+.vc-board.vc-board.is-dragging, .vc-board.vc-board.is-dragging * { cursor: grabbing; }
+body.vc-tool-dragging.vc-tool-dragging, body.vc-tool-dragging.vc-tool-dragging * { cursor: grabbing; }
+body.vc-block-drag-active.vc-block-drag-active, body.vc-block-drag-active.vc-block-drag-active * { cursor: grabbing; user-select: none; }
+.vc-board.vc-board.is-erasing[data-tool='pen'], .vc-board.vc-board.is-erasing[data-tool='pen'] * { cursor: cell; }
+
+/* PDF export: the stage waits off screen; while printing, only it shows. */
+.vc-print-host { position: fixed; left: -100000px; top: 0; overflow: hidden; }
+@media print {
+  html:has(> body.vc-printing), html body.vc-printing.vc-printing { height: auto; overflow: visible; background: transparent; }
+  html body.vc-printing.vc-printing.vc-print-bg { background: var(--background-primary); }
+  html body.vc-printing.vc-printing > *:not(.vc-print-host) { display: none; }
+  html body.vc-printing.vc-printing > .vc-print-host.vc-print-host { display: block; position: relative; left: 0; top: 0; }
+  html body.vc-printing.vc-printing .vc-print-host * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* Settings: the tool list sits under its row's name, across the whole row. */
+.vc-tool-setting { flex-wrap: wrap; }
+.vc-tool-setting > .setting-item-info { flex: 1 1 100%; }
+.vc-tool-setting > .setting-item-control:empty { display: none; }

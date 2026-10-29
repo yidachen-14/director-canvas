@@ -69,3 +69,4 @@ export function vcGet<T>(node: RawNode, key: string, fallback: T): T {
   const v = node.vc?.[key];
   return (v === undefined ? fallback : v) as T;
 }
+

@@ -339,12 +339,12 @@ function htmlTagMark(tag: string, attrs: string): Mark | null {
 
 const htmlOf = (node: PMNode): string => {
   const ser = DOMSerializer.fromSchema(schema);
-  const host = document.createElement('div');
+  const host = createDiv();
   host.appendChild(ser.serializeNode(node));
   // Internal links inside HTML: Obsidian follows <a class="internal-link">.
   host.querySelectorAll<HTMLElement>('span[data-wikilink]').forEach(el => {
     if (el.dataset.embed === '1') { el.replaceWith(document.createTextNode(`![[${el.dataset.wikilink}]]`)); return; }
-    const a = document.createElement('a');
+    const a = createEl('a');
     a.className = 'internal-link';
     a.setAttribute('data-href', el.dataset.wikilink ?? '');
     a.setAttribute('href', el.dataset.wikilink ?? '');

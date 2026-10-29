@@ -52,7 +52,7 @@ class LinkModal extends Modal {
       tx.inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); this.finish(v); } });
     });
     const buttons = new Setting(this.contentEl);
-    if (this.value) buttons.addButton(b => b.setButtonText(t('Remove link')).setWarning().onClick(() => this.finish('')));
+    if (this.value) buttons.addButton(b => b.setButtonText(t('Remove link')).setDestructive().onClick(() => this.finish('')));
     buttons.addButton(b => b.setButtonText(t('Cancel')).onClick(() => this.close()))
       .addButton(b => b.setButtonText(t('Save')).setCta().onClick(() => this.finish(v)));
     window.setTimeout(() => { input?.focus(); input?.select(); }, 0);

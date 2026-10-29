@@ -1,3 +1,4 @@
+import { getLanguage as appLanguage } from 'obsidian';
 import { ZH_TW } from './zh-tw';
 import { LOCALES } from './locales';
 
@@ -34,7 +35,7 @@ let current: Language = 'en';
 /** Obsidian's interface language, as one of ours (English when we don't have it). */
 export function obsidianLanguage(): Language {
   let code = 'en';
-  try { code = window.localStorage.getItem('language') || 'en'; } catch { /* default */ }
+  try { code = appLanguage() || 'en'; } catch { /* default (tests, no Obsidian) */ }
   const c = code.toLowerCase();
   if (c === 'zh-tw' || c === 'zh-hk' || c === 'zh-hant') return 'zh-TW';
   if (c.startsWith('zh')) return 'zh-CN';

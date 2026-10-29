@@ -133,7 +133,7 @@ class NoteModal extends Modal {
     }
 
     const buttons = new Setting(el);
-    if (this.remove) buttons.addButton(b => b.setButtonText(t('Delete')).setWarning().onClick(() => { this.close(); this.remove!(); }));
+    if (this.remove) buttons.addButton(b => b.setButtonText(t('Delete')).setDestructive().onClick(() => { this.close(); this.remove!(); }));
     buttons
       .addButton(b => b.setButtonText(t('Cancel')).onClick(() => this.close()))
       .addButton(b => b.setButtonText(this.isNew ? t('Add') : t('Save')).setCta().onClick(() => this.commit()));

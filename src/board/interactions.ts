@@ -102,6 +102,7 @@ export function attachInteractions(board: Board): void {
   const baseCursor = () => {
     if (spaceDown || board.tool === 'hand') return 'grab';
     if (board.tool === 'select') return '';
+    if (board.tool === 'pen' && root.hasClass('is-erasing')) return 'cell';
     const type = getCardType(board.tool);
     if (type && typeof type.icon === 'string') return placeCursor(type.icon);
     return 'crosshair';
@@ -495,6 +496,7 @@ export function attachInteractions(board: Board): void {
           board.select(nodes.filter(n => board.selection.has(n.id)).map(n => map.get(n.id)!));
         }
         root.addClass('is-dragging');
+        setCursor('');
         board.draggingIds = new Set(moving.map(n => n.id));
       }
       const cur = board.clientToWorld(ev.clientX, ev.clientY);

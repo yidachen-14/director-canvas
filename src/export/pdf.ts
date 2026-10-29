@@ -45,7 +45,8 @@ async function printPdf(board: Board, scope: Scope, opts: { page: PageSize; back
     const { width, height } = stage.bounds;
     const pg = pageFor(width, height, opts.page);
     stage.el.setCssStyles({ position: 'absolute', left: `${pg.ox}px`, top: `${pg.oy}px`, transformOrigin: '0 0', transform: `scale(${pg.scale})` });
-    host.setCssStyles({ position: 'fixed', left: '-100000px', top: '0', width: `${pg.pw}px`, height: `${pg.ph}px`, overflow: 'hidden' });
+    // Off screen until printed (styles.css); only its size is set here.
+    host.setCssStyles({ width: `${pg.pw}px`, height: `${pg.ph}px` });
     await imagesReady(stage.el);
     await new Promise(r => window.setTimeout(r, 120));
     const data = await wc.printToPDF({

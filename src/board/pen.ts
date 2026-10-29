@@ -89,7 +89,10 @@ export class PenController {
   }
 
   private syncCursor(): void {
-    this.board.root.toggleClass('is-erasing', this.board.tool === 'pen' && state.tool === 'eraser');
+    const erasing = this.board.tool === 'pen' && state.tool === 'eraser';
+    this.board.root.toggleClass('is-erasing', erasing);
+    // The board's own cursor is set on it directly (by the tool), so the eraser's goes there too.
+    if (this.board.tool === 'pen') this.board.root.setCssStyles({ cursor: erasing ? 'cell' : 'crosshair' });
   }
 
   private renderPicker(): void {

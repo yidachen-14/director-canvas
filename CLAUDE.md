@@ -6,7 +6,7 @@ Obsidian 插件：无限白板，直接打开并编辑原生 `.canvas` 文件。
 
 - **回复语言**：回复用**繁体中文**；工作文档用简体中文。用户不是程序员，用结果说话，不要讲实现细节。
 - **自己收尾**：自己弄出来的东西自己收拾，例如测试分支、被测试动过的白板。不要把杂事丢给用户。
-- **说做不到之前先找办法**：用户的 Mac 上 Safari 已登录 GitHub。网页操作（建 Release、删分支等）先申请用 Safari 自己做，不要直接说"做不到，请你来"。
+- **说做不到之前先找办法，也不要说错原因**：网页操作（建 Release、删分支等）先试内置浏览器等能用的途径，真的做不到时，要准确说明卡在哪里。
 - **每次改动都在用户的 Obsidian 里实测**：
   - 在用户的白板上测试后，一定要用撤销还原，并和测试前的快照比对，确认没有留下改动。
   - 不要把按键打进白板：开发者控制台的焦点会丢，打字前先点一下控制台输入行。
@@ -37,7 +37,7 @@ export default defineConfig([
   { files: ["src/**/*.ts"], languageOptions: { parserOptions: { project: "./tsconfig.json" } } },
 ]);
 EOF
-npx eslint src      # 要求 0 个 error（warning 是旧的，可忽略）
+npx eslint src      # 要求 0 个 error；只剩 execCommand、keyCode、caretRangeFromPoint 这几个刻意保留的 warning
 ```
 
 每次改完都要通过：build、test、lint 0 error。
@@ -75,10 +75,12 @@ for (let i = 0; i < 8; i++) { try { console.warn('INSTALLED', await dcI('<完整
 
 ## 发布新版本
 
-1. 改版本号：`manifest.json`、`package.json`、`package-lock.json`（前两处 `"version"`），并在 `versions.json` 加上 `"x.y.z": "1.7.2"`。
+1. 改版本号：`manifest.json`、`package.json`、`package-lock.json`（前两处 `"version"`），并在 `versions.json` 加上 `"x.y.z": "<minAppVersion>"`（2.1.1 起 minAppVersion 是 1.13.0）。
 2. build、test、lint 通过后提交，推送到 `main`。
 3. 在 GitHub 建 Release：tag 就是版本号（不加 v），选择"Create new tag on publish"，target 选 `main`，说明用英文写。
-   - 云端的会话不能建 Release，也不能推送 tag，所以要用用户 Mac 上的 Safari（需要申请权限）。
+   - 云端会话的 GitHub 代理不能建 Release、推 tag、删分支。电脑操作里 Safari 只给"只读"权限（不能点），Claude in Chrome 也未必连得上。
+   - 可行的做法：Claude 桌面应用的内置浏览器（Claude_Browser 工具）。用户需要在里面登录一次 GitHub，之后登录状态会保留。
+   - 如果都不行，就把步骤和英文说明整理好交给用户，并说明原因。
 4. `.github/workflows/release.yml` 会自动 build，并把三个文件附加到 Release 上。确认 Release 页面上有 main.js、manifest.json、styles.css，而且 manifest 里的版本号正确。
 5. 已经上架，不用再提交 obsidian-releases。用户在 Obsidian 里"检查更新"就能拿到。
 
@@ -105,6 +107,7 @@ for (let i = 0; i < 8; i++) { try { console.warn('INSTALLED', await dcI('<完整
   - `text-cards.ts`：文字、笔记、便利贴、提示框。
 - `src/mindmap/`：心智图，仿 Boardmix。
 - `src/export/`：PDF、PNG（分块渲染，上限 64M 像素）、HTML（固定输出文件夹）、打包。
+- `src/settings-tab.ts`：用 Obsidian 1.13 的 `getSettingDefinitions()`（每一行是一个 render 定义），所以能被 Obsidian 的设置搜索找到。重画用 `this.update()`。
 - `src/i18n/`：18 种语言。繁中在 `zh-tw.ts`，其他在 `locales/*.ts`。新增文字时每个语言都要补。
 - `styles.css`：全部样式。
 
@@ -119,3 +122,16 @@ for (let i = 0; i < 8; i++) { try { console.warn('INSTALLED', await dcI('<完整
 ## 还没做
 
 - PureRef 的按住键操作还没做：按住 C 拉框裁剪、按住 V 在框内移动图片、按住 Shift+V 缩放框内图片。目前用拖框边、拖框内来完成。
+
+## 社区页的扫描（Scorecard）
+
+https://community.obsidian.md/plugins/director-canvas 会自动扫描最新的 Release。2.1.1 已经处理过的项目：
+- styles.css 里没有 `!important`。改用更具体的选择器；拖动时的光标规则放在文件末尾。
+- `:has` 只剩 3 处，都在很小的范围内。
+- 设置页改用 declarative 写法，minAppVersion 提高到 1.13.0。
+- fflate 已升级到 0.8.3。
+- 改用 `getLanguage()` 和 `setDestructive()`，以及 `createDiv`/`createEl`。
+
+刻意保留的：`execCommand`（复制/剪切、心智图输入）、`keyCode` 和 `caretRangeFromPoint`（心智图的输入法处理和点击定位）。这几处改掉的风险大于好处。
+
+改 CSS 后，可以在 Obsidian 控制台跑"计算样式快照"来比对：改之前跑一次记下结果，改之后再跑一次，确认没有任何差异。2.1.1 就是这样验证的。
