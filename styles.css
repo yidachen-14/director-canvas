@@ -1744,20 +1744,17 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 }
 .vc-video-ctrl {
   position: relative; flex: none; z-index: 2; container-type: inline-size;
-  display: flex; flex-direction: row; align-items: center; gap: 2px; padding: 2px 6px; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 0; padding: 4px 6px 2px; box-sizing: border-box;
   background: var(--background-primary); color: var(--text-normal);
   border-top: 1px solid var(--background-modifier-border); cursor: default;
 }
-/* One slim row: play, the track (with its marks), then the time and the other buttons. */
-.vc-video-ctrl > .vc-vc-row { display: contents; }
-.vc-video-ctrl .vc-vc-spacer { display: none; }
-.vc-video-ctrl > .vc-vt { order: 1; flex: 1 1 auto; min-width: 60px; margin: 0 4px; }
-.vc-video-ctrl > .vc-vc-row > * { order: 2; }
-.vc-video-ctrl > .vc-vc-row > :first-child { order: 0; }
-.vc-video-ctrl .vc-vc-time { margin-left: 2px; }
+/* Two rows: the timeline (with its marks) right under the picture, the buttons below it. */
+.vc-video-ctrl > .vc-vt { margin: 0 4px; }
 /* Narrow cards keep the essentials: play, time, marks, speed, volume and full screen. */
-@container (max-width: 380px) { .vc-video-ctrl .vc-vc-sm { display: none; } }
-@container (max-width: 250px) { .vc-video-ctrl .vc-vc-xs { display: none; } }
+@container (max-width: 340px) { .vc-video-ctrl .vc-vc-sm { display: none; } }
+@container (max-width: 230px) { .vc-video-ctrl .vc-vc-xs { display: none; } }
+/* A description under the player gets its own separator. */
+.vc-video-ctrl + .vc-media-desc, .vc-video-ctrl ~ .vc-media-desc { border-top: 1px solid var(--background-modifier-border); }
 /* Notes on a range open above the bar, over the picture (the card clips what is below it). */
 .vc-video-ctrl .vc-vt-pop { top: auto; bottom: calc(100% + 6px); }
 .vc-video-ctrl.is-unsupported { display: none !important; }
@@ -1922,3 +1919,28 @@ body.is-phone .vc-board[data-toolbar-pos='top'] .vc-toolbar { top: 8px; }
 /* Settings: a square colour well, so its round hover ring isn't cut off at the top and bottom. */
 .vc-settings .setting-item-control input[type='color'] { width: 26px; height: 26px; min-height: 26px; }
 .vc-hidden { display: none !important; }
+
+/* GIFs (PureRef-like): a canvas over the picture once paused or stepped, a small bar when selected. */
+.vc-gif-canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: none; pointer-events: none; }
+.vc-media-frame.is-gif-canvas > img { display: none; }
+.vc-media-frame.is-gif-canvas > .vc-gif-canvas { display: block; }
+.vc-gif-ui {
+  position: absolute; left: 6px; right: 6px; bottom: 6px; z-index: 2; container-type: inline-size;
+  display: none; flex-direction: column; gap: 2px; padding: 3px 4px; box-sizing: border-box; border-radius: 8px;
+  background: rgba(24, 24, 26, 0.78); color: #f2f2f2; backdrop-filter: blur(6px); cursor: default;
+}
+.vc-board:not(.has-multi-selection):not(.is-dragging) .vc-node.is-selected .vc-gif-ui { display: flex; }
+.vc-gif-row { display: flex; align-items: center; gap: 1px; min-width: 0; }
+.vc-gif-spacer { flex: 1; }
+.vc-gif-btn.clickable-icon { padding: 3px; color: inherit; }
+.vc-gif-btn.clickable-icon:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.vc-gif-btn.is-active { color: var(--interactive-accent); }
+.vc-gif-btn svg { width: 15px; height: 15px; }
+.vc-gif-rate { font-size: 11.5px; font-weight: 600; min-width: 30px; justify-content: center; font-variant-numeric: tabular-nums; }
+.vc-gif-count { font-size: 11px; font-variant-numeric: tabular-nums; opacity: 0.8; margin-right: 2px; white-space: nowrap; }
+.vc-gif-tl { position: relative; height: 16px; margin: 0 6px; cursor: pointer; touch-action: none; }
+.vc-gif-tl-bar { position: absolute; left: 0; right: 0; top: 6px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.25); overflow: hidden; }
+.vc-gif-tl-fill { height: 100%; background: var(--interactive-accent); }
+.vc-gif-tl-head { position: absolute; top: 2px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #fff; pointer-events: none; }
+@container (max-width: 170px) { .vc-gif-count { display: none; } }
+@container (max-width: 130px) { .vc-gif-rate { display: none; } }
