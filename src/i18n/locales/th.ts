@@ -558,4 +558,7 @@ export const TH: Record<string, string> = {
   "Pure white or black": "ขาวล้วนหรือดำล้วน",
   "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "เป็นพิกเซล การจัดเรียงใช้ระยะเดียวกันได้ เพื่อให้การ์ดตรงกับกริด",
   "Same as the grid": "เหมือนกริด",
+  "Ink pen": "ปากกา",
+  "Fineliner": "ปากกาหัวเข็ม",
+  "Pencil": "ดินสอ",
 };

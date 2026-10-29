@@ -558,4 +558,7 @@ export const VI: Record<string, string> = {
   "Pure white or black": "Trắng hoặc đen thuần",
   "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "Tính bằng pixel. Sắp xếp có thể dùng cùng khoảng cách để thẻ thẳng hàng với lưới.",
   "Same as the grid": "Giống lưới",
+  "Ink pen": "Bút",
+  "Fineliner": "Bút kim",
+  "Pencil": "Bút chì",
 };

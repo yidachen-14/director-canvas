@@ -558,4 +558,7 @@ export const RU: Record<string, string> = {
   "Pure white or black": "Чисто белый или чёрный",
   "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "В пикселях. Упорядочивание может использовать тот же интервал, чтобы карточки выравнивались по сетке.",
   "Same as the grid": "Как у сетки",
+  "Ink pen": "Ручка",
+  "Fineliner": "Линер",
+  "Pencil": "Карандаш",
 };

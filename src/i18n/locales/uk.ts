@@ -558,4 +558,7 @@ export const UK: Record<string, string> = {
   "Pure white or black": "Чисто білий або чорний",
   "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "У пікселях. Упорядкування може використовувати той самий інтервал, щоб картки вирівнювалися за сіткою.",
   "Same as the grid": "Як у сітки",
+  "Ink pen": "Ручка",
+  "Fineliner": "Лайнер",
+  "Pencil": "Олівець",
 };

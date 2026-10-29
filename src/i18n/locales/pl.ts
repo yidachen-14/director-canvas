@@ -558,4 +558,7 @@ export const PL: Record<string, string> = {
   "Pure white or black": "Czysta biel lub czerń",
   "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "W pikselach. Układanie może używać tego samego odstępu, by karty trzymały się siatki.",
   "Same as the grid": "Jak siatka",
+  "Ink pen": "Pióro",
+  "Fineliner": "Cienkopis",
+  "Pencil": "Ołówek",
 };

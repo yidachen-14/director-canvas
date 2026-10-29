@@ -19,6 +19,26 @@ export interface Stroke {
   h?: boolean;
   /** A monoline stroke: one even width all along, no pressure or tapering (like Apple's monoline pen). */
   m?: boolean;
+  /** A pencil line: thin, pressure-shaded and grainy like graphite on paper. */
+  g?: boolean;
+}
+
+/** The graphite grain of pencil lines: the stroke shows through a fine, fixed noise. */
+export const PENCIL_FILTER_ID = 'vc-pencil-grain';
+export const PENCIL_FILTER = `<filter id="${PENCIL_FILTER_ID}" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">`
+  + '<feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="7" result="n"/>'
+  + '<feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.2 1.75" result="grain"/>'
+  + '<feComposite in="SourceGraphic" in2="grain" operator="in"/></filter>';
+
+/** Put the pencil grain into an SVG once (live drawing, drawing cards). */
+export function ensurePencilFilter(svgEl: SVGElement): void {
+  if (svgEl.querySelector(`#${PENCIL_FILTER_ID}`)) return;
+  const defs = document.createElementNS(SVG_NS, 'defs');
+  // Parsed through a throwaway SVG so the filter's elements land in the SVG namespace.
+  const tmp = new DOMParser().parseFromString(`<svg xmlns="${SVG_NS}">${PENCIL_FILTER}</svg>`, 'image/svg+xml');
+  const f = tmp.documentElement.firstElementChild;
+  if (f) defs.appendChild(document.importNode(f, true));
+  svgEl.insertBefore(defs, svgEl.firstChild);
 }
 
 export interface PenShape {
@@ -58,6 +78,16 @@ export function penOutline(st: Stroke, shape: PenShape = penShape, live = false)
     last: !live,
     start: { taper: 0, cap: true },
     end: { taper: 0, cap: true },
+  } : st.g ? {
+    // Pencil: pressure (or speed) shades it more than a pen, with soft ends.
+    size: st.s,
+    thinning: 0.5,
+    streamline: shape.streamline,
+    smoothing: shape.smoothing,
+    simulatePressure: !hasPressure(st.p),
+    last: !live,
+    start: { taper: Math.max(4, shape.taperStart), cap: true },
+    end: { taper: Math.max(4, shape.taperEnd), cap: true },
   } : {
     size: st.s,
     thinning: shape.thinning,
@@ -129,8 +159,9 @@ export function strokeOutline(st: Stroke, live = false): string {
 
 /** Inline SVG kept in the node's text, so the core Canvas shows the drawing too. */
 export function drawingSvg(strokes: Stroke[], vw: number, vh: number): string {
-  const paths = strokes.map(s => `<path d="${strokeOutline(s)}" style="fill:${s.c}${s.h ? ';fill-opacity:0.45' : ''}"/>`).join('');
-  return `<svg xmlns="${SVG_NS}" viewBox="0 0 ${r2(vw)} ${r2(vh)}" width="100%">${paths}</svg>`;
+  const paths = strokes.map(s => `<path d="${strokeOutline(s)}" style="fill:${s.c}${s.h ? ';fill-opacity:0.45' : ''}${s.g ? ';fill-opacity:0.9' : ''}"${s.g ? ` filter="url(#${PENCIL_FILTER_ID})"` : ''}/>`).join('');
+  const defs = strokes.some(s => s.g) ? `<defs>${PENCIL_FILTER}</defs>` : '';
+  return `<svg xmlns="${SVG_NS}" viewBox="0 0 ${r2(vw)} ${r2(vh)}" width="100%">${defs}${paths}</svg>`;
 }
 
 export function strokesOf(n: RawNode): Stroke[] {
@@ -221,11 +252,14 @@ class DrawingCard implements CardHandle {
     const vw = Number(n.vc?.vw) || n.width, vh = Number(n.vc?.vh) || n.height;
     this.svg.setAttribute('viewBox', `0 0 ${vw} ${vh}`);
     this.svg.replaceChildren();
-    for (const s of strokesOf(n)) {
+    const strokes = strokesOf(n);
+    if (strokes.some(s => s.g)) ensurePencilFilter(this.svg);
+    for (const s of strokes) {
       const p = document.createElementNS(SVG_NS, 'path');
       p.setAttribute('d', strokeOutline(s));
       p.style.fill = s.c;
       if (s.h) p.classList.add('is-highlight');
+      if (s.g) { p.classList.add('is-pencil'); p.setAttribute('filter', `url(#${PENCIL_FILTER_ID})`); }
       this.svg.appendChild(p);
     }
   }

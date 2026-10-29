@@ -17,7 +17,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const PAD = 24;
 const SIDES = ['right' as const, 'left' as const];
 
-interface Geo { w: number; h: number; ox: number; oy: number }
+interface Geo { w: number; h: number; ox: number; oy: number; rw: number; rh: number }
 
 function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number>, parent?: Element): SVGElementTagNameMap[K] {
   const el = document.createElementNS(SVG_NS, tag);
@@ -782,19 +782,23 @@ export class MindMapCard implements CardHandle, MindMapControl {
     this.drawBoundaries();
     this.drawOverlay();
     const r = this.placed.get(d.root.id)!;
-    return { w, h, ox: Math.round(r.x + this.shift.x + r.w / 2), oy: Math.round(r.y + this.shift.y + r.h / 2) };
+    return { w, h, ox: Math.round(r.x + this.shift.x + r.w / 2), oy: Math.round(r.y + this.shift.y + r.h / 2), rw: r.w, rh: r.h };
   }
 
   /** Where the central topic is now, kept still while the card changes size. */
   private fitInto(n: RawNode, geo: Geo): void {
     let ox = Number(n.vc?.ox), oy = Number(n.vc?.oy);
     if (!Number.isFinite(ox) || !Number.isFinite(oy)) { ox = n.width / 2; oy = n.height / 2; }
-    const cx = n.x + ox, cy = n.y + oy;
+    let cx = n.x + ox, cy = n.y + oy;
+    // A new map: its central topic's top-left corner sits where the board was clicked.
+    if (n.vc?.newAt) { cx = n.x + geo.rw / 2; cy = n.y + geo.rh / 2; }
     n.x = Math.round(cx - geo.ox);
     n.y = Math.round(cy - geo.oy);
     n.width = geo.w;
     n.height = geo.h;
-    n.vc = { ...(n.vc ?? {}), ox: geo.ox, oy: geo.oy };
+    const vc: Record<string, unknown> = { ...(n.vc ?? {}), ox: geo.ox, oy: geo.oy };
+    delete vc.newAt;
+    n.vc = vc;
   }
 
   private fitQuietly(): void {
@@ -1365,7 +1369,7 @@ export const mindMapCard: CardType = {
   noColor: true,
   create: () => {
     const d = newMindMap(t('Central topic'));
-    return { type: 'text', text: toMarkdown(d.root), vc: { kind: 'mindmap', mm: d } };
+    return { type: 'text', text: toMarkdown(d.root), vc: { kind: 'mindmap', mm: d, newAt: true } };
   },
   mount: (node, el, ctx) => new MindMapCard(node, el, ctx),
 };

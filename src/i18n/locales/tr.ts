@@ -558,4 +558,7 @@ export const TR: Record<string, string> = {
   "Pure white or black": "Saf beyaz veya siyah",
   "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "Piksel cinsinden. Düzenleme aynı aralığı kullanabilir, böylece kartlar ızgarayla hizalanır.",
   "Same as the grid": "Izgarayla aynı",
+  "Ink pen": "Kalem",
+  "Fineliner": "İnce uçlu kalem",
+  "Pencil": "Kurşun kalem",
 };

@@ -558,4 +558,7 @@ export const NL: Record<string, string> = {
   "Pure white or black": "Puur wit of zwart",
   "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "In pixels. Schikken kan dezelfde afstand gebruiken, zodat kaarten op het raster uitlijnen.",
   "Same as the grid": "Gelijk aan het raster",
+  "Ink pen": "Pen",
+  "Fineliner": "Fineliner",
+  "Pencil": "Potlood",
 };

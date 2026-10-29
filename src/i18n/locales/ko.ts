@@ -558,4 +558,7 @@ export const KO: Record<string, string> = {
   "Pure white or black": "순백 또는 순흑",
   "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "픽셀 단위. 정렬에 같은 간격을 쓰면 카드가 격자에 맞춰집니다.",
   "Same as the grid": "격자와 동일",
+  "Ink pen": "펜",
+  "Fineliner": "파인라이너",
+  "Pencil": "연필",
 };

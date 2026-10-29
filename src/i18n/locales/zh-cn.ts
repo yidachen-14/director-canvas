@@ -559,4 +559,7 @@ export const ZH_CN: Record<string, string> = {
   "Pure white or black": "纯白或纯黑",
   "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "单位为像素。排列可使用相同间距，让卡片与网格对齐。",
   "Same as the grid": "与网格相同",
+  "Ink pen": "笔",
+  "Fineliner": "针笔",
+  "Pencil": "铅笔",
 };

@@ -558,4 +558,7 @@ export const ID: Record<string, string> = {
   "Pure white or black": "Putih atau hitam murni",
   "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "Dalam piksel. Penyusunan dapat memakai jarak yang sama agar kartu sejajar dengan kisi.",
   "Same as the grid": "Sama dengan kisi",
+  "Ink pen": "Pena",
+  "Fineliner": "Fineliner",
+  "Pencil": "Pensil",
 };

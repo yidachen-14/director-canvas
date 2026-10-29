@@ -558,4 +558,7 @@ export const JA: Record<string, string> = {
   "Pure white or black": "純白または純黒",
   "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "ピクセル単位。整列にも同じ間隔を使うと、カードがグリッドに揃います。",
   "Same as the grid": "グリッドと同じ",
+  "Ink pen": "ペン",
+  "Fineliner": "ファインライナー",
+  "Pencil": "鉛筆",
 };
