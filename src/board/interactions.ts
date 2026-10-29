@@ -670,9 +670,105 @@ export function attachInteractions(board: Board): void {
     });
   }
 
+  /**
+   * Several cards selected: a handle on any of them scales the whole selection together, like any
+   * whiteboard. The card being dragged resizes as it would alone (pictures keep their proportions);
+   * every selected card is scaled by the same factor around the same fixed point (the dragged card's
+   * opposite corner or edge), so the layout between them is kept. Text cards scale their type,
+   * mind maps (sized by their topics) only move.
+   */
+  function startMultiResize(e: PointerEvent, id: string, zone: Zone): void {
+    const n = board.model.node(id);
+    if (!n) return;
+    // A selected group scales what sits inside it too (as moving it carries it).
+    const set = new Map<string, RawNode>();
+    for (const m of board.selectedNodes()) {
+      set.set(m.id, m);
+      if (m.type === 'group') for (const c of board.groupMembers(m)) set.set(c.id, c);
+    }
+    const nodes = [...set.values()];
+    const o = { x: n.x, y: n.y, w: n.width, h: n.height };
+    const extraOf = (m: RawNode) => KEEP_ASPECT.has(cardKindOf(m)) ? descriptionHeight(board.cards.get(m.id)?.el) : 0;
+    const extra = extraOf(n);
+    const fixedOf = (m: RawNode) => !!getCardType(cardKindOf(m))?.fixedSize;
+    const orig = nodes.map(m => ({
+      m, x: m.x, y: m.y, w: m.width, h: m.height, extra: extraOf(m), fixed: fixedOf(m),
+      text: cardKindOf(m) === 'text', font: vcGet(m, 'fontSize', board.settings.defaultTextSize),
+    }));
+    // The smallest scale that keeps every card at least the minimum size.
+    let kMin = 0.05;
+    for (const a of orig) {
+      if (a.fixed || a.text) continue;
+      kMin = Math.max(kMin, MIN_W / Math.max(1, a.w), MIN_H / Math.max(1, a.h - a.extra));
+    }
+    // The fixed point: the dragged card's opposite corner, or for an edge its opposite edge and middle.
+    const fx = zone.includes('w') ? o.x + o.w : zone.includes('e') ? o.x : o.x + o.w / 2;
+    const fy = zone.includes('n') ? o.y + o.h : zone.includes('s') ? o.y : o.y + o.h / 2;
+    const start = board.clientToWorld(e.clientX, e.clientY);
+    let gesture: ReturnType<typeof board.model.beginGesture> | null = null;
+    const ids = orig.map(a => a.m.id);
+    setCursor(ZONE_CURSOR[zone]);
+    root.addClass('is-resizing');
+    let frame = 0;
+    let last: PointerEvent | null = null;
+    const apply = () => {
+      frame = 0;
+      const ev = last;
+      if (!ev) return;
+      gesture ??= board.model.beginGesture();
+      const cur = board.clientToWorld(ev.clientX, ev.clientY);
+      const dx = cur.x - start.x, dy = cur.y - start.y;
+      let w = o.w, h = o.h;
+      if (zone.includes('e')) w = o.w + dx;
+      if (zone.includes('w')) w = o.w - dx;
+      if (zone.includes('s')) h = o.h + dy;
+      if (zone.includes('n')) h = o.h - dy;
+      const kx = w / Math.max(1, o.w), ky = (h - extra) / Math.max(1, o.h - extra);
+      let k = zone === 'e' || zone === 'w' ? kx : zone === 'n' || zone === 's' ? ky : (Math.abs(kx - 1) > Math.abs(ky - 1) ? kx : ky);
+      k = Math.max(kMin, k);
+      for (const a of orig) {
+        const m = a.m;
+        if (a.fixed) {
+          // Keeps its size; its middle moves with the rest.
+          const cx = fx + (a.x + a.w / 2 - fx) * k, cy = fy + (a.y + a.h / 2 - fy) * k;
+          m.x = cx - a.w / 2; m.y = cy - a.h / 2;
+          continue;
+        }
+        m.x = fx + (a.x - fx) * k;
+        m.y = fy + (a.y - fy) * k;
+        if (a.text) {
+          m.vc = { ...(m.vc ?? {}), fontSize: Math.min(400, Math.max(6, Math.round(a.font * k * 10) / 10)) };
+          m.width = a.w * k; m.height = a.h * k;
+        } else {
+          m.width = a.w * k;
+          m.height = (a.h - a.extra) * k + a.extra;
+        }
+      }
+      gesture.preview(ids);
+      // Text cards take the size of their text at the new type size.
+      let measured = false;
+      for (const a of orig) {
+        if (!a.text) continue;
+        const size = board.cards.get(a.m.id)?.handle.measure?.();
+        if (size) { a.m.width = size.width; a.m.height = size.height; measured = true; }
+      }
+      if (measured) gesture.preview(ids);
+    };
+    track(e, 'resize', (ev) => {
+      last = ev;
+      if (!frame) frame = window.requestAnimationFrame(apply);
+    }, () => {
+      if (frame) { cancelAnimationFrame(frame); apply(); }
+      root.removeClass('is-resizing');
+      gesture?.end();
+      setCursor('');
+    });
+  }
+
   function startResize(e: PointerEvent, id: string, zone: Zone): void {
     const n = board.model.node(id);
     if (!n) return;
+    if (board.selection.size > 1 && board.selection.has(id)) { startMultiResize(e, id, zone); return; }
     if (cardKindOf(n) === 'text') { startFontResize(e, n, zone); return; }
     if (!board.selection.has(id)) board.select([id]);
     const o = { x: n.x, y: n.y, w: n.width, h: n.height };
