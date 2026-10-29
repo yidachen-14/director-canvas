@@ -93,7 +93,7 @@ export function buildStage(board: Board, nodes: RawNode[], opts: { padding: numb
   // (playing) in a page.
   const liveGifs = [...board.worldEl.querySelectorAll<HTMLCanvasElement>('.vc-gif-canvas')];
   [...world.querySelectorAll<HTMLCanvasElement>('.vc-gif-canvas')].forEach((c, i) => {
-    const frame = c.parentElement;
+    const frame = c.closest<HTMLElement>('.vc-media-frame');
     const live = liveGifs[i];
     if (!opts.keepVideos && frame?.hasClass('is-gif-canvas') && live?.width) {
       let still = '';

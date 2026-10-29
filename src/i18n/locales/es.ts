@@ -580,4 +580,8 @@ export const ES: Record<string, string> = {
   "Frame copied.": "Fotograma copiado.",
   "Pause all GIFs": "Pausar todos los GIF",
   "Play all GIFs": "Reproducir todos los GIF",
+  "Crop image": "Recortar imagen",
+  "Reset crop": "Restablecer recorte",
+  "Flip horizontally": "Voltear horizontalmente",
+  "Flip vertically": "Voltear verticalmente",
 };

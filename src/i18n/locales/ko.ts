@@ -580,4 +580,8 @@ export const KO: Record<string, string> = {
   "Frame copied.": "프레임을 복사했습니다.",
   "Pause all GIFs": "모든 GIF 일시정지",
   "Play all GIFs": "모든 GIF 재생",
+  "Crop image": "이미지 자르기",
+  "Reset crop": "자르기 초기화",
+  "Flip horizontally": "좌우 뒤집기",
+  "Flip vertically": "상하 뒤집기",
 };

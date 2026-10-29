@@ -80,7 +80,9 @@ export class GifPlayer {
   constructor(private frame: HTMLElement, private img: HTMLImageElement, private file: TFile, private ctx: CardContext, private nodeId: string) {
     this.board = ctx.board;
     frame.addClass('vc-gif');
-    this.canvas = frame.createEl('canvas', { cls: 'vc-gif-canvas' });
+    // Beside the picture, so a crop or a flip of the picture applies to the frames too.
+    this.canvas = createEl('canvas', { cls: 'vc-gif-canvas' });
+    img.after(this.canvas);
     img.addEventListener('load', () => { this.startedAt = performance.now(); });
 
     this.bar = frame.createDiv('vc-gif-ui vc-interactive');

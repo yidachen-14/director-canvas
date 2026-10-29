@@ -581,4 +581,8 @@ export const ZH_CN: Record<string, string> = {
   "Frame copied.": "已复制这一帧。",
   "Pause all GIFs": "暂停所有动图",
   "Play all GIFs": "播放所有动图",
+  "Crop image": "裁剪图片",
+  "Reset crop": "重置裁剪",
+  "Flip horizontally": "水平翻转",
+  "Flip vertically": "垂直翻转",
 };

@@ -580,4 +580,8 @@ export const VI: Record<string, string> = {
   "Frame copied.": "Đã sao chép khung hình.",
   "Pause all GIFs": "Tạm dừng mọi GIF",
   "Play all GIFs": "Phát mọi GIF",
+  "Crop image": "Cắt ảnh",
+  "Reset crop": "Đặt lại vùng cắt",
+  "Flip horizontally": "Lật ngang",
+  "Flip vertically": "Lật dọc",
 };

@@ -580,4 +580,8 @@ export const UK: Record<string, string> = {
   "Frame copied.": "Кадр скопійовано.",
   "Pause all GIFs": "Призупинити всі GIF",
   "Play all GIFs": "Відтворити всі GIF",
+  "Crop image": "Обрізати зображення",
+  "Reset crop": "Скинути обрізання",
+  "Flip horizontally": "Віддзеркалити горизонтально",
+  "Flip vertically": "Віддзеркалити вертикально",
 };

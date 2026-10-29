@@ -580,4 +580,8 @@ export const ID: Record<string, string> = {
   "Frame copied.": "Frame disalin.",
   "Pause all GIFs": "Jeda semua GIF",
   "Play all GIFs": "Putar semua GIF",
+  "Crop image": "Pangkas gambar",
+  "Reset crop": "Atur ulang pangkasan",
+  "Flip horizontally": "Balik horizontal",
+  "Flip vertically": "Balik vertikal",
 };

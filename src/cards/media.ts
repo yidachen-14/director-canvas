@@ -6,6 +6,7 @@ import { commitNode, missingFile } from './basic';
 import { t } from '../i18n';
 import { RichText } from '../richtext/editor';
 import { GifPlayer, isGif } from './gif-player';
+import { applyView, cropOf, flipTransform, isCropped, startCrop } from './crop';
 import { VideoPlayer } from './video-player';
 import { MediaInfoModal } from './media-info';
 
@@ -76,6 +77,8 @@ class MediaCard implements CardHandle {
   private shownFile = '';
   private player: VideoPlayer | null = null;
   private gif: GifPlayer | null = null;
+  private view: HTMLElement | null = null;
+  private box: HTMLElement | null = null;
 
   constructor(private kind: MediaKind, node: RawNode, private el: HTMLElement, private ctx: CardContext) {
     this.node = node;
@@ -119,14 +122,19 @@ class MediaCard implements CardHandle {
       this.player = null;
       this.gif?.destroy();
       this.gif = null;
+      this.view = this.box = null;
       this.frame.empty();
       const file = resolveFile(this.ctx.app, n);
       if (!file) missingFile(this.frame, n.file);
       else {
         const src = this.ctx.app.vault.getResourcePath(file);
         if (this.kind === 'image') {
-          const img = this.frame.createEl('img', { attr: { src, draggable: 'false', alt: file.basename } });
-          img.addEventListener('load', () => this.fitToMedia(img.naturalWidth, img.naturalHeight));
+          // view (clips, mirrors a flip) > box (the whole picture, placed so only the crop shows) > img.
+          this.view = this.frame.createDiv('vc-crop-view');
+          this.box = this.view.createDiv('vc-crop-box');
+          applyView(this.view, this.box, n);
+          const img = this.box.createEl('img', { attr: { src, draggable: 'false', alt: file.basename } });
+          img.addEventListener('load', () => this.fitToPicture(img));
           if (isGif(file)) this.gif = new GifPlayer(this.frame, img, file, this.ctx, n.id);
         } else if (this.kind === 'video') {
           this.player = new VideoPlayer(this.frame, src, this.ctx, n, (w, h) => this.fitToMedia(w, h));
@@ -144,6 +152,8 @@ class MediaCard implements CardHandle {
         }
       }
     }
+    if (this.view && this.box) applyView(this.view, this.box, n);
+    else this.frame.querySelector<HTMLElement>('.vc-video-stage video')?.setCssStyles({ transform: flipTransform(n) });
     const editing = !!this.descRich?.editing;
     if (!editing) {
       const text = this.descText();
@@ -262,6 +272,12 @@ class MediaCard implements CardHandle {
     m.quiet(() => { n.height = want; m.touch(n.id); });
   }
 
+  /** A picture card has the proportions of the part of the picture it shows. */
+  private fitToPicture(img: HTMLImageElement): void {
+    const c = cropOf(this.node);
+    this.fitToMedia(img.naturalWidth * c.w, img.naturalHeight * c.h);
+  }
+
   /** The picture's or video's own pixel size (null until it has loaded). */
   private natural(): { width: number; height: number; duration?: number } | null {
     const img = this.frame.querySelector('img');
@@ -273,8 +289,11 @@ class MediaCard implements CardHandle {
 
   /** The card at the media's own size (plus its link bar and description). */
   originalSize(): { width: number; height: number; media: { width: number; height: number } } | null {
-    const nat = this.natural();
-    if (!nat) return null;
+    const whole = this.natural();
+    if (!whole) return null;
+    // A cropped picture: the shown part at its own pixel size.
+    const c = this.kind === 'image' ? cropOf(this.node) : { w: 1, h: 1 };
+    const nat = { width: Math.round(whole.width * c.w), height: Math.round(whole.height * c.h) };
     const extra = Number(this.ctx.board.model.node(this.node.id)?.vc?.descH) || 0;
     return { width: nat.width, height: nat.height + extra, media: { width: nat.width, height: nat.height } };
   }
@@ -297,7 +316,7 @@ class MediaCard implements CardHandle {
   /** Fit again to an already loaded picture (after an undo, a reload from disk, a width change). */
   private refit(): void {
     const img = this.frame.querySelector('img');
-    if (img?.naturalWidth) { window.setTimeout(() => this.fitToMedia(img.naturalWidth, img.naturalHeight), 0); return; }
+    if (img?.naturalWidth) { window.setTimeout(() => this.fitToPicture(img), 0); return; }
     const v = this.frame.querySelector('video');
     if (v?.videoWidth) window.setTimeout(() => this.fitToMedia(v.videoWidth, v.videoHeight), 0);
   }
@@ -339,6 +358,7 @@ class MediaCard implements CardHandle {
     items.push({ id: 'desc', icon: 'text', label: t(this.descText() ? 'Edit description' : 'Add description'), active: !!this.descText(), run: () => this.ctx.board.startEditing(this.node.id) });
     items.push({ id: 'link', icon: 'link', label: t(this.linkText() ? 'Edit link' : 'Insert link'), active: !!this.linkText(), run: () => this.editLink() });
     if (open) items.push(open);
+    if (this.kind === 'image' && file) items.push({ id: 'crop', icon: 'crop', label: t('Crop image'), active: isCropped(this.node), run: () => startCrop(this.ctx.board) });
     items.push({ id: '@sep', icon: '', label: '' });
     const on = this.hasFrame();
     items.push({ id: 'frame', icon: 'square', label: t(on ? 'Hide the frame' : 'Show a frame'), active: on, run: () => this.setFrame(!on) });

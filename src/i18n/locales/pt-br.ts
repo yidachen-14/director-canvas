@@ -580,4 +580,8 @@ export const PT_BR: Record<string, string> = {
   "Frame copied.": "Quadro copiado.",
   "Pause all GIFs": "Pausar todos os GIFs",
   "Play all GIFs": "Reproduzir todos os GIFs",
+  "Crop image": "Recortar imagem",
+  "Reset crop": "Redefinir recorte",
+  "Flip horizontally": "Inverter horizontalmente",
+  "Flip vertically": "Inverter verticalmente",
 };

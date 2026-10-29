@@ -580,4 +580,8 @@ export const TR: Record<string, string> = {
   "Frame copied.": "Kare kopyalandı.",
   "Pause all GIFs": "Tüm GIF'leri duraklat",
   "Play all GIFs": "Tüm GIF'leri oynat",
+  "Crop image": "Görüntüyü kırp",
+  "Reset crop": "Kırpmayı sıfırla",
+  "Flip horizontally": "Yatay çevir",
+  "Flip vertically": "Dikey çevir",
 };

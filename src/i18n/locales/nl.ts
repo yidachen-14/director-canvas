@@ -580,4 +580,8 @@ export const NL: Record<string, string> = {
   "Frame copied.": "Frame gekopieerd.",
   "Pause all GIFs": "Alle GIF's pauzeren",
   "Play all GIFs": "Alle GIF's afspelen",
+  "Crop image": "Afbeelding bijsnijden",
+  "Reset crop": "Bijsnijden herstellen",
+  "Flip horizontally": "Horizontaal spiegelen",
+  "Flip vertically": "Verticaal spiegelen",
 };

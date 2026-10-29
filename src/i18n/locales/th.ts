@@ -580,4 +580,8 @@ export const TH: Record<string, string> = {
   "Frame copied.": "คัดลอกเฟรมแล้ว",
   "Pause all GIFs": "หยุด GIF ทั้งหมดชั่วคราว",
   "Play all GIFs": "เล่น GIF ทั้งหมด",
+  "Crop image": "ครอบตัดรูปภาพ",
+  "Reset crop": "รีเซ็ตการครอบตัด",
+  "Flip horizontally": "พลิกแนวนอน",
+  "Flip vertically": "พลิกแนวตั้ง",
 };

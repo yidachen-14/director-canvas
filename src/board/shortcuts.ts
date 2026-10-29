@@ -3,6 +3,7 @@ import type { Board } from './board';
 import { duplicateSelection } from './interactions';
 import { ARRANGE, runArrange } from './arrange-commands';
 import { availableTools, FIXED_TOOLS } from './tools';
+import { flipSelection, resetCrop, startCrop } from '../cards/crop';
 
 /**
  * Every keyboard shortcut of a board, in one table. Keys are written "Mod+Alt+Shift+K":
@@ -53,6 +54,10 @@ export function allShortcuts(): Shortcut[] {
     { id: 'duplicate', label: 'Duplicate', group: 'edit', keys: ['Mod+D'], run: b => duplicateSelection(b) },
     { id: 'group', label: 'Group the selection', group: 'edit', keys: ['Mod+G'], run: b => b.groupSelection() },
     { id: 'ungroup', label: 'Ungroup', group: 'edit', keys: ['Mod+Shift+G'], run: b => b.ungroupSelection() },
+    { id: 'crop', label: 'Crop image', group: 'edit', keys: ['Mod+Alt+Shift+C'], run: b => startCrop(b) },
+    { id: 'reset-crop', label: 'Reset crop', group: 'edit', keys: ['Mod+Shift+C'], run: b => resetCrop(b) },
+    { id: 'flip-h', label: 'Flip horizontally', group: 'edit', keys: ['Alt+Shift+H'], run: b => flipSelection(b, 'h') },
+    { id: 'flip-v', label: 'Flip vertically', group: 'edit', keys: ['Alt+Shift+V'], run: b => flipSelection(b, 'v') },
     { id: 'zoom-in', label: 'Zoom in', group: 'view', keys: ['Mod+='], run: b => b.zoomStep(1) },
     { id: 'zoom-out', label: 'Zoom out', group: 'view', keys: ['Mod+-'], run: b => b.zoomStep(-1) },
     { id: 'zoom-100', label: 'Zoom to 100%', group: 'view', keys: ['Mod+0'], run: b => b.setZoom(1, true) },

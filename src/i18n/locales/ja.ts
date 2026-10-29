@@ -580,4 +580,8 @@ export const JA: Record<string, string> = {
   "Frame copied.": "フレームをコピーしました。",
   "Pause all GIFs": "すべての GIF を一時停止",
   "Play all GIFs": "すべての GIF を再生",
+  "Crop image": "画像をトリミング",
+  "Reset crop": "トリミングをリセット",
+  "Flip horizontally": "左右反転",
+  "Flip vertically": "上下反転",
 };

@@ -9,6 +9,7 @@ import { allCardTypes } from '../cards/registry';
 import { presetColor } from '../cards/util';
 import type { Point } from './viewport';
 import { boardHasGifs, setBoardGifsPaused } from '../cards/gif-player';
+import { anyCropped, canCrop, flipSelection, hasFlippable, resetCrop, startCrop } from '../cards/crop';
 import { t } from '../i18n';
 
 /** Extra entries other modules (arrange, export, cards) add to the menus. */
@@ -130,6 +131,13 @@ function cardMenu(menu: Menu, board: Board, at: Point): void {
     }
   }
   if (!multi && nodes[0]) board.cards.get(nodes[0].id)?.handle.menu?.(menu);
+  // Pictures (and videos): crop and flip what the card shows, like PureRef. The file is not changed.
+  if (canCrop(board)) menu.addItem(i => i.setTitle(t('Crop image')).setIcon('crop').setSection('picture').onClick(() => startCrop(board)));
+  if (anyCropped(board)) menu.addItem(i => i.setTitle(t('Reset crop')).setIcon('rotate-ccw').setSection('picture').onClick(() => resetCrop(board)));
+  if (hasFlippable(board)) {
+    menu.addItem(i => i.setTitle(t('Flip horizontally')).setIcon('flip-horizontal-2').setSection('picture').onClick(() => flipSelection(board, 'h')));
+    menu.addItem(i => i.setTitle(t('Flip vertically')).setIcon('flip-vertical-2').setSection('picture').onClick(() => flipSelection(board, 'v')));
+  }
   menu.addItem(i => i.setTitle(t('Copy')).setIcon('copy').setSection('edit').onClick(() => { board.root.focus(); document.execCommand('copy'); }));
   menu.addItem(i => i.setTitle(t('Cut')).setIcon('scissors').setSection('edit').onClick(() => { board.root.focus(); document.execCommand('cut'); }));
   menu.addItem(i => i.setTitle(t('Duplicate')).setIcon('copy-plus').setSection('edit').onClick(() => duplicateSelection(board)));
