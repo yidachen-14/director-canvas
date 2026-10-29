@@ -571,4 +571,13 @@ export const ES: Record<string, string> = {
   "Transparent": "Transparente",
   "A folder with index.html and the pictures and videos next to it.": "Una carpeta con index.html y las imágenes y vídeos al lado.",
   "Board export options…": "Opciones de exportación del tablero…",
+  "Open in default app": "Abrir con la app predeterminada",
+  "Reveal in Finder": "Mostrar en Finder",
+  "Show in system explorer": "Mostrar en el explorador del sistema",
+  "Frame timeline": "Línea de tiempo de fotogramas",
+  "Copy this frame": "Copiar este fotograma",
+  "Add this frame to the board": "Añadir este fotograma al tablero",
+  "Frame copied.": "Fotograma copiado.",
+  "Pause all GIFs": "Pausar todos los GIF",
+  "Play all GIFs": "Reproducir todos los GIF",
 };

@@ -571,4 +571,13 @@ export const KO: Record<string, string> = {
   "Transparent": "투명",
   "A folder with index.html and the pictures and videos next to it.": "index.html과 그 옆에 이미지와 동영상이 있는 폴더.",
   "Board export options…": "보드 내보내기 옵션…",
+  "Open in default app": "기본 앱으로 열기",
+  "Reveal in Finder": "Finder에서 보기",
+  "Show in system explorer": "시스템 탐색기에서 보기",
+  "Frame timeline": "프레임 타임라인",
+  "Copy this frame": "이 프레임 복사",
+  "Add this frame to the board": "이 프레임을 보드에 추가",
+  "Frame copied.": "프레임을 복사했습니다.",
+  "Pause all GIFs": "모든 GIF 일시정지",
+  "Play all GIFs": "모든 GIF 재생",
 };

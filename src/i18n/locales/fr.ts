@@ -571,4 +571,13 @@ export const FR: Record<string, string> = {
   "Transparent": "Transparent",
   "A folder with index.html and the pictures and videos next to it.": "Un dossier avec index.html et les images et vidéos à côté.",
   "Board export options…": "Options d’export du tableau…",
+  "Open in default app": "Ouvrir avec l'app par défaut",
+  "Reveal in Finder": "Afficher dans le Finder",
+  "Show in system explorer": "Afficher dans l'explorateur du système",
+  "Frame timeline": "Frise des images",
+  "Copy this frame": "Copier cette image",
+  "Add this frame to the board": "Ajouter cette image au tableau",
+  "Frame copied.": "Image copiée.",
+  "Pause all GIFs": "Mettre en pause tous les GIF",
+  "Play all GIFs": "Lire tous les GIF",
 };

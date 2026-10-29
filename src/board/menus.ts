@@ -8,6 +8,7 @@ import { addArrangeMenu } from './arrange-commands';
 import { allCardTypes } from '../cards/registry';
 import { presetColor } from '../cards/util';
 import type { Point } from './viewport';
+import { boardHasGifs, setBoardGifsPaused } from '../cards/gif-player';
 import { t } from '../i18n';
 
 /** Extra entries other modules (arrange, export, cards) add to the menus. */
@@ -108,6 +109,10 @@ function boardMenu(menu: Menu, board: Board, at: Point): void {
   for (const c of contributions) if (c.where === 'board') c.add(menu, board, at);
   menu.addItem(i => i.setTitle(t('Zoom to fit')).setIcon('maximize').setSection('view').onClick(() => board.zoomToFit(undefined, true)));
   menu.addItem(i => i.setTitle(t('Zoom to 100%')).setIcon('scan').setSection('view').onClick(() => board.setZoom(1, true)));
+  if (boardHasGifs(board)) {
+    menu.addItem(i => i.setTitle(t('Pause all GIFs')).setIcon('pause').setSection('gif').onClick(() => setBoardGifsPaused(board, true)));
+    menu.addItem(i => i.setTitle(t('Play all GIFs')).setIcon('play').setSection('gif').onClick(() => setBoardGifsPaused(board, false)));
+  }
 }
 
 function cardMenu(menu: Menu, board: Board, at: Point): void {

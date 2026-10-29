@@ -571,4 +571,13 @@ export const JA: Record<string, string> = {
   "Transparent": "透明",
   "A folder with index.html and the pictures and videos next to it.": "index.html と、その横に画像と動画を置いたフォルダ。",
   "Board export options…": "ボードの書き出しオプション…",
+  "Open in default app": "既定のアプリで開く",
+  "Reveal in Finder": "Finder で表示",
+  "Show in system explorer": "システムのエクスプローラーで表示",
+  "Frame timeline": "フレームタイムライン",
+  "Copy this frame": "このフレームをコピー",
+  "Add this frame to the board": "このフレームをボードに追加",
+  "Frame copied.": "フレームをコピーしました。",
+  "Pause all GIFs": "すべての GIF を一時停止",
+  "Play all GIFs": "すべての GIF を再生",
 };

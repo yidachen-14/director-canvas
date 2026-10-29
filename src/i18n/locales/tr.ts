@@ -571,4 +571,13 @@ export const TR: Record<string, string> = {
   "Transparent": "Saydam",
   "A folder with index.html and the pictures and videos next to it.": "index.html ve yanında görseller ile videolar bulunan bir klasör.",
   "Board export options…": "Pano dışa aktarma seçenekleri…",
+  "Open in default app": "Varsayılan uygulamada aç",
+  "Reveal in Finder": "Finder'da göster",
+  "Show in system explorer": "Sistem gezgininde göster",
+  "Frame timeline": "Kare zaman çizelgesi",
+  "Copy this frame": "Bu kareyi kopyala",
+  "Add this frame to the board": "Bu kareyi panoya ekle",
+  "Frame copied.": "Kare kopyalandı.",
+  "Pause all GIFs": "Tüm GIF'leri duraklat",
+  "Play all GIFs": "Tüm GIF'leri oynat",
 };

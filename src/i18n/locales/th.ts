@@ -571,4 +571,13 @@ export const TH: Record<string, string> = {
   "Transparent": "โปร่งใส",
   "A folder with index.html and the pictures and videos next to it.": "โฟลเดอร์ที่มี index.html พร้อมรูปภาพและวิดีโออยู่ข้างกัน",
   "Board export options…": "ตัวเลือกการส่งออกบอร์ด…",
+  "Open in default app": "เปิดด้วยแอปเริ่มต้น",
+  "Reveal in Finder": "แสดงใน Finder",
+  "Show in system explorer": "แสดงในตัวจัดการไฟล์ของระบบ",
+  "Frame timeline": "ไทม์ไลน์เฟรม",
+  "Copy this frame": "คัดลอกเฟรมนี้",
+  "Add this frame to the board": "เพิ่มเฟรมนี้ลงบอร์ด",
+  "Frame copied.": "คัดลอกเฟรมแล้ว",
+  "Pause all GIFs": "หยุด GIF ทั้งหมดชั่วคราว",
+  "Play all GIFs": "เล่น GIF ทั้งหมด",
 };

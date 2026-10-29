@@ -586,4 +586,13 @@ export const ZH_TW: Record<string, string> = {
   "Transparent": "透明",
   "A folder with index.html and the pictures and videos next to it.": "一個資料夾：index.html，旁邊放圖片和影片。",
   "Board export options…": "匯出白板選項…",
+  "Open in default app": "使用預設應用程式開啟",
+  "Reveal in Finder": "在 Finder 中顯示",
+  "Show in system explorer": "在系統檔案總管中顯示",
+  "Frame timeline": "影格時間軸",
+  "Copy this frame": "拷貝這一格",
+  "Add this frame to the board": "把這一格加到白板",
+  "Frame copied.": "已拷貝這一格。",
+  "Pause all GIFs": "暫停所有動圖",
+  "Play all GIFs": "播放所有動圖",
 };

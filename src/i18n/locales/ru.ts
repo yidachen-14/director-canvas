@@ -571,4 +571,13 @@ export const RU: Record<string, string> = {
   "Transparent": "Прозрачный",
   "A folder with index.html and the pictures and videos next to it.": "Папка с index.html и изображениями и видео рядом.",
   "Board export options…": "Параметры экспорта доски…",
+  "Open in default app": "Открыть в приложении по умолчанию",
+  "Reveal in Finder": "Показать в Finder",
+  "Show in system explorer": "Показать в проводнике системы",
+  "Frame timeline": "Шкала кадров",
+  "Copy this frame": "Копировать этот кадр",
+  "Add this frame to the board": "Добавить этот кадр на доску",
+  "Frame copied.": "Кадр скопирован.",
+  "Pause all GIFs": "Приостановить все GIF",
+  "Play all GIFs": "Воспроизвести все GIF",
 };

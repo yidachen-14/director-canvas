@@ -571,4 +571,13 @@ export const UK: Record<string, string> = {
   "Transparent": "Прозорий",
   "A folder with index.html and the pictures and videos next to it.": "Тека з index.html і зображеннями та відео поруч.",
   "Board export options…": "Параметри експорту дошки…",
+  "Open in default app": "Відкрити в типовій програмі",
+  "Reveal in Finder": "Показати у Finder",
+  "Show in system explorer": "Показати в провіднику системи",
+  "Frame timeline": "Шкала кадрів",
+  "Copy this frame": "Копіювати цей кадр",
+  "Add this frame to the board": "Додати цей кадр на дошку",
+  "Frame copied.": "Кадр скопійовано.",
+  "Pause all GIFs": "Призупинити всі GIF",
+  "Play all GIFs": "Відтворити всі GIF",
 };

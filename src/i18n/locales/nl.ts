@@ -571,4 +571,13 @@ export const NL: Record<string, string> = {
   "Transparent": "Transparant",
   "A folder with index.html and the pictures and videos next to it.": "Een map met index.html en de afbeeldingen en video’s ernaast.",
   "Board export options…": "Exportopties voor het bord…",
+  "Open in default app": "Openen met standaardapp",
+  "Reveal in Finder": "Toon in Finder",
+  "Show in system explorer": "Toon in systeemverkenner",
+  "Frame timeline": "Framestijdlijn",
+  "Copy this frame": "Dit frame kopiëren",
+  "Add this frame to the board": "Dit frame aan het bord toevoegen",
+  "Frame copied.": "Frame gekopieerd.",
+  "Pause all GIFs": "Alle GIF's pauzeren",
+  "Play all GIFs": "Alle GIF's afspelen",
 };

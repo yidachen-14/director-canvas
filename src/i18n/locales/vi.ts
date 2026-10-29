@@ -571,4 +571,13 @@ export const VI: Record<string, string> = {
   "Transparent": "Trong suốt",
   "A folder with index.html and the pictures and videos next to it.": "Một thư mục gồm index.html và hình ảnh, video bên cạnh.",
   "Board export options…": "Tùy chọn xuất bảng…",
+  "Open in default app": "Mở bằng ứng dụng mặc định",
+  "Reveal in Finder": "Hiện trong Finder",
+  "Show in system explorer": "Hiện trong trình quản lý tệp của hệ thống",
+  "Frame timeline": "Dòng thời gian khung hình",
+  "Copy this frame": "Sao chép khung hình này",
+  "Add this frame to the board": "Thêm khung hình này vào bảng",
+  "Frame copied.": "Đã sao chép khung hình.",
+  "Pause all GIFs": "Tạm dừng mọi GIF",
+  "Play all GIFs": "Phát mọi GIF",
 };

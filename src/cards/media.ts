@@ -1,10 +1,11 @@
-import { Menu, Modal, Notice, Setting, requestUrl, setIcon, setTooltip, type App } from 'obsidian';
+import { Menu, Modal, Notice, Platform, Setting, requestUrl, setIcon, setTooltip, type App } from 'obsidian';
 import type { RawNode } from '../model/canvas-file';
 import type { BarItem, CardContext, CardHandle, CardType } from './types';
 import { applyCardColor, resolveFile, vcGet } from './util';
 import { commitNode, missingFile } from './basic';
 import { t } from '../i18n';
 import { RichText } from '../richtext/editor';
+import { GifPlayer, isGif } from './gif-player';
 import { VideoPlayer } from './video-player';
 import { MediaInfoModal } from './media-info';
 
@@ -13,6 +14,9 @@ import { MediaInfoModal } from './media-info';
 type MediaKind = 'image' | 'video' | 'audio';
 
 /** Height of what a media card adds to the picture: the link bar above and the description below. */
+/** Height of the one-row video bar some cards were laid out with. */
+const LEGACY_CTRL_H = 29;
+
 export function descriptionHeight(el: HTMLElement | undefined): number {
   if (!el) return 0;
   const h = (sel: string) => { const x = el.querySelector<HTMLElement>(sel); return x && x.isShown() ? x.offsetHeight : 0; };
@@ -71,6 +75,7 @@ class MediaCard implements CardHandle {
   private ro: ResizeObserver;
   private shownFile = '';
   private player: VideoPlayer | null = null;
+  private gif: GifPlayer | null = null;
 
   constructor(private kind: MediaKind, node: RawNode, private el: HTMLElement, private ctx: CardContext) {
     this.node = node;
@@ -112,6 +117,8 @@ class MediaCard implements CardHandle {
       this.shownFile = n.file ?? '';
       this.player?.destroy();
       this.player = null;
+      this.gif?.destroy();
+      this.gif = null;
       this.frame.empty();
       const file = resolveFile(this.ctx.app, n);
       if (!file) missingFile(this.frame, n.file);
@@ -120,6 +127,7 @@ class MediaCard implements CardHandle {
         if (this.kind === 'image') {
           const img = this.frame.createEl('img', { attr: { src, draggable: 'false', alt: file.basename } });
           img.addEventListener('load', () => this.fitToMedia(img.naturalWidth, img.naturalHeight));
+          if (isGif(file)) this.gif = new GifPlayer(this.frame, img, file, this.ctx, n.id);
         } else if (this.kind === 'video') {
           this.player = new VideoPlayer(this.frame, src, this.ctx, n, (w, h) => this.fitToMedia(w, h));
           // Its controls are part of the card's height, like the description.
@@ -206,26 +214,34 @@ class MediaCard implements CardHandle {
     const n = this.ctx.board.model.node(this.node.id);
     if (!n || !this.el.isConnected) return;
     const counted = Number(n.vc?.descH) || 0;
-    const ctrlNew = !!ctrl && ctrl.isShown() && !n.vc?.ctrlIn;
-    if (h === counted && !ctrlNew) return;
+    const ctrlH = ctrl && ctrl.isShown() ? Math.ceil(ctrl.offsetHeight) : 0;
+    const ctrlNew = ctrlH > 0 && !n.vc?.ctrlIn;
+    // Cards laid out with the earlier one-row bar (about 29px) keep their size when the bar changes.
+    const ctrlResized = ctrlH > 0 && !!n.vc?.ctrlIn && (Number(n.vc.ctrlH) || LEGACY_CTRL_H) !== ctrlH;
+    if (h === counted && !ctrlNew && !ctrlResized) return;
     n.vc = { ...(n.vc ?? {}) };
-    if (ctrlNew && this.ctx.board.loadedIds.has(n.id)) {
+    const loaded = this.ctx.board.loadedIds.has(n.id);
+    const narrow = (total: number, pictureBefore: number, pictureAfter: number): boolean => {
+      if (pictureBefore <= 0 || pictureAfter <= 0) return false;
+      n.width = Math.max(60, Math.round(n.width * pictureAfter / pictureBefore));
+      n.height = total;
+      return true;
+    };
+    if (ctrlNew && loaded) {
       // A video laid out before its controls became part of the card: it keeps its place and its
       // height, and gets a little narrower so the controls fit in, so nothing around it moves or is
       // covered. (A test build had already grown such cards by the controls' height: undone here.)
-      const ctrlH = Math.ceil(ctrl.offsetHeight);
       const total = h === counted ? n.height - ctrlH : n.height - counted + (h - ctrlH);
-      const pictureBefore = total - (h - ctrlH), pictureAfter = total - h;
-      if (pictureBefore > 0 && pictureAfter > 0) {
-        n.width = Math.max(60, Math.round(n.width * pictureAfter / pictureBefore));
-        n.height = total;
-      } else n.height = Math.max(24, n.height - counted + h);
+      if (!narrow(total, total - (h - ctrlH), total - h)) n.height = Math.max(24, n.height - counted + h);
+    } else if (ctrlResized && loaded) {
+      if (!narrow(n.height, n.height - counted, n.height - h)) n.height = Math.max(24, n.height - counted + h);
     } else n.height = Math.max(24, n.height - counted + h);
     if (ctrlNew) n.vc.ctrlIn = true;
+    if (ctrlH) n.vc.ctrlH = ctrlH;
     if (h) n.vc.descH = h; else delete n.vc.descH;
     const card = this.el.closest<HTMLElement>('.vc-node');
     if (card) card.setCssStyles({ width: `${n.width}px`, height: `${n.height}px` });
-    if (ctrlNew) { const m = this.ctx.board.model; m.quiet(() => m.touch(n.id)); }
+    if (ctrlNew || ctrlResized) { const m = this.ctx.board.model; m.quiet(() => m.touch(n.id)); }
     this.ctx.board.renderEdges();
   }
 
@@ -288,6 +304,7 @@ class MediaCard implements CardHandle {
   destroy(): void {
     this.ro.disconnect();
     this.player?.destroy();
+    this.gif?.destroy();
     this.descRich?.destroy();
     this.el.querySelectorAll('video,audio').forEach(m => (m as HTMLMediaElement).pause());
   }
@@ -306,7 +323,7 @@ class MediaCard implements CardHandle {
 
   isEditing(): boolean { return !!this.descRich?.editing; }
 
-  onKey(e: KeyboardEvent): boolean { return this.player?.onKey(e) ?? false; }
+  onKey(e: KeyboardEvent): boolean { return this.player?.onKey(e) ?? this.gif?.onKey(e) ?? false; }
 
   stopEditing(): void { this.descRich?.stopEditing(); }
 
@@ -344,6 +361,11 @@ class MediaCard implements CardHandle {
       menu.addItem(i => i.setTitle(t('Set as cover')).setIcon('image').setSection('edit').onClick(() => void player.setCover()));
       if (player.hasCover()) menu.addItem(i => i.setTitle(t('Remove cover')).setIcon('image-off').setSection('edit').onClick(() => player.removeCover()));
     }
+    const gif = this.gif;
+    if (gif?.animated) {
+      menu.addItem(i => i.setTitle(t('Copy this frame')).setIcon('copy').setSection('edit').onClick(() => void gif.copyFrame()));
+      menu.addItem(i => i.setTitle(t('Add this frame to the board')).setIcon('image-plus').setSection('edit').onClick(() => void gif.addFrame()));
+    }
     const file = resolveFile(this.ctx.app, this.node);
     if (file) menu.addItem(i => i.setTitle(t('Information')).setIcon('info').setSection('edit').onClick(() => this.showInfo()));
     if (file) {
@@ -354,6 +376,16 @@ class MediaCard implements CardHandle {
           const explorer = (this.ctx.app as unknown as { internalPlugins?: { getPluginById?: (id: string) => { instance?: { revealInFolder?: (f: unknown) => void } } | null } }).internalPlugins?.getPluginById?.('file-explorer');
           explorer?.instance?.revealInFolder?.(file);
         }));
+      // As in Obsidian's own file menu: hand the file to the system (desktop only).
+      const sys = this.ctx.app as unknown as { openWithDefaultApp?: (path: string) => void; showInFolder?: (path: string) => void };
+      if (Platform.isDesktopApp && sys.openWithDefaultApp) {
+        menu.addItem(i => i.setTitle(t('Open in default app')).setIcon('arrow-up-right').setSection('system')
+          .onClick(() => sys.openWithDefaultApp?.(file.path)));
+      }
+      if (Platform.isDesktopApp && sys.showInFolder) {
+        menu.addItem(i => i.setTitle(Platform.isMacOS ? t('Reveal in Finder') : t('Show in system explorer')).setIcon('arrow-up-right')
+          .setSection('system').onClick(() => sys.showInFolder?.(file.path)));
+      }
     }
   }
 }

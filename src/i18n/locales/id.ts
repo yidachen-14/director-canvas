@@ -571,4 +571,13 @@ export const ID: Record<string, string> = {
   "Transparent": "Transparan",
   "A folder with index.html and the pictures and videos next to it.": "Satu folder berisi index.html dengan gambar dan video di sampingnya.",
   "Board export options…": "Opsi ekspor papan…",
+  "Open in default app": "Buka dengan aplikasi bawaan",
+  "Reveal in Finder": "Tampilkan di Finder",
+  "Show in system explorer": "Tampilkan di penjelajah sistem",
+  "Frame timeline": "Linimasa frame",
+  "Copy this frame": "Salin frame ini",
+  "Add this frame to the board": "Tambahkan frame ini ke papan",
+  "Frame copied.": "Frame disalin.",
+  "Pause all GIFs": "Jeda semua GIF",
+  "Play all GIFs": "Putar semua GIF",
 };

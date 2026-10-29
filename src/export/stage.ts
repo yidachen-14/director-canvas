@@ -37,7 +37,7 @@ export function boundsOf(nodes: RawNode[], padding: number): Bounds {
 /** Things that belong to editing, not to the picture. */
 const UI_ONLY = [
   '.vc-mm-btn', '.vc-mm-ghost', '.vc-mm-drop', '.vc-resize-handle', '.vc-block-handle', '.vc-drop-line',
-  '.vc-swatch-pipette', '.vc-cal-add', '.vc-kb-del', '.vc-kb-add', '.vc-format-bar',
+  '.vc-swatch-pipette', '.vc-cal-add', '.vc-kb-del', '.vc-kb-add', '.vc-format-bar', '.vc-gif-ui',
 ];
 const STATE_CLASSES = ['is-selected', 'has-topic-sel', 'is-editing', 'is-dragging', 'is-drop-target', 'is-hover', 'is-armed'];
 
@@ -89,6 +89,21 @@ export function buildStage(board: Board, nodes: RawNode[], opts: { padding: numb
     x.removeAttribute('contenteditable');
     x.removeAttribute('data-vc-armed');
   }
+  // A paused GIF is a canvas over its picture: a picture of that frame in a still copy, the GIF itself
+  // (playing) in a page.
+  const liveGifs = [...board.worldEl.querySelectorAll<HTMLCanvasElement>('.vc-gif-canvas')];
+  [...world.querySelectorAll<HTMLCanvasElement>('.vc-gif-canvas')].forEach((c, i) => {
+    const frame = c.parentElement;
+    const live = liveGifs[i];
+    if (!opts.keepVideos && frame?.hasClass('is-gif-canvas') && live?.width) {
+      let still = '';
+      try { still = live.toDataURL('image/png'); } catch { /* keep the GIF */ }
+      const img = frame.querySelector('img');
+      if (still && img) img.setAttribute('src', still);
+    }
+    frame?.removeClass('is-gif-canvas');
+    c.remove();
+  });
   // The copy's videos have no frame yet: show the live one's current frame where possible.
   const liveVideos = [...board.worldEl.querySelectorAll('video')];
   const copies = [...world.querySelectorAll('video')];
