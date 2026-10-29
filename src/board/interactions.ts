@@ -124,6 +124,7 @@ export function attachInteractions(board: Board): void {
     if (board.tool !== 'select' || spaceDown) { setCursor(baseCursor()); hoverZone = null; return; }
     hoverZone = zoneAt(w.x, w.y);
     setCursor(hoverZone ? ZONE_CURSOR[hoverZone.zone] : '');
+    root.toggleClass('is-zone-hover', !!hoverZone);
   });
 
   root.addEventListener('pointerleave', () => {
@@ -138,7 +139,11 @@ export function attachInteractions(board: Board): void {
     // Interactive bits inside cards (links, checkboxes, inputs) keep their own clicks;
     // media controls only once their card is selected, so a first click selects it.
     const t = e.target as HTMLElement;
-    if (t.closest('a, input, button, select, textarea, [contenteditable="true"], [contenteditable="plaintext-only"]:not([data-vc-armed]), .vc-interactive')) return;
+    // A player's control bar runs along the card's bottom edge: the resize band there still resizes.
+    const pw = board.clientToWorld(e.clientX, e.clientY);
+    const edgeOfBar = board.tool === 'select' && !!t.closest('.vc-video-ctrl, .vc-gif-ui') && !t.closest('.vc-vt, .vc-gif-tl, .vc-vt-pop, .vc-vc-volpop')
+      && !!zoneAt(pw.x, pw.y, e.pointerType === 'touch');
+    if (!edgeOfBar && t.closest('a, input, button, select, textarea, [contenteditable="true"], [contenteditable="plaintext-only"]:not([data-vc-armed]), .vc-interactive')) return;
     const mediaHost = t.closest('video, audio')?.closest<HTMLElement>('.vc-node');
     if (mediaHost && board.selection.has(mediaHost.dataset.id ?? '') && board.selection.size === 1) return;
     // Buttons inside cards (kanban, swatch, calendar) work once their card is the selection.
@@ -672,9 +677,9 @@ export function attachInteractions(board: Board): void {
 
   /**
    * Several cards selected: a handle on any of them scales the whole selection together, like any
-   * whiteboard. The card being dragged resizes as it would alone (pictures keep their proportions);
-   * every selected card is scaled by the same factor around the same fixed point (the dragged card's
-   * opposite corner or edge), so the layout between them is kept. Text cards scale their type,
+   * whiteboard: every selected card is scaled by the same factor around one fixed point on the
+   * selection's frame, opposite the handle (corner for a corner, middle of the edge for an edge),
+   * so the layout between them is kept. Text cards scale their type,
    * mind maps (sized by their topics) only move.
    */
   function startMultiResize(e: PointerEvent, id: string, zone: Zone): void {
@@ -687,9 +692,7 @@ export function attachInteractions(board: Board): void {
       if (m.type === 'group') for (const c of board.groupMembers(m)) set.set(c.id, c);
     }
     const nodes = [...set.values()];
-    const o = { x: n.x, y: n.y, w: n.width, h: n.height };
     const extraOf = (m: RawNode) => KEEP_ASPECT.has(cardKindOf(m)) ? descriptionHeight(board.cards.get(m.id)?.el) : 0;
-    const extra = extraOf(n);
     const fixedOf = (m: RawNode) => !!getCardType(cardKindOf(m))?.fixedSize;
     const orig = nodes.map(m => ({
       m, x: m.x, y: m.y, w: m.width, h: m.height, extra: extraOf(m), fixed: fixedOf(m),
@@ -701,9 +704,12 @@ export function attachInteractions(board: Board): void {
       if (a.fixed || a.text) continue;
       kMin = Math.max(kMin, MIN_W / Math.max(1, a.w), MIN_H / Math.max(1, a.h - a.extra));
     }
-    // The fixed point: the dragged card's opposite corner, or for an edge its opposite edge and middle.
-    const fx = zone.includes('w') ? o.x + o.w : zone.includes('e') ? o.x : o.x + o.w / 2;
-    const fy = zone.includes('n') ? o.y + o.h : zone.includes('s') ? o.y : o.y + o.h / 2;
+    // The fixed point is on the whole selection's frame, opposite the handle: the bottom-right
+    // handle scales from the top-left corner, the bottom edge from the middle of the top edge, etc.
+    let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+    for (const a of orig) { bx0 = Math.min(bx0, a.x); by0 = Math.min(by0, a.y); bx1 = Math.max(bx1, a.x + a.w); by1 = Math.max(by1, a.y + a.h); }
+    const fx = zone.includes('w') ? bx1 : zone.includes('e') ? bx0 : (bx0 + bx1) / 2;
+    const fy = zone.includes('n') ? by1 : zone.includes('s') ? by0 : (by0 + by1) / 2;
     const start = board.clientToWorld(e.clientX, e.clientY);
     let gesture: ReturnType<typeof board.model.beginGesture> | null = null;
     const ids = orig.map(a => a.m.id);
@@ -717,13 +723,9 @@ export function attachInteractions(board: Board): void {
       if (!ev) return;
       gesture ??= board.model.beginGesture();
       const cur = board.clientToWorld(ev.clientX, ev.clientY);
-      const dx = cur.x - start.x, dy = cur.y - start.y;
-      let w = o.w, h = o.h;
-      if (zone.includes('e')) w = o.w + dx;
-      if (zone.includes('w')) w = o.w - dx;
-      if (zone.includes('s')) h = o.h + dy;
-      if (zone.includes('n')) h = o.h - dy;
-      const kx = w / Math.max(1, o.w), ky = (h - extra) / Math.max(1, o.h - extra);
+      // The point under the pointer follows it: its distance from the fixed point sets the scale.
+      const kx = Math.abs(start.x - fx) > 1 ? (cur.x - fx) / (start.x - fx) : 1;
+      const ky = Math.abs(start.y - fy) > 1 ? (cur.y - fy) / (start.y - fy) : 1;
       let k = zone === 'e' || zone === 'w' ? kx : zone === 'n' || zone === 's' ? ky : (Math.abs(kx - 1) > Math.abs(ky - 1) ? kx : ky);
       k = Math.max(kMin, k);
       for (const a of orig) {
