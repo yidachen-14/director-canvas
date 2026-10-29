@@ -1352,7 +1352,7 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
   flex-direction: column;
   gap: 6px;
   box-sizing: border-box;
-  width: 264px;
+  width: 300px;
   padding: 8px 10px 10px;
   border-radius: 12px;
   background: var(--background-primary);
@@ -1369,11 +1369,11 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-pen-swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--text-normal) 18%, transparent); }
 .vc-pen-swatch.is-auto { background: linear-gradient(135deg, var(--text-normal) 50%, var(--background-primary) 50%); }
 .vc-pen-swatch.is-active { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
-.vc-pen-instruments { align-items: flex-end; height: 50px; gap: 6px; padding: 0 2px; border-bottom: 1px solid var(--background-modifier-border); margin-bottom: 2px; overflow: hidden; }
-.vc-pen-instrument { --ink: var(--text-normal); width: 30px; height: 50px; flex: none; display: flex; align-items: flex-end; justify-content: center; cursor: pointer; transform: translateY(12px); transition: transform 0.15s ease; }
+.vc-pen-instruments { align-items: flex-end; height: 58px; gap: 8px; padding: 0 2px; border-bottom: 1px solid var(--background-modifier-border); margin-bottom: 2px; overflow: hidden; }
+.vc-pen-instrument { --ink: var(--text-normal); width: 34px; height: 58px; flex: none; display: flex; align-items: flex-end; justify-content: center; cursor: pointer; transform: translateY(12px); transition: transform 0.15s ease; }
 .vc-pen-instrument:hover { transform: translateY(8px); }
 .vc-pen-instrument.is-active { transform: translateY(1px); }
-.vc-pen-instrument svg { width: 20px; height: 40px; overflow: visible; }
+.vc-pen-instrument svg { width: 24px; height: 48px; overflow: visible; }
 .vc-pen-instrument svg .b { fill: var(--background-primary); stroke: var(--text-muted); stroke-width: 1.2; stroke-linejoin: round; }
 .vc-pen-instrument svg .l { fill: none; stroke: var(--text-faint); stroke-width: 1; }
 .vc-pen-instrument svg .w { fill: color-mix(in srgb, #d8b07a 70%, var(--background-primary)); stroke: var(--text-muted); stroke-width: 1.2; stroke-linejoin: round; }
