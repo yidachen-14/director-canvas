@@ -1744,17 +1744,24 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 }
 .vc-video-ctrl {
   position: relative; flex: none; z-index: 2; container-type: inline-size;
-  display: flex; flex-direction: column; gap: 0; padding: 4px 6px 2px; box-sizing: border-box;
-  background: var(--background-primary); color: var(--text-normal);
-  border-top: 1px solid var(--background-modifier-border); cursor: default;
+  display: flex; flex-direction: column; gap: 2px; padding: 6px 8px 5px; box-sizing: border-box;
+  /* Dark like a player, so it reads apart from the description under it in any theme. */
+  --vc-ctrl-bg: #1c1c1e;
+  background: var(--vc-ctrl-bg); color: #f2f2f2; cursor: default;
 }
 /* Two rows: the timeline (with its marks) right under the picture, the buttons below it. */
-.vc-video-ctrl > .vc-vt { margin: 0 4px; }
+.vc-video-ctrl > .vc-vt { margin: 0 6px; }
+.vc-video-ctrl .vc-vc-row { gap: 2px; }
+.vc-video-ctrl .vc-vc-btn.clickable-icon { color: rgba(255, 255, 255, 0.82); }
+.vc-video-ctrl .vc-vc-btn.clickable-icon:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+.vc-video-ctrl .vc-vc-btn.is-active { background: rgba(255, 255, 255, 0.16); color: var(--interactive-accent); }
+.vc-video-ctrl .vc-vc-time { color: rgba(255, 255, 255, 0.6); }
+.vc-video-ctrl .vc-vt-bar { background: rgba(255, 255, 255, 0.22); }
+.vc-video-ctrl .vc-vt-head { box-shadow: 0 0 0 2px var(--vc-ctrl-bg); }
+.vc-video-ctrl .vc-vt-range.is-open, .vc-video-ctrl .vc-vt-point.is-open { outline-color: #fff; }
 /* Narrow cards keep the essentials: play, time, marks, speed, volume and full screen. */
 @container (max-width: 340px) { .vc-video-ctrl .vc-vc-sm { display: none; } }
 @container (max-width: 230px) { .vc-video-ctrl .vc-vc-xs { display: none; } }
-/* A description under the player gets its own separator. */
-.vc-video-ctrl + .vc-media-desc, .vc-video-ctrl ~ .vc-media-desc { border-top: 1px solid var(--background-modifier-border); }
 /* Notes on a range open above the bar, over the picture (the card clips what is below it). */
 .vc-video-ctrl .vc-vt-pop { top: auto; bottom: calc(100% + 6px); }
 .vc-video-ctrl.is-unsupported { display: none !important; }
