@@ -574,6 +574,6 @@ export const ZH_TW: Record<string, string> = {
   "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "單位為像素。排列可使用相同間距，讓卡片與網格對齊。",
   "Same as the grid": "與網格相同",
   "Ink pen": "筆",
-  "Fineliner": "針筆",
+  "Fineliner": "代針筆",
   "Pencil": "鉛筆",
 };

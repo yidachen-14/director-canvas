@@ -1369,17 +1369,17 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-pen-swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--text-normal) 18%, transparent); }
 .vc-pen-swatch.is-auto { background: linear-gradient(135deg, var(--text-normal) 50%, var(--background-primary) 50%); }
 .vc-pen-swatch.is-active { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
-.vc-pen-instruments { align-items: flex-end; height: 58px; gap: 8px; padding: 0 2px; border-bottom: 1px solid var(--background-modifier-border); margin-bottom: 2px; overflow: hidden; }
-.vc-pen-instrument { --ink: var(--text-normal); width: 34px; height: 58px; flex: none; display: flex; align-items: flex-end; justify-content: center; cursor: pointer; transform: translateY(12px); transition: transform 0.15s ease; }
-.vc-pen-instrument:hover { transform: translateY(8px); }
-.vc-pen-instrument.is-active { transform: translateY(1px); }
-.vc-pen-instrument svg { width: 24px; height: 48px; overflow: visible; }
-.vc-pen-instrument svg .b { fill: var(--background-primary); stroke: var(--text-muted); stroke-width: 1.2; stroke-linejoin: round; }
-.vc-pen-instrument svg .l { fill: none; stroke: var(--text-faint); stroke-width: 1; }
-.vc-pen-instrument svg .w { fill: color-mix(in srgb, #d8b07a 70%, var(--background-primary)); stroke: var(--text-muted); stroke-width: 1.2; stroke-linejoin: round; }
-.vc-pen-instrument svg .e { fill: #f28b9a; stroke: var(--text-muted); stroke-width: 1.2; }
-.vc-pen-instrument svg .i { fill: var(--ink); stroke: none; }
-.vc-pen-instrument.is-highlighter svg .i { opacity: 0.85; }
+.vc-pen-instruments { align-items: stretch; gap: 2px; padding-bottom: 6px; border-bottom: 1px solid var(--background-modifier-border); margin-bottom: 2px; }
+.vc-pen-instrument { --ink: var(--text-normal); flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0 3px; border-radius: 8px; cursor: pointer; color: var(--icon-color); }
+.vc-pen-instrument:hover { background: var(--background-modifier-hover); }
+.vc-pen-instrument.is-active { background: color-mix(in srgb, var(--interactive-accent) 14%, transparent); color: var(--text-normal); }
+.vc-pen-instrument svg { width: 24px; height: 24px; }
+.vc-pen-instrument svg .o { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.vc-pen-instrument svg .f { fill: currentColor; }
+.vc-pen-instrument svg .cut { stroke: var(--background-primary); stroke-width: 1.4; }
+.vc-pen-instrument svg .i { fill: var(--ink); }
+.vc-pen-instrument-name { font-size: 10.5px; line-height: 1.2; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.vc-pen-instrument.is-active .vc-pen-instrument-name { color: var(--text-normal); font-weight: 600; }
 .vc-pen-instruments .vc-pen-tool { margin-left: auto; align-self: center; }
 .vc-pen-colors { flex-wrap: wrap; gap: 6px; }
 .vc-pen-custom { position: relative; background: conic-gradient(#ff4d4d, #ffd84d, #5bd65b, #4dd2ff, #6b5bff, #ff4dd8, #ff4d4d); }
@@ -1389,7 +1389,8 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-pen-width { flex: 1; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 7px; cursor: pointer; border: 1px solid transparent; }
 .vc-pen-width:hover { background: var(--background-modifier-hover); }
 .vc-pen-width.is-active { border-color: var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 10%, transparent); }
-.vc-pen-width-dot { border-radius: 50%; background: var(--text-normal); }
+.vc-pen-width svg { width: 26px; height: 26px; stroke: var(--ink, var(--text-normal)); }
+.vc-pen-width svg.is-highlight { stroke-opacity: 0.6; }
 .vc-pen-options {
   position: absolute;
   /* Just right of the picker, level with it. */

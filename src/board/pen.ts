@@ -25,23 +25,26 @@ const HL_COLORS: [string, string][] = [
 const WIDTHS = [2, 4, 7, 11, 16];
 
 /**
- * The instruments drawn upright like Freeform's: an outline body, with the part that touches the
- * paper painted in the ink colour (`--ink`).
+ * The instruments as Freeform draws them in its menu: small nib glyphs in the icon colour, with the
+ * part that touches the paper (`.i`) in the ink colour (`--ink`).
  */
 const INSTRUMENT_SVG: Record<Instrument, string> = {
-  pen: '<path d="M6 40V17l4-13 4 13v23" class="b"/><path d="M6 17h8" class="l"/><path d="M8.6 8.6 10 4l1.4 4.6z" class="i"/><path d="M6 21h8v3H6z" class="i"/>',
-  monoline: '<path d="M5.5 40V18h9v22" class="b"/><path d="M8 18v-6h4v6" class="b"/><path d="M9.3 12V3.5h1.4V12z" class="i"/><path d="M5.5 22h9v3h-9z" class="i"/>',
-  highlighter: '<path d="M4 40V18h12v22" class="b"/><path d="M5.5 18v-5h9v5" class="b"/><path d="M6.5 13V8l7-3v8z" class="i"/>',
-  pencil: '<path d="M6 40V16h8v24" class="b"/><path d="M8.7 16v24M11.3 16v24" class="l"/><path d="M6 16 10 3.5 14 16z" class="w"/><path d="M8.6 8 10 3.5 11.4 8z" class="i"/>',
-  eraser: '<path d="M5 40V18h10v22" class="b"/><path d="M5 18v-6a5 5 0 0 1 10 0v6z" class="e"/><path d="M5 22h10" class="l"/>',
+  pen: '<path d="M8 20.5 11.2 6h1.6L16 20.5" class="o"/><path d="M11.2 6 12 3l.8 3z" class="i"/>',
+  monoline: '<path d="M8.5 20.5V13h7v7.5" class="o"/><path d="M10 13v-3.2h4V13" class="o"/><path d="M11.35 9.8V3h1.3v6.8z" class="i"/>',
+  highlighter: '<path d="M8 20.5V11.5h8v9z" class="f"/><path d="M9 11.5V8l6-3v6.5z" class="i"/>',
+  pencil: '<path d="M7.5 20.5 12 4l4.5 16.5" class="o"/><path d="M9.6 12.8q.6 1.4 1.2 0t1.2 0 1.2 0 1.2 0" class="o"/><path d="M10.6 9.2 12 4l1.4 5.2z" class="i"/>',
+  eraser: '<path d="M7.5 20.5V9.5a4.5 4.5 0 0 1 9 0v11z" class="f"/><path d="M7.5 15h9" class="cut"/>',
 };
+
+/** A width sample: a short squiggle drawn at that thickness. */
+const SQUIGGLE = 'M4 15.5c1.8-6 4-7.5 5.2-2.2s2.7 5.6 4.7.5 3.6-6.3 6.1.2';
 
 /** A new pen stroke joins the sketch being drawn when it starts this close to it (board units). */
 const JOIN_DISTANCE = 48;
 
 /** One instrument's drawing, parsed from the fixed markup above (no user input in it). */
 function instrumentSvg(tool: Instrument): SVGElement {
-  const doc = new DOMParser().parseFromString(`<svg xmlns="${SVG_NS}" viewBox="0 0 20 40" aria-hidden="true">${INSTRUMENT_SVG[tool]}</svg>`, 'image/svg+xml');
+  const doc = new DOMParser().parseFromString(`<svg xmlns="${SVG_NS}" viewBox="0 0 24 24" aria-hidden="true">${INSTRUMENT_SVG[tool]}</svg>`, 'image/svg+xml');
   return document.importNode(doc.documentElement, true) as unknown as SVGElement;
 }
 
@@ -106,6 +109,7 @@ export class PenController {
     for (const [tool, label] of instruments) {
       const b = tools.createDiv({ cls: `vc-pen-instrument is-${tool}`, attr: { role: 'button', 'aria-label': t(label) } });
       b.appendChild(instrumentSvg(tool));
+      b.createDiv({ cls: 'vc-pen-instrument-name', text: t(label) });
       // Each instrument shows the colour it would draw with.
       const own = tool === 'highlighter' ? state.hlColor : tool === 'eraser' ? '' : state.color;
       if (own && own !== 'currentColor') b.style.setProperty('--ink', own);
@@ -159,12 +163,13 @@ export class PenController {
     input.addEventListener('change', () => this.renderPicker());
 
     const widths = p.createDiv('vc-pen-row vc-pen-widths');
-    WIDTHS.forEach((w, i) => {
+    WIDTHS.forEach((_w, i) => {
       const b = widths.createDiv({ cls: 'vc-pen-width', attr: { role: 'button', 'aria-label': t('Thickness {n}', { n: i + 1 }) } });
-      const dot = b.createDiv('vc-pen-width-dot');
-      const shown = Math.max(2, Math.min(18, (hl ? w * 1.6 : w) * 0.9 + 1));
-      dot.setCssStyles({ width: `${shown}px`, height: `${shown}px` });
-      if (ink && ink !== 'currentColor') dot.style.background = ink;
+      const doc = new DOMParser().parseFromString(`<svg xmlns="${SVG_NS}" viewBox="0 0 24 24"><path d="${SQUIGGLE}" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="${[1.2, 2, 3, 4.2, 5.6][i]}"/></svg>`, 'image/svg+xml');
+      const svgEl = document.importNode(doc.documentElement, true) as unknown as SVGElement;
+      if (ink && ink !== 'currentColor') svgEl.style.setProperty('--ink', ink);
+      if (hl) svgEl.addClass('is-highlight');
+      b.appendChild(svgEl);
       b.toggleClass('is-active', state.width === i);
       b.addEventListener('click', () => { state.width = i; this.renderPicker(); });
     });

@@ -1,5 +1,6 @@
 import type { Board } from './board';
 import { getCardType } from '../cards/registry';
+import '../ui/icons';
 
 /**
  * A toolbar tool. Mode tools (select, hand, connect, card kinds) stay active
@@ -32,7 +33,7 @@ export const TOOLS: Tool[] = [
   cardTool('kanban'),
   cardTool('column'),
   cardTool('group'),
-  { id: 'connect', label: 'Connect', icon: 'spline' },
+  { id: 'connect', label: 'Connect', icon: 'vc-connect' },
   { id: 'pen', label: 'Pen', icon: 'pen-line', available: () => !!getCardType('drawing') },
   cardTool('swatch'),
   cardTool('bookmark'),
