@@ -37,7 +37,7 @@ export function attachInteractions(board: Board): void {
   const root = board.root;
   let spaceDown = false;
   let hoverZone: { id: string; zone: Zone } | null = null;
-  let active: { kind: string; cleanup: () => void } | null = null;
+  let active: { kind: string; cleanup: () => void; cancel: () => void } | null = null;
   const connect = new ConnectController(board);
   const pen = new PenController(board);
   board.connections = connect;
@@ -51,13 +51,16 @@ export function attachInteractions(board: Board): void {
   const nodeAt = (wx: number, wy: number): RawNode | null => board.nodeAt(wx, wy);
 
   /** Resize zone under a world point: a band just inside and outside each edge. */
-  const zoneAt = (wx: number, wy: number): { id: string; zone: Zone } | null => {
-    const out = 6 / board.vp.zoom, inn = 5 / board.vp.zoom;
+  const zoneAt = (wx: number, wy: number, touch = false): { id: string; zone: Zone } | null => {
+    // A finger needs wider bands, and only the selected cards offer them (else every touch near an edge would resize).
+    const k = touch ? 2.6 : 1;
+    const out = 6 * k / board.vp.zoom, inn = 5 * k / board.vp.zoom;
     const nodes = board.model.nodes;
     // Search cards first (they sit on top), then groups.
     const order = [...nodes.filter(n => n.type !== 'group').reverse(), ...nodes.filter(n => n.type === 'group').reverse()];
     for (const n of order) {
       if (board.editingId === n.id) continue;
+      if (touch && !board.selection.has(n.id)) continue;
       if (getCardType(cardKindOf(n))?.fixedSize) {
         if (wx > n.x && wx < n.x + n.width && wy > n.y && wy < n.y + n.height) return null;
         continue;
@@ -184,7 +187,8 @@ export function attachInteractions(board: Board): void {
       return;
     }
 
-    const zone = zoneAt(w.x, w.y);
+    const touch = e.pointerType === 'touch';
+    const zone = zoneAt(w.x, w.y, touch);
     if (zone) { startResize(e, zone.id, zone.zone); return; }
 
     // A group's label sits above its frame; it picks the group.
@@ -196,8 +200,12 @@ export function attachInteractions(board: Board): void {
       if (board.selection.has(n.id)) startMove(e);
       return;
     }
+    // A finger on an empty spot moves the board; holding it still first draws a selection box.
+    if (touch) { if (!e.shiftKey) board.clearSelection(); startPan(e); return; }
     startMarquee(e);
   });
+
+  attachTouch();
 
   root.addEventListener('contextmenu', (e) => {
     if (board.settings.panButton === 'right' && suppressNextContextMenu) { e.preventDefault(); suppressNextContextMenu = false; return; }
@@ -208,6 +216,143 @@ export function attachInteractions(board: Board): void {
   let lastPlaceAt = 0;
   /** A drag's second click is not a double-click. */
   let lastDragAt = 0;
+
+
+  // ── touch: pinch, long press, double tap ───────────────
+
+  /**
+   * Phones and tablets: two fingers pinch and pan; a long press opens the menu (on an empty spot,
+   * holding then dragging draws a selection box); a double tap does what a double-click does.
+   */
+  function attachTouch(): void {
+    const LONG_PRESS = 480, SLOP = 10, DOUBLE_TAP = 350;
+    const touches = new Map<number, { x: number; y: number }>();
+    let pinch: { d: number; mx: number; my: number } | null = null;
+    /** Fingers whose remaining moves belong to nothing (after a pinch or a long press). */
+    const ignored = new Set<number>();
+    let hold: { id: number; x: number; y: number; t: number; target: HTMLElement; down: PointerEvent; timer: number; fired: boolean; empty: boolean } | null = null;
+    let lastTap = { t: 0, x: 0, y: 0 };
+    let synthDblAt = 0, synthMenuAt = 0, touchAt = 0, nativeDblAt = 0, swallowClickUntil = 0;
+
+    const inUi = (t: EventTarget | null) => t instanceof Node && board.uiEl.contains(t);
+    const cancelHold = () => { if (hold) { window.clearTimeout(hold.timer); hold = null; } };
+    const fire = (type: 'contextmenu' | 'dblclick', target: HTMLElement, x: number, y: number) => {
+      const ev = new MouseEvent(type, { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, screenX: x, screenY: y, button: type === 'contextmenu' ? 2 : 0, detail: type === 'dblclick' ? 2 : 0, view: window });
+      if (type === 'dblclick') {
+        if (Date.now() - nativeDblAt < 500) return; // the system already sent one
+        synthDblAt = Date.now();
+      } else synthMenuAt = Date.now();
+      target.dispatchEvent(ev);
+    };
+    const mid = () => {
+      const [a, b] = [...touches.values()];
+      return { d: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+    };
+
+    root.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch') return;
+      touchAt = Date.now();
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size >= 2) {
+        // A second finger: whatever the first one began gives way to pinching.
+        cancelHold();
+        active?.cancel();
+        pen.cancelStroke();
+        for (const id of touches.keys()) ignored.add(id);
+        if (touches.size === 2) pinch = mid();
+        lastDragAt = Date.now();
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (inUi(e.target) || editingTarget(e.target)) return;
+      const target = e.target as HTMLElement;
+      // Buttons, links and fields inside cards keep their own taps.
+      if (target.closest('a, input, button, select, textarea, [contenteditable="true"], .vc-interactive, .vc-click, .vc-vc-btn, .clickable-icon')) { lastTap = { t: 0, x: 0, y: 0 }; return; }
+      const w = board.clientToWorld(e.clientX, e.clientY);
+      const empty = board.tool === 'select' && !nodeAt(w.x, w.y) && !target.closest('[data-edge-id]');
+      if (board.tool !== 'select' && board.tool !== 'hand') return;
+      hold = { id: e.pointerId, x: e.clientX, y: e.clientY, t: Date.now(), target, down: e, fired: false, empty, timer: 0 };
+      hold.timer = window.setTimeout(() => {
+        const h = hold;
+        if (!h) return;
+        h.fired = true;
+        navigator.vibrate?.(12);
+        active?.cancel();
+        if (h.empty && board.tool === 'select') {
+          // Hold, then drag: a selection box; hold and let go: the board's menu.
+          startMarquee(h.down);
+        } else {
+          ignored.add(h.id);
+          fire('contextmenu', h.target, h.x, h.y);
+        }
+      }, LONG_PRESS);
+    }, true);
+
+    root.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'touch' || !touches.has(e.pointerId)) return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (hold && hold.id === e.pointerId && !hold.fired && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > SLOP) cancelHold();
+      if (hold?.fired && hold.id === e.pointerId && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > SLOP) hold.empty = false; // a box, not a menu
+      if (pinch && touches.size >= 2) {
+        const m = mid();
+        const r = root.getBoundingClientRect();
+        board.vp.panBy(m.mx - pinch.mx, m.my - pinch.my);
+        if (pinch.d > 0 && m.d > 0) board.vp.zoomAt(m.mx - r.left, m.my - r.top, m.d / pinch.d);
+        board.applyViewport();
+        pinch = m;
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (ignored.has(e.pointerId)) e.stopImmediatePropagation();
+    }, true);
+
+    const lift = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      const wasIgnored = ignored.has(e.pointerId);
+      touches.delete(e.pointerId);
+      ignored.delete(e.pointerId);
+      if (touches.size < 2) pinch = null;
+      const h = hold && hold.id === e.pointerId ? hold : null;
+      cancelHold();
+      // The tap that ends a long press must not land on the menu it opened.
+      if (h?.fired) swallowClickUntil = Date.now() + 500;
+      if (wasIgnored) { e.stopImmediatePropagation(); return; }
+      if (e.type !== 'pointerup') return;
+      if (h?.fired) {
+        // Held still on an empty spot and let go: the menu (after the box gesture has ended).
+        if (h.empty) window.setTimeout(() => fire('contextmenu', h.target, h.x, h.y), 0);
+        return;
+      }
+      // A quick tap: two of them close together make a double-click.
+      const now = Date.now();
+      const tap = h && now - h.t < 300 && Math.hypot(e.clientX - h.x, e.clientY - h.y) < SLOP;
+      if (!tap) { lastTap = { t: 0, x: 0, y: 0 }; return; }
+      if (now - lastTap.t < DOUBLE_TAP && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) {
+        lastTap = { t: 0, x: 0, y: 0 };
+        // Right away, inside the touch itself: only then may editing bring up the on-screen keyboard.
+        active?.cancel();
+        e.stopImmediatePropagation();
+        fire('dblclick', h.target.isConnected ? h.target : root, e.clientX, e.clientY);
+      } else lastTap = { t: now, x: e.clientX, y: e.clientY };
+    };
+    root.addEventListener('pointerup', lift, true);
+    root.addEventListener('pointercancel', lift, true);
+
+    // The system's own long-press menu and double-tap would come on top of ours.
+    root.addEventListener('contextmenu', (e) => {
+      if (e.isTrusted && Date.now() - touchAt < 1500 && (touches.size > 0 || Date.now() - synthMenuAt < 1500)) { e.preventDefault(); e.stopImmediatePropagation(); }
+    }, true);
+    root.addEventListener('dblclick', (e) => {
+      if (!e.isTrusted) return;
+      if (Date.now() - synthDblAt < 700) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+      if (Date.now() - touchAt < 1000) nativeDblAt = Date.now();
+    }, true);
+    const doc = root.ownerDocument;
+    const swallow = (e: MouseEvent) => { if (Date.now() < swallowClickUntil) { swallowClickUntil = 0; e.preventDefault(); e.stopImmediatePropagation(); } };
+    doc.addEventListener('click', swallow, true);
+    board.addDisposer(() => { cancelHold(); doc.removeEventListener('click', swallow, true); });
+  }
 
   // ── gestures ────────────────────────────────────────────
 
@@ -239,7 +384,7 @@ export function attachInteractions(board: Board): void {
     root.addEventListener('pointermove', onMove);
     root.addEventListener('pointerup', onUp);
     root.addEventListener('pointercancel', onCancel);
-    active = { kind, cleanup };
+    active = { kind, cleanup, cancel: onCancel };
   };
 
   function startPan(e: PointerEvent, fromRight = false): void {

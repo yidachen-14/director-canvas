@@ -5,5 +5,5 @@
 	"minAppVersion": "1.7.2",
 	"description": "An infinite whiteboard that opens your native .canvas files, with rich text cards, mind maps, image arranging and full export.",
 	"author": "Yida Chen",
-	"isDesktopOnly": true
+	"isDesktopOnly": false
 }

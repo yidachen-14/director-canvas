@@ -8,7 +8,7 @@ import { exportPdf, type PageSize } from './pdf';
 import { canvasBytes, renderCanvas } from './raster';
 import { exportHtml } from './html';
 import { buildBundle, zipFiles } from './bundle';
-import { saveFile, saveFolder } from './files';
+import { saveFile, saveFolder, usableFolder } from './files';
 
 export type Format = 'pdf' | 'png' | 'html' | 'bundle';
 
@@ -132,7 +132,7 @@ export class ExportModal extends Modal {
       el.createDiv({ cls: 'vc-export-note', text: t('The board and every note and attachment it uses go into one folder, with paths changed to match. Put the folder at the top of any vault.') });
     }
 
-    const where = this.board.settings.exportFolder.trim();
+    const where = usableFolder(this.board.settings.exportFolder);
     el.createDiv({ cls: 'vc-export-note', text: where ? t('Saves to: {path}', { path: where }) : t('You choose where to save it.') });
     new Setting(el)
       .addButton(b => b.setButtonText(t('Cancel')).onClick(() => this.close()))

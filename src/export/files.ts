@@ -1,4 +1,4 @@
-import { FileSystemAdapter, Notice, normalizePath, type App } from 'obsidian';
+import { FileSystemAdapter, Notice, Platform, normalizePath, type App } from 'obsidian';
 import { t } from '../i18n';
 
  
@@ -94,6 +94,19 @@ const bytesOf = (d: Uint8Array | string) => (typeof d === 'string' ? enc.encode(
 const isAbsolute = (p: string) => /^(\/|~|[A-Za-z]:[\\/])/.test(p);
 const expandHome = (p: string) => (p.startsWith('~') ? (nodeModule<NodeOs>('os')?.homedir() ?? '~') + p.slice(1) : p);
 
+/** Where exports go on phones and tablets when no vault folder is set: there is no save dialog there. */
+export const MOBILE_EXPORT_FOLDER = 'Exports';
+
+/**
+ * The export folder to write into, or '' to ask. A path outside the vault only works on the desktop;
+ * on phones and tablets everything goes into a vault folder.
+ */
+export function usableFolder(exportFolder: string): string {
+  const f = exportFolder.trim();
+  if (!Platform.isMobile && nodeFs()) return f;
+  return f && !isAbsolute(f) ? f : MOBILE_EXPORT_FOLDER;
+}
+
 /** A name that doesn't overwrite: "name (2).ext". */
 function freeName(exists: (p: string) => boolean, dir: string, name: string, join: (a: string, b: string) => string): string {
   if (!exists(join(dir, name))) return name;
@@ -152,7 +165,8 @@ function download(name: string, data: Uint8Array | string, mime: string): void {
  * Returns where it went (null when cancelled).
  */
 export async function saveFile(app: App, exportFolder: string, name: string, data: Uint8Array | string, filter: FileFilter): Promise<string | null> {
-  if (exportFolder.trim()) return writeToFolder(app, exportFolder.trim(), name, (top) => [{ path: top, data }]);
+  const folder = usableFolder(exportFolder);
+  if (folder) return writeToFolder(app, folder, name, (top) => [{ path: top, data }]);
   const remote = electronRemote();
   const fs = nodeFs();
   if (remote?.dialog && fs) {
@@ -170,7 +184,8 @@ export async function saveFile(app: App, exportFolder: string, name: string, dat
  * and returns files whose paths start with it. Without a folder dialog: one ZIP.
  */
 export async function saveFolder(app: App, exportFolder: string, top: string, make: MakeFiles, zip: (files: OutFile[]) => Uint8Array): Promise<string | null> {
-  if (exportFolder.trim()) return writeToFolder(app, exportFolder.trim(), top, make);
+  const folder = usableFolder(exportFolder);
+  if (folder) return writeToFolder(app, folder, top, make);
   const remote = electronRemote();
   const fs = nodeFs(), path = nodePath();
   if (remote?.dialog && fs && path) {
@@ -184,5 +199,6 @@ export async function saveFolder(app: App, exportFolder: string, top: string, ma
 
 /** The vault's folder on disk, if it has one. */
 export function vaultBasePath(app: App): string | null {
+  if (typeof FileSystemAdapter === 'undefined') return null;
   return app.vault.adapter instanceof FileSystemAdapter ? app.vault.adapter.getBasePath() : null;
 }

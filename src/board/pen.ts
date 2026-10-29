@@ -206,9 +206,11 @@ export class PenController {
       doc.removeEventListener('pointercancel', cancel, true);
       if (raf) cancelAnimationFrame(raf);
       live.remove();
+      this.cancelStroke = () => {};
       this.commit(stroke);
     };
     const cancel = () => {
+      this.cancelStroke = () => {};
       doc.removeEventListener('pointermove', move, true);
       doc.removeEventListener('pointerup', up, true);
       doc.removeEventListener('pointercancel', cancel, true);
@@ -217,7 +219,11 @@ export class PenController {
     doc.addEventListener('pointermove', move, true);
     doc.addEventListener('pointerup', up, true);
     doc.addEventListener('pointercancel', cancel, true);
+    this.cancelStroke = cancel;
   }
+
+  /** Drop the stroke being drawn (a second finger came down to pinch). */
+  cancelStroke: () => void = () => {};
 
   /** Add a finished stroke: to the sketch it starts near, or as a new drawing card. */
   private commit(stroke: Stroke): void {

@@ -14,7 +14,7 @@ function nodeFs(): NodeFs | null {
 function probeFile(app: App, file: TFile): VideoProbe | null {
   const fs = nodeFs();
   const adapter = app.vault.adapter;
-  if (!fs || !(adapter instanceof FileSystemAdapter)) return null;
+  if (!fs || typeof FileSystemAdapter === 'undefined' || !(adapter instanceof FileSystemAdapter)) return null;
   let fd = -1;
   try {
     fd = fs.openSync(adapter.getFullPath(file.path), 'r');
@@ -31,6 +31,17 @@ function probeFile(app: App, file: TFile): VideoProbe | null {
   }
 }
 
+/** Without direct disk access (phones and tablets): read the whole file, when it isn't too big. */
+async function probeWhole(app: App, file: TFile): Promise<VideoProbe | null> {
+  if (file.stat.size > 512 * 1024 * 1024) return null;
+  try {
+    const bytes = new Uint8Array(await app.vault.readBinary(file));
+    return probeVideo((offset, length) => bytes.subarray(offset, Math.min(bytes.length, offset + Math.max(0, length))), bytes.length);
+  } catch {
+    return null;
+  }
+}
+
 /** What the picture or video itself reports (works for any format the board can show). */
 export interface Shown { width: number; height: number; duration?: number }
 
@@ -38,7 +49,9 @@ export interface Shown { width: number; height: number; duration?: number }
 export class MediaInfoModal extends Modal {
   constructor(app: App, private file: TFile, private kind: 'image' | 'video', private shown: Shown | null) { super(app); }
 
-  onOpen(): void {
+  onOpen(): void { void this.render(); }
+
+  private async render(): Promise<void> {
     this.titleEl.setText(t('Information'));
     this.modalEl.addClass('vc-info-modal');
     const table = this.contentEl.createDiv('vc-info');
@@ -67,7 +80,8 @@ export class MediaInfoModal extends Modal {
       return;
     }
 
-    const probe = probeFile(this.app, f);
+    const probe = nodeFs() ? probeFile(this.app, f) : await probeWhole(this.app, f);
+    if (!this.contentEl.isConnected) return;
     const video = probe?.tracks.find(x => x.kind === 'video');
     const audio = probe?.tracks.find(x => x.kind === 'audio');
     const vw = video?.width || w, vh = video?.height || h;

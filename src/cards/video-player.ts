@@ -320,8 +320,11 @@ export class VideoPlayer {
   private fullScreen(): void {
     const card = this.ctrl.parentElement;
     if (!card) return;
-    if (document.fullscreenElement === card) void document.exitFullscreen();
-    else void card.requestFullscreen();
+    if (document.fullscreenElement === card) { void document.exitFullscreen(); return; }
+    // Phones (and app views without the full-screen API) get the system's own video player instead.
+    const native = () => (this.video as HTMLVideoElement & { webkitEnterFullscreen?: () => void }).webkitEnterFullscreen?.();
+    if (!document.fullscreenEnabled || typeof card.requestFullscreen !== 'function') { native(); return; }
+    card.requestFullscreen().catch(native);
   }
 
   private onFullscreen = (): void => {

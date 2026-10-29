@@ -1847,3 +1847,33 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 }
 .vc-spacing-handle:hover .vc-spacing-label, .vc-spacing-handle.is-active .vc-spacing-label { display: block; }
 .vc-spacing.is-dragging .vc-spacing-handle:not(.is-active) { display: none; }
+
+/* ── phones and tablets ── */
+
+/* Bigger targets for fingers. */
+body.is-mobile .vc-ctx-btn { height: 36px; min-width: 36px; }
+body.is-mobile .vc-ctx-icon svg { width: 19px; height: 19px; }
+body.is-mobile .vc-corner-btn { width: 34px; height: 34px; }
+body.is-mobile .vc-toolbar[data-size='S'] .vc-tool { width: 40px; height: 40px; }
+body.is-mobile .vc-toolbar[data-size='S'] .vc-tool-icon svg { width: 19px; height: 19px; }
+body.is-mobile .vc-spacing-handle { width: 30px; height: 30px; margin: -15px 0 0 -15px; }
+/* What a pointer reveals on hover stays visible on a selected card. */
+body.is-mobile .vc-node.is-selected .vc-kb-del { display: flex; }
+
+/* Bars wider than the screen scroll sideways instead of running off it. */
+body.is-mobile .vc-toolbar, body.is-mobile .vc-ctx-bar {
+  max-width: calc(100% - 16px);
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+body.is-mobile .vc-toolbar::-webkit-scrollbar, body.is-mobile .vc-ctx-bar::-webkit-scrollbar { display: none; }
+body.is-mobile .vc-board[data-toolbar-pos='left'] .vc-toolbar, body.is-mobile .vc-board[data-toolbar-pos='right'] .vc-toolbar {
+  max-width: none; max-height: calc(100% - 120px); overflow-x: hidden; overflow-y: auto;
+}
+body.is-mobile .vc-ctx-pop { max-width: calc(100% - 16px); }
+
+/* Phones: the zoom and undo corner sits below the bottom toolbar rather than beside it. */
+body.is-phone .vc-corner { left: 8px; bottom: 8px; }
+body.is-phone .vc-board[data-toolbar-pos='bottom'] .vc-toolbar { bottom: 58px; }
+body.is-phone .vc-board[data-toolbar-pos='top'] .vc-toolbar { top: 8px; }
