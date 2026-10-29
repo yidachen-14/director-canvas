@@ -222,7 +222,8 @@ class MediaCard implements CardHandle {
     n.vc = { ...(n.vc ?? {}) };
     const loaded = this.ctx.board.loadedIds.has(n.id);
     const narrow = (total: number, pictureBefore: number, pictureAfter: number): boolean => {
-      if (pictureBefore <= 0 || pictureAfter <= 0) return false;
+      // Only ever narrower: a card whose counted extras were off must not grow wide (the plain height fit below handles it).
+      if (pictureBefore <= 0 || pictureAfter <= 0 || pictureAfter > pictureBefore) return false;
       n.width = Math.max(60, Math.round(n.width * pictureAfter / pictureBefore));
       n.height = total;
       return true;

@@ -443,6 +443,20 @@ export class ContextBar {
         w.value = String(orig.width);
         h.value = String(orig.height);
       });
+      // A quarter, half or three quarters of the original (the description and controls keep their height).
+      const extra = orig.height - orig.media.height;
+      const row = pop.createDiv('vc-ctx-size-pcts');
+      for (const pct of [25, 50, 75]) {
+        const sw = Math.max(24, Math.round(orig.media.width * pct / 100));
+        const sh = Math.max(16, Math.round(orig.media.height * pct / 100)) + extra;
+        const pb = row.createEl('button', { text: `${pct}%`, attr: { 'aria-label': `${sw} × ${sh - extra}` } });
+        pb.addEventListener('click', () => {
+          const n = nodes[0];
+          b.model.transact(() => { n.width = sw; n.height = sh; b.model.touch(n.id); });
+          w.value = String(sw);
+          h.value = String(sh);
+        });
+      }
     }
   }
 
