@@ -561,4 +561,7 @@ export const TH: Record<string, string> = {
   "Ink pen": "ปากกา",
   "Fineliner": "ปากกาหัวเข็ม",
   "Pencil": "ดินสอ",
+  "Create new Director Canvas": "สร้าง Director Canvas ใหม่",
+  "Show \"Create new Director Canvas\" in the left ribbon": "แสดง “สร้าง Director Canvas ใหม่” ในแถบด้านซ้าย",
+  "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "ซ่อนได้เฉพาะเมื่อเปิดไฟล์ .canvas ด้วย Director Canvas มิฉะนั้นนี่คือทางสร้างบอร์ดใหม่",
 };

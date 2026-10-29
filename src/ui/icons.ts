@@ -9,3 +9,6 @@ addIcon('vc-connect', lucideLike('<circle cx="5.5" cy="18.5" r="3"/><circle cx="
 
 /** Mind map: a central box branching to two. */
 addIcon('vc-mm-icon', lucideLike('<rect x="2.5" y="9.5" width="6" height="5" rx="1.2"/><rect x="15.5" y="3" width="6" height="5" rx="1.2"/><rect x="15.5" y="16" width="6" height="5" rx="1.2"/><path d="M8.5 12h3.5V5.5h3.5M12 12v6.5h3.5"/>'));
+
+/** Director Canvas itself (the ribbon button, "new board" menus). */
+export const BOARD_ICON = 'layout-dashboard';

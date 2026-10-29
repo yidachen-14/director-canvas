@@ -576,4 +576,7 @@ export const ZH_TW: Record<string, string> = {
   "Ink pen": "筆",
   "Fineliner": "代針筆",
   "Pencil": "鉛筆",
+  "Create new Director Canvas": "建立 Director Canvas",
+  "Show \"Create new Director Canvas\" in the left ribbon": "在左側欄顯示「建立 Director Canvas」",
+  "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "只有在 .canvas 檔用 Director Canvas 開啟時才能隱藏；否則它是建立新白板的入口。",
 };

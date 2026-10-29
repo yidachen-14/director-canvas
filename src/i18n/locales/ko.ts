@@ -561,4 +561,7 @@ export const KO: Record<string, string> = {
   "Ink pen": "펜",
   "Fineliner": "파인라이너",
   "Pencil": "연필",
+  "Create new Director Canvas": "새 Director Canvas 만들기",
+  "Show \"Create new Director Canvas\" in the left ribbon": "왼쪽 리본에 \"새 Director Canvas 만들기\" 표시",
+  "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": ".canvas 파일을 Director Canvas로 열 때만 숨길 수 있습니다. 그렇지 않으면 새 보드를 만드는 입구입니다.",
 };

@@ -1,3 +1,4 @@
+import { BOARD_ICON } from './ui/icons';
 import { Notice, Plugin, TFile, TFolder, normalizePath } from 'obsidian';
 import { installRenameSync } from './rename-sync';
 import { ARRANGE, runArrange } from './board/arrange-commands';
@@ -13,6 +14,16 @@ import type { Board } from './board/board';
 
 export default class VisualCanvasPlugin extends Plugin {
   settings!: VisualCanvasSettings;
+  private ribbonEl: HTMLElement | null = null;
+
+  /**
+   * The ribbon button: always there while boards open in the core Canvas (it is then the way to make
+   * one); hideable once .canvas files open here.
+   */
+  syncRibbon(): void {
+    const show = !this.settings.openCanvasByDefault || this.settings.showRibbon;
+    this.ribbonEl?.toggleClass('vc-hidden', !show);
+  }
 
   async onload(): Promise<void> {
     this.settings = normalizeSettings(await this.loadData());
@@ -23,7 +34,8 @@ export default class VisualCanvasPlugin extends Plugin {
     this.register(installCanvasTakeover(path => this.takesOver(path)));
     this.addSettingTab(new VisualCanvasSettingTab(this.app, this));
 
-    this.addRibbonIcon('layout-dashboard', t('New Director Canvas board'), () => { void this.createBoard(); });
+    this.ribbonEl = this.addRibbonIcon(BOARD_ICON, t('Create new Director Canvas'), () => { void this.createBoard(); });
+    this.syncRibbon();
 
     this.addCommand({ id: 'new-board', name: t('New board'), callback: () => { void this.createBoard(); } });
     this.addCommand({
@@ -79,7 +91,7 @@ export default class VisualCanvasPlugin extends Plugin {
     }));
     this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
       if (!(file instanceof TFolder)) return;
-      menu.addItem(i => i.setTitle(t('New Director Canvas board')).setIcon('layout-dashboard').setSection('action-primary').onClick(() => { void this.createBoard(file); }));
+      menu.addItem(i => i.setTitle(t('New Director Canvas board')).setIcon(BOARD_ICON).setSection('action-primary').onClick(() => { void this.createBoard(file); }));
     }));
 
     // Boards already open in the core view switch over when the plugin loads.

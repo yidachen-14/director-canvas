@@ -561,4 +561,7 @@ export const ID: Record<string, string> = {
   "Ink pen": "Pena",
   "Fineliner": "Fineliner",
   "Pencil": "Pensil",
+  "Create new Director Canvas": "Buat Director Canvas baru",
+  "Show \"Create new Director Canvas\" in the left ribbon": "Tampilkan \"Buat Director Canvas baru\" di pita kiri",
+  "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "Hanya bisa disembunyikan selama berkas .canvas dibuka dengan Director Canvas; jika tidak, ini cara membuat papan baru.",
 };

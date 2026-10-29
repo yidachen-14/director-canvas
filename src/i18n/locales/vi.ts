@@ -561,4 +561,7 @@ export const VI: Record<string, string> = {
   "Ink pen": "Bút",
   "Fineliner": "Bút kim",
   "Pencil": "Bút chì",
+  "Create new Director Canvas": "Tạo Director Canvas mới",
+  "Show \"Create new Director Canvas\" in the left ribbon": "Hiện “Tạo Director Canvas mới” ở thanh bên trái",
+  "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "Chỉ ẩn được khi tệp .canvas mở bằng Director Canvas; nếu không, đây là cách tạo bảng mới.",
 };

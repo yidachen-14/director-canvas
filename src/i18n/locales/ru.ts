@@ -561,4 +561,7 @@ export const RU: Record<string, string> = {
   "Ink pen": "Ручка",
   "Fineliner": "Линер",
   "Pencil": "Карандаш",
+  "Create new Director Canvas": "Создать Director Canvas",
+  "Show \"Create new Director Canvas\" in the left ribbon": "Показывать «Создать Director Canvas» на левой панели",
+  "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "Скрыть можно, только пока файлы .canvas открываются в Director Canvas; иначе это способ создать новую доску.",
 };

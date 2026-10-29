@@ -561,4 +561,7 @@ export const JA: Record<string, string> = {
   "Ink pen": "ペン",
   "Fineliner": "ファインライナー",
   "Pencil": "鉛筆",
+  "Create new Director Canvas": "Director Canvas を新規作成",
+  "Show \"Create new Director Canvas\" in the left ribbon": "左リボンに「Director Canvas を新規作成」を表示",
+  "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": ".canvas ファイルを Director Canvas で開く設定のときだけ隠せます。それ以外は新しいボードを作る入口です。",
 };

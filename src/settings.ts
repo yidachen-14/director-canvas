@@ -9,6 +9,8 @@ export interface VisualCanvasSettings {
   openCanvasByDefault: boolean;
   /** Only boards inside these folders open with Director Canvas; empty = every board. */
   takeoverFolders: string[];
+  /** The "Create new Director Canvas" ribbon button (hideable only while boards open here). */
+  showRibbon: boolean;
 
   toolbarPosition: ToolbarPosition;
   toolbarSize: ToolbarSize;
@@ -72,6 +74,7 @@ export const DEFAULT_SETTINGS: VisualCanvasSettings = {
   language: 'auto',
   openCanvasByDefault: true,
   takeoverFolders: [],
+  showRibbon: true,
 
   toolbarPosition: 'top',
   toolbarSize: 'S',

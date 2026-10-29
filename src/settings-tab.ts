@@ -42,7 +42,31 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
     new Setting(el)
       .setName(t('Open .canvas files with Director Canvas'))
       .setDesc(t('Boards open here instead of the core Canvas. You can always switch a board back from its header.'))
-      .addToggle(tg => tg.setValue(s.openCanvasByDefault).onChange(async (v) => { s.openCanvasByDefault = v; await this.save(false); }));
+      .addToggle(tg => tg.setValue(s.openCanvasByDefault).onChange(async (v) => {
+        s.openCanvasByDefault = v;
+        await this.save(false);
+        this.plugin.syncRibbon();
+        paintRibbon();
+      }));
+    const ribbon = new Setting(el)
+      .setName(t('Show "Create new Director Canvas" in the left ribbon'))
+      .setDesc(t('It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.'));
+    let ribbonToggle: { setValue(v: boolean): unknown; setDisabled(d: boolean): unknown } | null = null;
+    ribbon.addToggle(tg => {
+      ribbonToggle = tg;
+      tg.onChange(async (v) => {
+        if (!s.openCanvasByDefault) return;
+        s.showRibbon = v;
+        await this.save(false);
+        this.plugin.syncRibbon();
+      });
+    });
+    const paintRibbon = () => {
+      ribbonToggle?.setValue(!s.openCanvasByDefault || s.showRibbon);
+      ribbonToggle?.setDisabled(!s.openCanvasByDefault);
+      ribbon.settingEl.toggleClass('is-disabled', !s.openCanvasByDefault);
+    };
+    paintRibbon();
     const folders = new Setting(el)
       .setName(t('Only in these folders'))
       .setDesc(t('Boards in these folders (and the folders inside them) open with Director Canvas. None chosen: every board.'));

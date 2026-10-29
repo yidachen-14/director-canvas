@@ -148,10 +148,28 @@ export class ConnectController {
     return best ? { side: best.side, t: best.t } : null;
   }
 
+  /**
+   * The card a connection would attach to at a world point: the one under it, or a card one of
+   * whose pins is right there (a mind map's pins sit on the edge of its topics, which only take a
+   * pointer on the topics themselves).
+   */
+  private targetAt(w: Point, except?: string): RawNode | null {
+    const board = this.board;
+    const n = board.nodeAt(w.x, w.y, 10 / board.vp.zoom);
+    if (n && n.id !== except) return n;
+    const nodes = board.model.nodes;
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const m = nodes[i];
+      if (m.id === except || m.type === 'group' || m.vc?.kind !== 'mindmap') continue;
+      if (this.pinNear(m, w)) return m;
+    }
+    return n && n.id !== except ? n : null;
+  }
+
   /** Hover with the Connect tool. */
   hover(w: Point): void {
     if (this.busy) return;
-    const n = this.board.nodeAt(w.x, w.y, 10 / this.board.vp.zoom);
+    const n = this.targetAt(w);
     this.showPins(n, n ? this.pinNear(n, w) : null);
   }
 
@@ -161,7 +179,7 @@ export class ConnectController {
   startConnect(e: PointerEvent): void {
     const board = this.board;
     const start = board.clientToWorld(e.clientX, e.clientY);
-    const fromNode = board.nodeAt(start.x, start.y, 10 / board.vp.zoom);
+    const fromNode = this.targetAt(start);
     let from: EndSpec;
     if (fromNode) {
       const pin = this.pinNear(fromNode, start);
@@ -186,8 +204,7 @@ export class ConnectController {
       if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < CLICK_SLOP) return;
       moved = true;
       const w = board.clientToWorld(ev.clientX, ev.clientY);
-      const over = board.nodeAt(w.x, w.y, 10 / board.vp.zoom);
-      const target = over && (from.kind === 'free' || over.id !== from.id) ? over : null;
+      const target = this.targetAt(w, from.kind === 'free' ? undefined : from.id);
       if (target) {
         const pin = this.pinNear(target, w);
         to = pin ? { kind: 'pin', id: target.id, ...pin } : { kind: 'float', id: target.id };
@@ -205,11 +222,6 @@ export class ConnectController {
       this.busy = false;
       this.showPins(board.tool === 'connect' ? fromNode : null);
       if (!ev) return;
-      if (!moved) {
-        // A click on empty board drops a default arrow; a click on a card does nothing.
-        if (from.kind === 'free') this.create(from, { kind: 'free', p: { x: start.x + 160, y: start.y } });
-        return;
-      }
       const end = to;
       if (!end) return;
       const dist = Math.hypot(ev.clientX - sx, ev.clientY - sy);
@@ -220,15 +232,39 @@ export class ConnectController {
     };
 
     const doc = board.root.ownerDocument;
-    const up = (ev: PointerEvent) => finish(ev);
+    /** After a click (not a drag) the line follows the pointer until a second click places its end. */
+    let waiting = false;
+    const up = (ev: PointerEvent) => {
+      if (waiting) { ev.stopPropagation(); return; }
+      if (moved) { finish(ev); return; }
+      waiting = true;
+      moved = true; // from now on every move updates the line
+      move(ev);
+    };
+    const second = (ev: PointerEvent) => {
+      if (!waiting) return;
+      // A press on the board's own controls (or outside the board) drops the line and does its job.
+      const tgt = ev.target as Node;
+      if (board.tool !== 'connect' || !board.root.contains(tgt) || board.uiEl.contains(tgt)) { finish(null); return; }
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (ev.button !== 0) { finish(null); return; }
+      move(ev);
+      finish(ev);
+      // The release of this second click belongs to nothing.
+      const swallow = (u: PointerEvent) => { u.stopPropagation(); doc.removeEventListener('pointerup', swallow, true); };
+      doc.addEventListener('pointerup', swallow, true);
+    };
     const key = (ev: KeyboardEvent) => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finish(null); } };
     const cleanup = () => {
       doc.removeEventListener('pointermove', move, true);
       doc.removeEventListener('pointerup', up, true);
+      doc.removeEventListener('pointerdown', second, true);
       doc.removeEventListener('keydown', key, true);
     };
     doc.addEventListener('pointermove', move, true);
     doc.addEventListener('pointerup', up, true);
+    doc.addEventListener('pointerdown', second, true);
     doc.addEventListener('keydown', key, true);
   }
 

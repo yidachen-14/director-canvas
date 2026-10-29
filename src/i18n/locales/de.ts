@@ -561,4 +561,7 @@ export const DE: Record<string, string> = {
   "Ink pen": "Stift",
   "Fineliner": "Fineliner",
   "Pencil": "Bleistift",
+  "Create new Director Canvas": "Neues Director Canvas erstellen",
+  "Show \"Create new Director Canvas\" in the left ribbon": "„Neues Director Canvas erstellen“ in der linken Leiste zeigen",
+  "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "Nur ausblendbar, solange .canvas-Dateien mit Director Canvas öffnen; sonst ist es der Weg zu einem neuen Board.",
 };

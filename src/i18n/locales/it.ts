@@ -561,4 +561,7 @@ export const IT: Record<string, string> = {
   "Ink pen": "Penna",
   "Fineliner": "Fineliner",
   "Pencil": "Matita",
+  "Create new Director Canvas": "Crea nuovo Director Canvas",
+  "Show \"Create new Director Canvas\" in the left ribbon": "Mostra «Crea nuovo Director Canvas» nella barra a sinistra",
+  "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "Si può nascondere solo mentre i file .canvas si aprono con Director Canvas; altrimenti è il modo per creare una nuova lavagna.",
 };

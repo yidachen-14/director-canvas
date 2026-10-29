@@ -561,4 +561,7 @@ export const TR: Record<string, string> = {
   "Ink pen": "Kalem",
   "Fineliner": "İnce uçlu kalem",
   "Pencil": "Kurşun kalem",
+  "Create new Director Canvas": "Yeni Director Canvas oluştur",
+  "Show \"Create new Director Canvas\" in the left ribbon": "Sol şeritte \"Yeni Director Canvas oluştur\"u göster",
+  "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "Yalnızca .canvas dosyaları Director Canvas ile açılırken gizlenebilir; aksi halde yeni pano oluşturmanın yoludur.",
 };
