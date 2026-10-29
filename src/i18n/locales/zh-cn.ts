@@ -571,4 +571,5 @@ export const ZH_CN: Record<string, string> = {
   "The board’s background": "白板当前的背景",
   "Transparent": "透明",
   "A folder with index.html and the pictures and videos next to it.": "一个文件夹：index.html，旁边放图片和视频。",
+  "Board export options…": "导出白板选项…",
 };

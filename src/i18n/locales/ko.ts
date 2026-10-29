@@ -570,4 +570,5 @@ export const KO: Record<string, string> = {
   "The board’s background": "보드 배경",
   "Transparent": "투명",
   "A folder with index.html and the pictures and videos next to it.": "index.html과 그 옆에 이미지와 동영상이 있는 폴더.",
+  "Board export options…": "보드 내보내기 옵션…",
 };

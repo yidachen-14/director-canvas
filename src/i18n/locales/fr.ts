@@ -570,4 +570,5 @@ export const FR: Record<string, string> = {
   "The board’s background": "Fond du tableau",
   "Transparent": "Transparent",
   "A folder with index.html and the pictures and videos next to it.": "Un dossier avec index.html et les images et vidéos à côté.",
+  "Board export options…": "Options d’export du tableau…",
 };

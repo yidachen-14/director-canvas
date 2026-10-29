@@ -115,7 +115,11 @@ export class Board {
 
   private suppressSave = false;
 
+  /** Cards that came from the file (not made since it was opened): one-time layout upgrades apply to them only. */
+  readonly loadedIds = new Set<string>();
+
   load(file: CanvasFile, keepHistory = false): void {
+    for (const n of file.nodes ?? []) this.loadedIds.add(n.id);
     this.suppressSave = true;
     try { this.model.load(file, keepHistory); } finally { this.suppressSave = false; }
   }

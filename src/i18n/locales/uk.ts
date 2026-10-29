@@ -570,4 +570,5 @@ export const UK: Record<string, string> = {
   "The board’s background": "Тло дошки",
   "Transparent": "Прозорий",
   "A folder with index.html and the pictures and videos next to it.": "Тека з index.html і зображеннями та відео поруч.",
+  "Board export options…": "Параметри експорту дошки…",
 };

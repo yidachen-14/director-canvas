@@ -570,4 +570,5 @@ export const IT: Record<string, string> = {
   "The board’s background": "Sfondo della lavagna",
   "Transparent": "Trasparente",
   "A folder with index.html and the pictures and videos next to it.": "Una cartella con index.html e accanto immagini e video.",
+  "Board export options…": "Opzioni di esportazione della lavagna…",
 };

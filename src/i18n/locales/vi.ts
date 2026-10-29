@@ -570,4 +570,5 @@ export const VI: Record<string, string> = {
   "The board’s background": "Nền của bảng",
   "Transparent": "Trong suốt",
   "A folder with index.html and the pictures and videos next to it.": "Một thư mục gồm index.html và hình ảnh, video bên cạnh.",
+  "Board export options…": "Tùy chọn xuất bảng…",
 };

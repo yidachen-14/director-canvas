@@ -68,7 +68,8 @@ export class VideoPlayer {
     this.video = this.stage.createEl('video', { attr: { crossorigin: 'anonymous', preload: 'metadata', playsinline: '' } });
     this.video.src = src;
     this.sub = this.stage.createDiv('vc-video-sub');
-    // The controls hang under the card while it is selected, so they never cover the picture.
+    // The controls are part of the card, right under the picture and always there: a video reads as a
+    // video at a glance, and no neighbouring card can cover them.
     this.ctrl = createDiv('vc-video-ctrl vc-interactive');
     this.attachPanel(host);
 
@@ -82,16 +83,16 @@ export class VideoPlayer {
 
     const row = this.ctrl.createDiv('vc-vc-row');
     this.playBtn = this.button(row, 'play', t('Play / pause (Space)'), () => this.togglePlay());
-    this.button(row, 'chevron-left', t('Previous frame (←)'), () => this.step(-1));
-    this.button(row, 'chevron-right', t('Next frame (→)'), () => this.step(1));
+    this.button(row, 'chevron-left', t('Previous frame (←)'), () => this.step(-1)).addClass('vc-vc-sm');
+    this.button(row, 'chevron-right', t('Next frame (→)'), () => this.step(1)).addClass('vc-vc-sm');
     this.timeEl = row.createDiv('vc-vc-time');
     row.createDiv('vc-vc-spacer');
-    this.button(row, 'vc-mark-in', t('Mark in (I)'), () => this.markIn());
-    this.button(row, 'vc-mark-out', t('Mark out (O)'), () => this.markOut());
-    this.button(row, 'flag', t('Add a mark (M)'), () => this.addPoint());
+    this.button(row, 'vc-mark-in', t('Mark in (I)'), () => this.markIn()).addClass('vc-vc-xs');
+    this.button(row, 'vc-mark-out', t('Mark out (O)'), () => this.markOut()).addClass('vc-vc-xs');
+    this.button(row, 'flag', t('Add a mark (M)'), () => this.addPoint()).addClass('vc-vc-xs');
     this.rateBtn = this.button(row, '', t('Playback speed'), (e) => this.rateMenu(e));
-    this.rateBtn.addClass('vc-vc-rate');
-    this.button(row, 'image', t('Set as cover'), () => void this.setCover());
+    this.rateBtn.addClass('vc-vc-rate', 'vc-vc-sm');
+    this.button(row, 'image', t('Set as cover'), () => void this.setCover()).addClass('vc-vc-sm');
     const volWrap = row.createDiv('vc-vc-volwrap');
     this.volBtn = this.button(volWrap, 'volume-2', t('Volume'), () => this.toggleVolume(volWrap));
     this.fsBtn = this.button(row, 'maximize', t('Full screen'), () => this.fullScreen());
@@ -370,12 +371,12 @@ export class VideoPlayer {
     setIcon(this.volBtn, v.muted || v.volume === 0 ? 'volume-x' : v.volume < 0.5 ? 'volume-1' : 'volume-2');
   }
 
-  /** Put the controls under the card (outside its clipped body). */
+  /** Put the controls right under the picture, inside the card. */
   private attachPanel(host: HTMLElement): void {
     const card = host.closest<HTMLElement>('.vc-node');
     if (card) {
-      if (this.ctrl.parentElement === card) return;
-      card.appendChild(this.ctrl);
+      if (this.ctrl.parentElement) return;
+      host.after(this.ctrl);
       // In full screen the board (outside it) no longer gets the keys: the card takes them itself.
       card.addEventListener('keydown', (e) => {
         if (document.fullscreenElement !== card) return;

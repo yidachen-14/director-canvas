@@ -570,4 +570,5 @@ export const NL: Record<string, string> = {
   "The board’s background": "Achtergrond van het bord",
   "Transparent": "Transparant",
   "A folder with index.html and the pictures and videos next to it.": "Een map met index.html en de afbeeldingen en video’s ernaast.",
+  "Board export options…": "Exportopties voor het bord…",
 };

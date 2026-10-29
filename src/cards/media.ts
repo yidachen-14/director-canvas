@@ -122,6 +122,12 @@ class MediaCard implements CardHandle {
           img.addEventListener('load', () => this.fitToMedia(img.naturalWidth, img.naturalHeight));
         } else if (this.kind === 'video') {
           this.player = new VideoPlayer(this.frame, src, this.ctx, n, (w, h) => this.fitToMedia(w, h));
+          // Its controls are part of the card's height, like the description.
+          window.setTimeout(() => {
+            const ctrl = this.el.querySelector<HTMLElement>(':scope > .vc-video-ctrl');
+            if (ctrl) this.ro.observe(ctrl);
+            this.fitDescription();
+          }, 0);
         }
         else {
           const wrap = this.frame.createDiv('vc-audio-wrap');
@@ -194,16 +200,32 @@ class MediaCard implements CardHandle {
    * the card is kept in vc.descH, so this stays right across reloads.
    */
   private fitDescription(): void {
-    const h = (this.desc.isShown() ? Math.ceil(this.desc.offsetHeight) : 0) + (this.linkBar.isShown() ? Math.ceil(this.linkBar.offsetHeight) : 0);
+    const ctrl = this.el.querySelector<HTMLElement>(':scope > .vc-video-ctrl');
+    const h = (this.desc.isShown() ? Math.ceil(this.desc.offsetHeight) : 0) + (this.linkBar.isShown() ? Math.ceil(this.linkBar.offsetHeight) : 0)
+      + (ctrl && ctrl.isShown() ? Math.ceil(ctrl.offsetHeight) : 0);
     const n = this.ctx.board.model.node(this.node.id);
     if (!n || !this.el.isConnected) return;
     const counted = Number(n.vc?.descH) || 0;
-    if (h === counted) return;
-    n.height = Math.max(24, n.height - counted + h);
+    const ctrlNew = !!ctrl && ctrl.isShown() && !n.vc?.ctrlIn;
+    if (h === counted && !ctrlNew) return;
     n.vc = { ...(n.vc ?? {}) };
+    if (ctrlNew && this.ctx.board.loadedIds.has(n.id)) {
+      // A video laid out before its controls became part of the card: it keeps its place and its
+      // height, and gets a little narrower so the controls fit in, so nothing around it moves or is
+      // covered. (A test build had already grown such cards by the controls' height: undone here.)
+      const ctrlH = Math.ceil(ctrl.offsetHeight);
+      const total = h === counted ? n.height - ctrlH : n.height - counted + (h - ctrlH);
+      const pictureBefore = total - (h - ctrlH), pictureAfter = total - h;
+      if (pictureBefore > 0 && pictureAfter > 0) {
+        n.width = Math.max(60, Math.round(n.width * pictureAfter / pictureBefore));
+        n.height = total;
+      } else n.height = Math.max(24, n.height - counted + h);
+    } else n.height = Math.max(24, n.height - counted + h);
+    if (ctrlNew) n.vc.ctrlIn = true;
     if (h) n.vc.descH = h; else delete n.vc.descH;
     const card = this.el.closest<HTMLElement>('.vc-node');
-    if (card) card.style.height = `${n.height}px`;
+    if (card) card.setCssStyles({ width: `${n.width}px`, height: `${n.height}px` });
+    if (ctrlNew) { const m = this.ctx.board.model; m.quiet(() => m.touch(n.id)); }
     this.ctx.board.renderEdges();
   }
 

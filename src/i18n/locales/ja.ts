@@ -570,4 +570,5 @@ export const JA: Record<string, string> = {
   "The board’s background": "ボードの背景",
   "Transparent": "透明",
   "A folder with index.html and the pictures and videos next to it.": "index.html と、その横に画像と動画を置いたフォルダ。",
+  "Board export options…": "ボードの書き出しオプション…",
 };

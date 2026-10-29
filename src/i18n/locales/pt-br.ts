@@ -570,4 +570,5 @@ export const PT_BR: Record<string, string> = {
   "The board’s background": "Fundo do quadro",
   "Transparent": "Transparente",
   "A folder with index.html and the pictures and videos next to it.": "Uma pasta com index.html e as imagens e vídeos ao lado.",
+  "Board export options…": "Opções de exportação do quadro…",
 };

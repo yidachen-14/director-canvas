@@ -1,4 +1,4 @@
-import { Menu, Modal, Notice, Setting, type MenuItem, type Plugin } from 'obsidian';
+import { Modal, Notice, Setting, type Menu, type Plugin } from 'obsidian';
 import type { Board } from '../board/board';
 import { contributeMenu } from '../board/menus';
 import { contributeOverflow } from '../board/ui';
@@ -177,33 +177,23 @@ export class ExportModal extends Modal {
   }
 }
 
-type SubItem = MenuItem & { setSubmenu?: () => Menu };
-
-function exportSubmenu(menu: Menu, title: string, board: Board, scope: Scope): void {
-  menu.addItem((item: SubItem) => {
-    item.setTitle(title).setIcon('download').setSection('export');
-    const formats = formatsFor(scope);
-    if (item.setSubmenu) {
-      const sub = item.setSubmenu();
-      for (const f of FORMATS.filter(x => formats.includes(x.id))) {
-        sub.addItem(i => i.setTitle(`${t(f.label)}…`).setIcon(f.icon).onClick(() => new ExportModal(board, scope, f.id).open()));
-      }
-    } else item.onClick(() => new ExportModal(board, scope).open());
-  });
+/** One entry that opens the export dialog (the format is picked there). */
+function exportItem(menu: Menu, title: string, board: Board, scope: Scope): void {
+  menu.addItem(item => item.setTitle(title).setIcon('download').setSection('export').onClick(() => new ExportModal(board, scope).open()));
 }
 
 /** Menu entries and commands. */
 export function installExport(plugin: Plugin & { activeBoard(): Board | null }): void {
-  contributeOverflow({ section: 'export', last: true, icon: 'download', label: 'Export the whole board', run: (board) => new ExportModal(board, { kind: 'board' }).open() });
-  contributeMenu({ where: 'board', section: 'export', add: (menu, board) => exportSubmenu(menu, t('Export the whole board'), board, { kind: 'board' }) });
+  contributeOverflow({ section: 'export', last: true, icon: 'download', label: 'Board export options…', run: (board) => new ExportModal(board, { kind: 'board' }).open() });
+  contributeMenu({ where: 'board', section: 'export', add: (menu, board) => exportItem(menu, t('Board export options…'), board, { kind: 'board' }) });
   contributeMenu({
     where: 'card', section: 'export',
     add: (menu, board) => {
       if (board.selection.size !== 1) return;
-      exportSubmenu(menu, t('Export this object'), board, { kind: 'object', id: [...board.selection][0] });
+      exportItem(menu, `${t('Export this object')}…`, board, { kind: 'object', id: [...board.selection][0] });
     },
   });
-  contributeMenu({ where: 'multi', section: 'export', add: (menu, board) => exportSubmenu(menu, t('Export the selection'), board, { kind: 'selection' }) });
+  contributeMenu({ where: 'multi', section: 'export', add: (menu, board) => exportItem(menu, `${t('Export the selection')}…`, board, { kind: 'selection' }) });
 
   for (const f of FORMATS) {
     plugin.addCommand({

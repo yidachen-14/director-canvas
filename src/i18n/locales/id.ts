@@ -570,4 +570,5 @@ export const ID: Record<string, string> = {
   "The board’s background": "Latar papan",
   "Transparent": "Transparan",
   "A folder with index.html and the pictures and videos next to it.": "Satu folder berisi index.html dengan gambar dan video di sampingnya.",
+  "Board export options…": "Opsi ekspor papan…",
 };

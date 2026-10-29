@@ -1743,12 +1743,23 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 6px rgba(0, 0, 0, 0.6);
 }
 .vc-video-ctrl {
-  position: absolute; left: 0; right: 0; top: calc(100% + 8px); z-index: 5; min-width: 360px;
-  display: none; flex-direction: column; gap: 2px; padding: 6px 8px 4px; box-sizing: border-box;
+  position: relative; flex: none; z-index: 2; container-type: inline-size;
+  display: flex; flex-direction: row; align-items: center; gap: 2px; padding: 2px 6px; box-sizing: border-box;
   background: var(--background-primary); color: var(--text-normal);
-  border: 1px solid var(--background-modifier-border); border-radius: 10px; box-shadow: var(--shadow-s); cursor: default;
+  border-top: 1px solid var(--background-modifier-border); cursor: default;
 }
-.vc-board:not(.has-multi-selection):not(.is-dragging) .vc-node.is-selected > .vc-video-ctrl { display: flex; }
+/* One slim row: play, the track (with its marks), then the time and the other buttons. */
+.vc-video-ctrl > .vc-vc-row { display: contents; }
+.vc-video-ctrl .vc-vc-spacer { display: none; }
+.vc-video-ctrl > .vc-vt { order: 1; flex: 1 1 auto; min-width: 60px; margin: 0 4px; }
+.vc-video-ctrl > .vc-vc-row > * { order: 2; }
+.vc-video-ctrl > .vc-vc-row > :first-child { order: 0; }
+.vc-video-ctrl .vc-vc-time { margin-left: 2px; }
+/* Narrow cards keep the essentials: play, time, marks, speed, volume and full screen. */
+@container (max-width: 380px) { .vc-video-ctrl .vc-vc-sm { display: none; } }
+@container (max-width: 250px) { .vc-video-ctrl .vc-vc-xs { display: none; } }
+/* Notes on a range open above the bar, over the picture (the card clips what is below it). */
+.vc-video-ctrl .vc-vt-pop { top: auto; bottom: calc(100% + 6px); }
 .vc-video-ctrl.is-unsupported { display: none !important; }
 .vc-vt { position: relative; height: 22px; margin: 0 6px; cursor: pointer; touch-action: none; }
 .vc-vt-marks { position: absolute; left: 0; right: 0; top: 0; height: 10px; }
@@ -1837,13 +1848,13 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 /* Full screen: the card fills the screen with the picture on top and its controls below. */
 .vc-node.vc-kind-video:fullscreen { display: flex; flex-direction: column; background: #000; }
 .vc-node.vc-kind-video:fullscreen::after,
-.vc-node.vc-kind-video:fullscreen > :not(.vc-node-body):not(.vc-video-ctrl) { display: none !important; }
+.vc-node.vc-kind-video:fullscreen > :not(.vc-node-body) { display: none !important; }
 .vc-node.vc-kind-video:fullscreen > .vc-node-body { position: relative; inset: auto; flex: 1; min-height: 0; border-radius: 0; box-shadow: none; }
-.vc-node.vc-kind-video:fullscreen > .vc-video-ctrl { display: flex !important; position: relative; top: auto; min-width: 0; margin: 0; border-radius: 0; border-width: 1px 0 0; }
+.vc-node.vc-kind-video:fullscreen .vc-video-ctrl { display: flex !important; }
 .vc-node.vc-kind-video:fullscreen .vc-vt-pop { top: auto; bottom: calc(100% + 6px); }
 .vc-node.vc-kind-video:fullscreen .vc-video-sub { font-size: 22px; bottom: 24px; }
 .vc-node.vc-kind-video:fullscreen .vc-media-desc, .vc-node.vc-kind-video:fullscreen .vc-media-link { display: none; }
-.vc-node.vc-kind-video:fullscreen > .vc-video-ctrl { padding: 8px 16px 8px; gap: 4px; }
+.vc-node.vc-kind-video:fullscreen .vc-video-ctrl { padding: 8px 16px 8px; gap: 4px; }
 .vc-node.vc-kind-video:fullscreen .vc-vt { height: 28px; }
 .vc-node.vc-kind-video:fullscreen .vc-vt-marks { height: 13px; }
 .vc-node.vc-kind-video:fullscreen .vc-vt-range { height: 13px; }

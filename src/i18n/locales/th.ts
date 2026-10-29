@@ -570,4 +570,5 @@ export const TH: Record<string, string> = {
   "The board’s background": "พื้นหลังของบอร์ด",
   "Transparent": "โปร่งใส",
   "A folder with index.html and the pictures and videos next to it.": "โฟลเดอร์ที่มี index.html พร้อมรูปภาพและวิดีโออยู่ข้างกัน",
+  "Board export options…": "ตัวเลือกการส่งออกบอร์ด…",
 };

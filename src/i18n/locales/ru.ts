@@ -570,4 +570,5 @@ export const RU: Record<string, string> = {
   "The board’s background": "Фон доски",
   "Transparent": "Прозрачный",
   "A folder with index.html and the pictures and videos next to it.": "Папка с index.html и изображениями и видео рядом.",
+  "Board export options…": "Параметры экспорта доски…",
 };

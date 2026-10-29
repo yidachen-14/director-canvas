@@ -570,4 +570,5 @@ export const TR: Record<string, string> = {
   "The board’s background": "Panonun arka planı",
   "Transparent": "Saydam",
   "A folder with index.html and the pictures and videos next to it.": "index.html ve yanında görseller ile videolar bulunan bir klasör.",
+  "Board export options…": "Pano dışa aktarma seçenekleri…",
 };
