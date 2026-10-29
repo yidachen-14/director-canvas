@@ -1958,3 +1958,6 @@ body.is-phone .vc-board[data-toolbar-pos='top'] .vc-toolbar { top: 8px; }
 .vc-gif-tl-head { position: absolute; top: 2px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #fff; pointer-events: none; }
 @container (max-width: 170px) { .vc-gif-count { display: none; } }
 @container (max-width: 130px) { .vc-gif-rate { display: none; } }
+/* Over a resize band, a player's bar shows the resize cursor too. */
+.vc-board.is-zone-hover .vc-video-ctrl, .vc-board.is-zone-hover .vc-gif-ui,
+.vc-board.is-zone-hover .vc-video-ctrl .vc-vc-btn, .vc-board.is-zone-hover .vc-gif-ui .vc-gif-btn { cursor: inherit; }
