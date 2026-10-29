@@ -1746,7 +1746,7 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
   position: relative; flex: none; z-index: 2; container-type: inline-size;
   display: flex; flex-direction: column; gap: 2px; padding: 6px 8px 5px; box-sizing: border-box;
   /* Dark like a player, so it reads apart from the description under it in any theme. */
-  --vc-ctrl-bg: #1c1c1e;
+  --vc-ctrl-bg: #0e0e0f;
   background: var(--vc-ctrl-bg); color: #f2f2f2; cursor: default;
 }
 /* Two rows: the timeline (with its marks) right under the picture, the buttons below it. */
@@ -1759,6 +1759,8 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 .vc-video-ctrl .vc-vt-bar { background: rgba(255, 255, 255, 0.22); }
 .vc-video-ctrl .vc-vt-head { box-shadow: 0 0 0 2px var(--vc-ctrl-bg); }
 .vc-video-ctrl .vc-vt-range.is-open, .vc-video-ctrl .vc-vt-point.is-open { outline-color: #fff; }
+/* In a dark theme the description is a lighter grey than the black bar above it. */
+.theme-dark .vc-video-ctrl ~ .vc-media-desc { background: var(--background-secondary); }
 /* Narrow cards keep the essentials: play, time, marks, speed, volume and full screen. */
 @container (max-width: 340px) { .vc-video-ctrl .vc-vc-sm { display: none; } }
 @container (max-width: 230px) { .vc-video-ctrl .vc-vc-xs { display: none; } }
