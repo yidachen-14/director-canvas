@@ -564,4 +564,10 @@ export const VI: Record<string, string> = {
   "Create new Director Canvas": "Tạo Director Canvas mới",
   "Show \"Create new Director Canvas\" in the left ribbon": "Hiện “Tạo Director Canvas mới” ở thanh bên trái",
   "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "Chỉ ẩn được khi tệp .canvas mở bằng Director Canvas; nếu không, đây là cách tạo bảng mới.",
+  "Source files": "Tệp nguồn",
+  "Too large for a PNG at this resolution. Pick a lower one, or select fewer cards.": "PNG quá lớn ở độ phân giải này. Hãy chọn độ phân giải thấp hơn hoặc chọn ít thẻ hơn.",
+  "too large": "quá lớn",
+  "The board’s background": "Nền của bảng",
+  "Transparent": "Trong suốt",
+  "A folder with index.html and the pictures and videos next to it.": "Một thư mục gồm index.html và hình ảnh, video bên cạnh.",
 };

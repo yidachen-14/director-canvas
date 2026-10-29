@@ -564,4 +564,10 @@ export const TH: Record<string, string> = {
   "Create new Director Canvas": "สร้าง Director Canvas ใหม่",
   "Show \"Create new Director Canvas\" in the left ribbon": "แสดง “สร้าง Director Canvas ใหม่” ในแถบด้านซ้าย",
   "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "ซ่อนได้เฉพาะเมื่อเปิดไฟล์ .canvas ด้วย Director Canvas มิฉะนั้นนี่คือทางสร้างบอร์ดใหม่",
+  "Source files": "ไฟล์ต้นฉบับ",
+  "Too large for a PNG at this resolution. Pick a lower one, or select fewer cards.": "PNG ใหญ่เกินไปที่ความละเอียดนี้ เลือกความละเอียดที่ต่ำลง หรือเลือกการ์ดน้อยลง",
+  "too large": "ใหญ่เกินไป",
+  "The board’s background": "พื้นหลังของบอร์ด",
+  "Transparent": "โปร่งใส",
+  "A folder with index.html and the pictures and videos next to it.": "โฟลเดอร์ที่มี index.html พร้อมรูปภาพและวิดีโออยู่ข้างกัน",
 };

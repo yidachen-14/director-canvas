@@ -564,4 +564,10 @@ export const UK: Record<string, string> = {
   "Create new Director Canvas": "Створити Director Canvas",
   "Show \"Create new Director Canvas\" in the left ribbon": "Показувати «Створити Director Canvas» на лівій панелі",
   "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "Приховати можна, лише поки файли .canvas відкриваються в Director Canvas; інакше це спосіб створити нову дошку.",
+  "Source files": "Вихідні файли",
+  "Too large for a PNG at this resolution. Pick a lower one, or select fewer cards.": "Завеликий PNG для цієї роздільності. Виберіть меншу або виділіть менше карток.",
+  "too large": "завеликий",
+  "The board’s background": "Тло дошки",
+  "Transparent": "Прозорий",
+  "A folder with index.html and the pictures and videos next to it.": "Тека з index.html і зображеннями та відео поруч.",
 };

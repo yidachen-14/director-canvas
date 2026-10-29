@@ -564,4 +564,10 @@ export const FR: Record<string, string> = {
   "Create new Director Canvas": "Créer un Director Canvas",
   "Show \"Create new Director Canvas\" in the left ribbon": "Afficher « Créer un Director Canvas » dans le ruban de gauche",
   "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "Masquable seulement quand les fichiers .canvas s’ouvrent avec Director Canvas ; sinon c’est le moyen de créer un tableau.",
+  "Source files": "Fichiers sources",
+  "Too large for a PNG at this resolution. Pick a lower one, or select fewer cards.": "Trop grand pour un PNG à cette résolution. Choisissez-en une plus faible ou sélectionnez moins de cartes.",
+  "too large": "trop grand",
+  "The board’s background": "Fond du tableau",
+  "Transparent": "Transparent",
+  "A folder with index.html and the pictures and videos next to it.": "Un dossier avec index.html et les images et vidéos à côté.",
 };

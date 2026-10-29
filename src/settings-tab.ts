@@ -263,12 +263,8 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
       .addText(tx => tx.setPlaceholder(t('Ask every time')).setValue(s.exportFolder).onChange(async (v) => { s.exportFolder = v.trim(); await this.save(false); }));
     new Setting(el)
       .setName(t('PNG resolution'))
-      .addDropdown(d => d.addOptions({ 1: '1x', 2: '2x', 3: '3x' }).setValue(String(s.pngScale))
-        .onChange(async (v) => { s.pngScale = Number(v) as 1 | 2 | 3; await this.save(false); }));
-    new Setting(el)
-      .setName(t('HTML export'))
-      .addDropdown(d => d.addOptions({ folder: t('Folder (index.html + files)'), single: t('Single file') }).setValue(s.htmlMode)
-        .onChange(async (v) => { s.htmlMode = v as typeof s.htmlMode; await this.save(false); }));
+      .addDropdown(d => d.addOptions({ 1: '1x', 2: '2x', 3: '3x', 4: '4x', 5: '5x' }).setValue(String(s.pngScale))
+        .onChange(async (v) => { s.pngScale = Number(v); await this.save(false); }));
   }
 
   /** Width × height of new cards of a kind, in pixels. */

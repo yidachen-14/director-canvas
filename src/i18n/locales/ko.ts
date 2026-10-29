@@ -564,4 +564,10 @@ export const KO: Record<string, string> = {
   "Create new Director Canvas": "새 Director Canvas 만들기",
   "Show \"Create new Director Canvas\" in the left ribbon": "왼쪽 리본에 \"새 Director Canvas 만들기\" 표시",
   "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": ".canvas 파일을 Director Canvas로 열 때만 숨길 수 있습니다. 그렇지 않으면 새 보드를 만드는 입구입니다.",
+  "Source files": "원본 파일",
+  "Too large for a PNG at this resolution. Pick a lower one, or select fewer cards.": "이 해상도로는 PNG가 너무 큽니다. 더 낮은 해상도를 고르거나 카드를 적게 선택하세요.",
+  "too large": "너무 큼",
+  "The board’s background": "보드 배경",
+  "Transparent": "투명",
+  "A folder with index.html and the pictures and videos next to it.": "index.html과 그 옆에 이미지와 동영상이 있는 폴더.",
 };

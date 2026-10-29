@@ -1,29 +1,91 @@
 import { toCanvas } from 'html-to-image';
 import type { Board } from '../board/board';
 import { buildStage, imagesReady, offscreenHost, type Scope, scopeNodes } from './stage';
-import { inlineMedia } from './files';
 
 /** Browsers refuse canvases much larger than this on a side. */
 const MAX_SIDE = 16000;
+/** Each piece is drawn on its own, so no single drawing grows huge (output pixels per side). */
+const TILE = 4096;
 
 export interface RasterResult { canvas: HTMLCanvasElement; scale: number; width: number; height: number }
 
-/** Draw a scope of the board to a canvas, `scale` pixels per board unit. */
+/**
+ * Pictures in the copy at the size they will be drawn, not their full original size: a board of
+ * large photos would otherwise hold every one of them, full size, several times over in memory.
+ */
+async function shrinkImages(root: HTMLElement, scale: number): Promise<void> {
+  const imgs = [...root.querySelectorAll('img')];
+  await Promise.all(imgs.map(async (el) => {
+    const src = el.getAttribute('src') ?? '';
+    if (!src || src.startsWith('blob:')) return;
+    const box = el.getBoundingClientRect();
+    if (!box.width || !box.height) return;
+    const pic = new Image();
+    pic.decoding = 'async';
+    pic.src = src;
+    try { await pic.decode(); } catch { return; }
+    const nw = pic.naturalWidth, nh = pic.naturalHeight;
+    if (!nw || !nh) return;
+    // Enough pixels for the box at this scale (covering it, for cropped pictures), never more than the original.
+    const k = Math.min(1, Math.max((box.width * scale) / nw, (box.height * scale) / nh) * 1.05);
+    if (k > 0.9 && src.startsWith('data:')) return;
+    const c = createEl('canvas');
+    c.width = Math.max(1, Math.round(nw * k));
+    c.height = Math.max(1, Math.round(nh * k));
+    const ctx = c.getContext('2d');
+    if (!ctx) return;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(pic, 0, 0, c.width, c.height);
+    const alpha = /\.(png|gif|webp|svg)(\?|#|$)/i.test(src) || src.startsWith('data:image/png');
+    try { el.setAttribute('src', alpha ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.92)); } catch { /* a tainted picture stays as it is */ }
+    c.width = c.height = 0;
+  }));
+  // Videos without a still can't be drawn; their sources would only be carried along.
+  for (const v of [...root.querySelectorAll('video, audio')]) v.removeAttribute('src');
+}
+
+/** Draw a scope of the board to a canvas, `scale` pixels per board unit, piece by piece. */
 export async function renderCanvas(board: Board, scope: Scope, opts: { scale: number; background: boolean; padding: number }): Promise<RasterResult> {
   const host = offscreenHost();
   try {
-    const stage = buildStage(board, scopeNodes(board, scope), { padding: opts.padding, background: opts.background, host });
-    inlineMedia(stage.el);
-    await imagesReady(stage.el);
+    const nodes = scopeNodes(board, scope);
+    const stage = buildStage(board, nodes, { padding: opts.padding, background: opts.background, host });
     const { width, height } = stage.bounds;
-    const scale = Math.max(0.1, Math.min(opts.scale, MAX_SIDE / width, MAX_SIDE / height));
-    const canvas = await toCanvas(stage.el, {
-      width, height, pixelRatio: scale, skipFonts: true, cacheBust: false,
-      backgroundColor: opts.background ? stage.el.style.background || undefined : undefined,
-      // Board styles are already inline or in the document's sheets.
-      filter: (n) => !(n.instanceOf(HTMLElement) && n.classList.contains('vc-mm-overlay') && !n.childElementCount),
-    });
-    return { canvas, scale, width, height };
+    const scale = Math.max(0.05, Math.min(opts.scale, MAX_SIDE / width, MAX_SIDE / height));
+    await shrinkImages(stage.el, scale);
+    await imagesReady(stage.el);
+    const W = Math.max(1, Math.round(width * scale)), H = Math.max(1, Math.round(height * scale));
+    const out = createEl('canvas');
+    out.width = W; out.height = H;
+    const ctx = out.getContext('2d');
+    if (!ctx) throw new Error('canvas export failed');
+    const background = opts.background ? stage.el.style.background || undefined : undefined;
+    const step = TILE / scale;
+    const baseX = stage.bounds.x, baseY = stage.bounds.y;
+    const rects = nodes.map(n => ({ id: n.id, x: n.x - baseX, y: n.y - baseY, w: n.width, h: n.height }));
+    for (let y = 0; y < height; y += step) {
+      for (let x = 0; x < width; x += step) {
+        const tw = Math.min(step, width - x), th = Math.min(step, height - y);
+        stage.el.setCssStyles({ width: `${tw}px`, height: `${th}px` });
+        stage.world.setCssStyles({ transform: `translate(${-baseX - x}px, ${-baseY - y}px)` });
+        // Only the cards that reach into this piece (with a margin for shadows and labels).
+        const m = 80;
+        const away = new Set(rects.filter(r => r.x > x + tw + m || r.x + r.w < x - m || r.y > y + th + m || r.y + r.h < y - m).map(r => r.id));
+        const piece = await toCanvas(stage.el, {
+          width: tw, height: th, pixelRatio: scale, skipFonts: true, cacheBust: false, backgroundColor: background,
+          filter: (n) => {
+            if (!n.instanceOf(HTMLElement)) return true;
+            if (n.classList.contains('vc-mm-overlay') && !n.childElementCount) return false;
+            return !(n.classList.contains('vc-node') && away.has(n.dataset.id ?? ''));
+          },
+        });
+        ctx.drawImage(piece, Math.round(x * scale), Math.round(y * scale));
+        piece.width = piece.height = 0;
+        // Let the app breathe between pieces.
+        await new Promise(r => window.setTimeout(r, 0));
+      }
+    }
+    return { canvas: out, scale, width, height };
   } finally {
     host.remove();
   }

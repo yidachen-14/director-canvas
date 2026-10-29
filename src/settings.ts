@@ -62,7 +62,7 @@ export interface VisualCanvasSettings {
   normalizeBase: 'first' | 'average';
 
   exportFolder: string;
-  pngScale: 1 | 2 | 3;
+  pngScale: number;
   htmlMode: 'folder' | 'single';
 
   autoRelink: boolean;
@@ -154,7 +154,7 @@ export function normalizeSettings(raw: unknown): VisualCanvasSettings {
   s.toolbarTools = s.toolbarTools.filter(id => id !== 'select' && id !== 'hand');
   s.toolbarOrder = s.toolbarOrder.filter(id => id !== 'select' && id !== 'hand');
   s.settingsVersion = SETTINGS_VERSION;
-  if (![1, 2, 3].includes(s.pngScale)) s.pngScale = 2;
+  if (![1, 2, 3, 4, 5].includes(s.pngScale)) s.pngScale = 2;
   if (!['lines', 'dots'].includes(s.gridStyle)) s.gridStyle = 'dots';
   if (!['straight', 'curve', 'elbow'].includes(s.defaultRoute)) s.defaultRoute = 'elbow';
   if (!['theme', 'pure'].includes(s.background)) s.background = 'theme';

@@ -564,4 +564,10 @@ export const NL: Record<string, string> = {
   "Create new Director Canvas": "Nieuw Director Canvas maken",
   "Show \"Create new Director Canvas\" in the left ribbon": "„Nieuw Director Canvas maken” in het linker lint tonen",
   "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "Alleen te verbergen zolang .canvas-bestanden met Director Canvas openen; anders is het de manier om een nieuw bord te maken.",
+  "Source files": "Bronbestanden",
+  "Too large for a PNG at this resolution. Pick a lower one, or select fewer cards.": "Te groot voor een PNG in deze resolutie. Kies een lagere of selecteer minder kaarten.",
+  "too large": "te groot",
+  "The board’s background": "Achtergrond van het bord",
+  "Transparent": "Transparant",
+  "A folder with index.html and the pictures and videos next to it.": "Een map met index.html en de afbeeldingen en video’s ernaast.",
 };

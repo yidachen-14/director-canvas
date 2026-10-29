@@ -1,6 +1,6 @@
 import type { Board } from '../board/board';
 import { buildStage, offscreenHost, type Scope, scopeNodes } from './stage';
-import { mediaElements, mimeOf, readResource, resourcePath, dataUrl, type OutFile } from './files';
+import { mediaElements, readResource, resourcePath, type OutFile } from './files';
 import { t } from '../i18n';
 
 /** All CSS the board uses right now: Obsidian's, the theme's and ours. */
@@ -100,17 +100,17 @@ window.addEventListener('resize', drawMini);
 fit();
 })();`;
 
-export interface HtmlExport { name: string; single: string; files(top: string): OutFile[] }
+export interface HtmlExport { name: string; files(top: string): OutFile[] }
 
 /**
- * A page that shows the board in any browser. `single`: one .html file with everything inside;
- * otherwise a folder with index.html and the pictures and videos next to it.
+ * A page that shows the board in any browser: a folder with index.html and the pictures and
+ * videos next to it (videos play there with the browser's own controls).
  */
-export async function exportHtml(board: Board, scope: Scope, name: string, single: boolean): Promise<HtmlExport> {
+export async function exportHtml(board: Board, scope: Scope, name: string): Promise<HtmlExport> {
   const host = offscreenHost();
   try {
     const nodes = scopeNodes(board, scope);
-    const stage = buildStage(board, nodes, { padding: 0, background: false, host });
+    const stage = buildStage(board, nodes, { padding: 0, background: false, host, keepVideos: true });
     const world = stage.world;
     world.id = 'vc-world';
     world.setCssStyles({ transform: '' });
@@ -121,7 +121,6 @@ export async function exportHtml(board: Board, scope: Scope, name: string, singl
       const bytes = readResource(src);
       if (!bytes) continue;
       const path = resourcePath(src) ?? src;
-      if (single) { el.setAttribute('src', dataUrl(bytes, mimeOf(path))); continue; }
       let rel = used.get(path);
       if (!rel) {
         const base = (path.split(/[\\/]/).pop() ?? 'file').replace(/[^\w.\-\u3000-\u9fff]+/g, '_');
@@ -164,7 +163,6 @@ export async function exportHtml(board: Board, scope: Scope, name: string, singl
 </html>`;
     return {
       name,
-      single: html,
       files: (top: string) => [{ path: `${top}/index.html`, data: html }, ...assets.map(a => ({ path: `${top}/${a.rel}`, data: a.data }))],
     };
   } finally {

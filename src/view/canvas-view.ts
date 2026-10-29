@@ -2,7 +2,7 @@ import { BOARD_ICON } from '../ui/icons';
 import { attachInsets } from '../board/insets';
 import { Notice, Scope, TextFileView, type TFile, type ViewStateResult, type WorkspaceLeaf } from 'obsidian';
 import type VisualCanvasPlugin from '../main';
-import { VIEW_TYPE, switchCanvasView } from '../takeover';
+import { VIEW_TYPE, coreCanvasOn, switchCanvasView } from '../takeover';
 import { parseCanvas, serializeCanvas, emptyCanvas } from '../model/canvas-file';
 import { settleSidesForSave } from '../board/connections';
 import { Board } from '../board/board';
@@ -47,7 +47,7 @@ export class CanvasView extends TextFileView {
     new SpacingHandles(board);
     attachInsets(board);
     this.savedPill = this.contentEl.createDiv({ cls: 'vc-saved-pill', text: t('Saved') });
-    this.addAction('layout-grid', t('Open in core Canvas'), () => { void switchCanvasView(this.leaf, 'native'); });
+    if (coreCanvasOn(this.app)) this.addAction('layout-grid', t('Open in core Canvas'), () => { void switchCanvasView(this.leaf, 'native'); });
     this.setupTitleRename();
     this.scope = new Scope(this.app.scope);
     installShortcuts(this.scope, () => this.board);

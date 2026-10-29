@@ -564,4 +564,10 @@ export const JA: Record<string, string> = {
   "Create new Director Canvas": "Director Canvas を新規作成",
   "Show \"Create new Director Canvas\" in the left ribbon": "左リボンに「Director Canvas を新規作成」を表示",
   "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": ".canvas ファイルを Director Canvas で開く設定のときだけ隠せます。それ以外は新しいボードを作る入口です。",
+  "Source files": "ソースファイル",
+  "Too large for a PNG at this resolution. Pick a lower one, or select fewer cards.": "この解像度では PNG が大きすぎます。低い解像度を選ぶか、選択するカードを減らしてください。",
+  "too large": "大きすぎ",
+  "The board’s background": "ボードの背景",
+  "Transparent": "透明",
+  "A folder with index.html and the pictures and videos next to it.": "index.html と、その横に画像と動画を置いたフォルダ。",
 };

@@ -564,4 +564,10 @@ export const ID: Record<string, string> = {
   "Create new Director Canvas": "Buat Director Canvas baru",
   "Show \"Create new Director Canvas\" in the left ribbon": "Tampilkan \"Buat Director Canvas baru\" di pita kiri",
   "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "Hanya bisa disembunyikan selama berkas .canvas dibuka dengan Director Canvas; jika tidak, ini cara membuat papan baru.",
+  "Source files": "Berkas sumber",
+  "Too large for a PNG at this resolution. Pick a lower one, or select fewer cards.": "Terlalu besar untuk PNG pada resolusi ini. Pilih yang lebih rendah, atau pilih lebih sedikit kartu.",
+  "too large": "terlalu besar",
+  "The board’s background": "Latar papan",
+  "Transparent": "Transparan",
+  "A folder with index.html and the pictures and videos next to it.": "Satu folder berisi index.html dengan gambar dan video di sampingnya.",
 };

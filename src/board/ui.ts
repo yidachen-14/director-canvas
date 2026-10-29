@@ -10,7 +10,7 @@ import { cssColor } from '../cards/util';
 import { t } from '../i18n';
 
 /** Extra entries for the toolbar's "More" panel, added by later modules. */
-export interface OverflowAction { section: string; icon: string; label: string; run(board: Board): void; available?(board: Board): boolean; }
+export interface OverflowAction { section: string; icon: string; label: string; run(board: Board): void; available?(board: Board): boolean; /** After "Customise the toolbar". */ last?: boolean; }
 const overflowActions: OverflowAction[] = [];
 export function contributeOverflow(a: OverflowAction): void { overflowActions.push(a); }
 
@@ -193,7 +193,7 @@ class OverflowPanel {
 
     const sections = new Map<string, OverflowAction[]>();
     for (const a of overflowActions) {
-      if (a.available && !a.available(board)) continue;
+      if (a.last || (a.available && !a.available(board))) continue;
       if (!sections.has(a.section)) sections.set(a.section, []);
       sections.get(a.section)!.push(a);
     }
@@ -203,6 +203,9 @@ class OverflowPanel {
     }
     if (el.childElementCount) el.createDiv('vc-more-sep');
     row('settings-2', t('Customise the toolbar…')).addEventListener('click', () => { this.close(); board.plugin.openSettings(); });
+    const tail = overflowActions.filter(a => a.last && (!a.available || a.available(board)));
+    if (tail.length) el.createDiv('vc-more-sep');
+    for (const a of tail) row(a.icon, t(a.label)).addEventListener('click', () => { this.close(); a.run(board); });
 
     // Open next to the button, kept inside the board.
     const br = board.root.getBoundingClientRect();

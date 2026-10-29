@@ -3,7 +3,7 @@ import { Notice, Plugin, TFile, TFolder, normalizePath } from 'obsidian';
 import { installRenameSync } from './rename-sync';
 import { ARRANGE, runArrange } from './board/arrange-commands';
 import { CanvasView } from './view/canvas-view';
-import { VIEW_TYPE, installCanvasTakeover, switchCanvasView } from './takeover';
+import { VIEW_TYPE, coreCanvasOn, installCanvasTakeover, installExtensionFallback, switchCanvasView } from './takeover';
 import { normalizeSettings, type VisualCanvasSettings } from './settings';
 import { VisualCanvasSettingTab } from './settings-tab';
 import { setLanguage, t } from './i18n';
@@ -32,6 +32,7 @@ export default class VisualCanvasPlugin extends Plugin {
 
     this.registerView(VIEW_TYPE, leaf => new CanvasView(leaf, this));
     this.register(installCanvasTakeover(path => this.takesOver(path)));
+    this.app.workspace.onLayoutReady(() => this.register(installExtensionFallback(this.app)));
     this.addSettingTab(new VisualCanvasSettingTab(this.app, this));
 
     this.ribbonEl = this.addRibbonIcon(BOARD_ICON, t('Create new Director Canvas'), () => { void this.createBoard(); });
@@ -43,7 +44,7 @@ export default class VisualCanvasPlugin extends Plugin {
       name: t('Open this board in core Canvas'),
       checkCallback: (checking) => {
         const leaf = this.app.workspace.getActiveViewOfType(CanvasView)?.leaf;
-        if (!leaf) return false;
+        if (!leaf || !coreCanvasOn(this.app)) return false;
         if (!checking) void switchCanvasView(leaf, 'native');
         return true;
       },
@@ -84,7 +85,7 @@ export default class VisualCanvasPlugin extends Plugin {
         const leaf = this.app.workspace.getLeaf('tab');
         await leaf.setViewState({ type: VIEW_TYPE, state: { file: file.path }, active: true });
       }));
-      menu.addItem(i => i.setTitle(t('Open in core Canvas')).setIcon('layout-grid').setSection('open').onClick(async () => {
+      if (coreCanvasOn(this.app)) menu.addItem(i => i.setTitle(t('Open in core Canvas')).setIcon('layout-grid').setSection('open').onClick(async () => {
         const leaf = this.app.workspace.getLeaf('tab');
         await leaf.setViewState({ type: 'canvas', state: { file: file.path, vcNative: true }, active: true });
       }));
@@ -105,7 +106,7 @@ export default class VisualCanvasPlugin extends Plugin {
 
   onunload(): void {
     // Hand open boards back to the core view so no pane is left blank.
-    this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach(leaf => { void switchCanvasView(leaf, 'native'); });
+    if (coreCanvasOn(this.app)) this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach(leaf => { void switchCanvasView(leaf, 'native'); });
   }
 
   /** Whether a board at `path` opens with Director Canvas. */

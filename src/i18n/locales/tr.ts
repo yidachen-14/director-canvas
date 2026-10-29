@@ -564,4 +564,10 @@ export const TR: Record<string, string> = {
   "Create new Director Canvas": "Yeni Director Canvas oluştur",
   "Show \"Create new Director Canvas\" in the left ribbon": "Sol şeritte \"Yeni Director Canvas oluştur\"u göster",
   "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "Yalnızca .canvas dosyaları Director Canvas ile açılırken gizlenebilir; aksi halde yeni pano oluşturmanın yoludur.",
+  "Source files": "Kaynak dosyalar",
+  "Too large for a PNG at this resolution. Pick a lower one, or select fewer cards.": "Bu çözünürlükte PNG çok büyük. Daha düşük birini seçin ya da daha az kart seçin.",
+  "too large": "çok büyük",
+  "The board’s background": "Panonun arka planı",
+  "Transparent": "Saydam",
+  "A folder with index.html and the pictures and videos next to it.": "index.html ve yanında görseller ile videolar bulunan bir klasör.",
 };

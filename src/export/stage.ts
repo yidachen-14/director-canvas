@@ -54,7 +54,7 @@ export interface Stage {
  * A still copy of part of the board, laid out at 100% with the bounds' top-left at 0,0,
  * attached under `host` (it must be in the document for styles and images).
  */
-export function buildStage(board: Board, nodes: RawNode[], opts: { padding: number; background: boolean; host: HTMLElement }): Stage {
+export function buildStage(board: Board, nodes: RawNode[], opts: { padding: number; background: boolean; host: HTMLElement; keepVideos?: boolean }): Stage {
   const bounds = boundsOf(nodes, opts.padding);
   const ids = new Set(nodes.map(n => n.id));
   const root = board.root;
@@ -95,6 +95,16 @@ export function buildStage(board: Board, nodes: RawNode[], opts: { padding: numb
   copies.forEach((v, i) => {
     const live = liveVideos.find(l => l.currentSrc === v.currentSrc || l.src === v.src) ?? liveVideos[i];
     const still = videoStill(live);
+    if (opts.keepVideos) {
+      // A page that plays them: the browser's own controls, the current frame as the poster.
+      v.setAttribute('controls', '');
+      // A page opened from disk can't load its own files "cross-origin".
+      v.removeAttribute('crossorigin');
+      v.setAttribute('playsinline', '');
+      v.setAttribute('preload', 'metadata');
+      if (still && !v.getAttribute('poster')) v.setAttribute('poster', still);
+      return;
+    }
     if (still) {
       const img = createEl('img', { attr: { src: still } });
       img.className = v.className;
@@ -102,6 +112,8 @@ export function buildStage(board: Board, nodes: RawNode[], opts: { padding: numb
       v.replaceWith(img);
     } else v.setAttribute('preload', 'auto');
   });
+  // The board's own player controls do nothing in a copy.
+  if (opts.keepVideos) for (const x of [...world.querySelectorAll('.vc-video-ctrl')]) x.remove();
   return { el, world, bounds, nodes, remove: () => el.remove() };
 }
 

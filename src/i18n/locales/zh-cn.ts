@@ -565,4 +565,10 @@ export const ZH_CN: Record<string, string> = {
   "Create new Director Canvas": "新建 Director Canvas",
   "Show \"Create new Director Canvas\" in the left ribbon": "在左侧栏显示“新建 Director Canvas”",
   "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "只有在 .canvas 文件用 Director Canvas 打开时才能隐藏；否则它是新建白板的入口。",
+  "Source files": "源文件打包",
+  "Too large for a PNG at this resolution. Pick a lower one, or select fewer cards.": "以这个分辨率导出的 PNG 太大了。请选较低的分辨率，或少选一些卡片。",
+  "too large": "太大",
+  "The board’s background": "白板当前的背景",
+  "Transparent": "透明",
+  "A folder with index.html and the pictures and videos next to it.": "一个文件夹：index.html，旁边放图片和视频。",
 };

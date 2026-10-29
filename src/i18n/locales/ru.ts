@@ -564,4 +564,10 @@ export const RU: Record<string, string> = {
   "Create new Director Canvas": "Создать Director Canvas",
   "Show \"Create new Director Canvas\" in the left ribbon": "Показывать «Создать Director Canvas» на левой панели",
   "It can be hidden only while .canvas files open with Director Canvas; otherwise it is the way to make a new board.": "Скрыть можно, только пока файлы .canvas открываются в Director Canvas; иначе это способ создать новую доску.",
+  "Source files": "Исходные файлы",
+  "Too large for a PNG at this resolution. Pick a lower one, or select fewer cards.": "Слишком большой PNG для этого разрешения. Выберите меньшее или выделите меньше карточек.",
+  "too large": "слишком большой",
+  "The board’s background": "Фон доски",
+  "Transparent": "Прозрачный",
+  "A folder with index.html and the pictures and videos next to it.": "Папка с index.html и изображениями и видео рядом.",
 };

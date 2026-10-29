@@ -105,7 +105,6 @@ function boardMenu(menu: Menu, board: Board, at: Point): void {
       }));
     }
   });
-  addArrangeMenu(menu, board, (title, icon, section, build) => submenu(menu, title, icon, section, build), false);
   for (const c of contributions) if (c.where === 'board') c.add(menu, board, at);
   menu.addItem(i => i.setTitle(t('Zoom to fit')).setIcon('maximize').setSection('view').onClick(() => board.zoomToFit(undefined, true)));
   menu.addItem(i => i.setTitle(t('Zoom to 100%')).setIcon('scan').setSection('view').onClick(() => board.setZoom(1, true)));
