@@ -553,4 +553,9 @@ export const NL: Record<string, string> = {
   "Tidy up, keeping positions": "Opruimen, posities behouden",
   "Same as Obsidian": "Zoals Obsidian",
   "Mono sound": "Mono",
+  "Grid contrast": "Rastercontrast",
+  "How strongly the dots or lines stand out, in percent. It follows the light or dark mode.": "Hoe sterk de stippen of lijnen opvallen, in procenten. Volgt de lichte of donkere modus.",
+  "Pure white or black": "Puur wit of zwart",
+  "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "In pixels. Schikken kan dezelfde afstand gebruiken, zodat kaarten op het raster uitlijnen.",
+  "Same as the grid": "Gelijk aan het raster",
 };

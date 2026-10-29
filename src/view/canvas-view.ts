@@ -1,3 +1,4 @@
+import { attachInsets } from '../board/insets';
 import { Notice, Scope, TextFileView, type TFile, type ViewStateResult, type WorkspaceLeaf } from 'obsidian';
 import type VisualCanvasPlugin from '../main';
 import { VIEW_TYPE, switchCanvasView } from '../takeover';
@@ -43,6 +44,7 @@ export class CanvasView extends TextFileView {
     attachCorner(board);
     new ContextBar(board);
     new SpacingHandles(board);
+    attachInsets(board);
     this.savedPill = this.contentEl.createDiv({ cls: 'vc-saved-pill', text: t('Saved') });
     this.addAction('layout-grid', t('Open in core Canvas'), () => { void switchCanvasView(this.leaf, 'native'); });
     this.setupTitleRename();

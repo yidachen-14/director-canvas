@@ -553,4 +553,9 @@ export const JA: Record<string, string> = {
   "Tidy up, keeping positions": "位置を保ったまま整える",
   "Same as Obsidian": "Obsidian と同じ",
   "Mono sound": "モノラル",
+  "Grid contrast": "グリッドのコントラスト",
+  "How strongly the dots or lines stand out, in percent. It follows the light or dark mode.": "点や線の濃さ（パーセント）。ライト／ダークモードに追従します。",
+  "Pure white or black": "純白または純黒",
+  "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "ピクセル単位。整列にも同じ間隔を使うと、カードがグリッドに揃います。",
+  "Same as the grid": "グリッドと同じ",
 };

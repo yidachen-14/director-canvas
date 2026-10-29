@@ -553,4 +553,9 @@ export const PL: Record<string, string> = {
   "Tidy up, keeping positions": "Uporządkuj z zachowaniem położenia",
   "Same as Obsidian": "Jak w Obsidian",
   "Mono sound": "Mono",
+  "Grid contrast": "Kontrast siatki",
+  "How strongly the dots or lines stand out, in percent. It follows the light or dark mode.": "Jak wyraźne są kropki lub linie, w procentach. Podąża za trybem jasnym lub ciemnym.",
+  "Pure white or black": "Czysta biel lub czerń",
+  "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "W pikselach. Układanie może używać tego samego odstępu, by karty trzymały się siatki.",
+  "Same as the grid": "Jak siatka",
 };

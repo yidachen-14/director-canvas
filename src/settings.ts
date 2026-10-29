@@ -14,6 +14,8 @@ export interface VisualCanvasSettings {
   toolbarSize: ToolbarSize;
   /** Tool ids shown on the toolbar, in order; the rest live under "…". Select and Hand are always first. */
   toolbarTools: string[];
+  /** The order of every tool (on the toolbar or not), as arranged in the settings. */
+  toolbarOrder: string[];
   /** Custom shortcuts: command id → "Mod+Shift+K" style key; missing = the default. */
   hotkeys: Record<string, string>;
   /** Bumped when defaults change in a way that should reach saved settings once. */
@@ -44,12 +46,16 @@ export interface VisualCanvasSettings {
   panButton: 'middle' | 'right' | 'none';
   /** Background grid: an even square lattice of dots (Boardmix) or of lines. */
   gridStyle: 'lines' | 'dots';
-  dotColor: string;
   dotSize: number;
-  backgroundColor: string;
+  /** The board's ground: the theme's own background, or plain white (light mode) / black (dark mode). */
+  background: 'theme' | 'pure';
+  /** How strongly the dots or lines stand out from the background, in percent. */
+  gridContrast: number;
   snapToGrid: boolean;
   gridSize: number;
 
+  /** Spacing of arranged cards: the grid size (so they line up with it), or a number of its own. */
+  arrangeGapMode: 'grid' | 'custom';
   arrangeGap: number;
   normalizeBase: 'first' | 'average';
 
@@ -60,7 +66,7 @@ export interface VisualCanvasSettings {
   autoRelink: boolean;
 }
 
-export const SETTINGS_VERSION = 3;
+export const SETTINGS_VERSION = 4;
 
 export const DEFAULT_SETTINGS: VisualCanvasSettings = {
   language: 'auto',
@@ -70,6 +76,7 @@ export const DEFAULT_SETTINGS: VisualCanvasSettings = {
   toolbarPosition: 'top',
   toolbarSize: 'S',
   toolbarTools: ['text', 'note', 'sticky', 'group', 'connect'],
+  toolbarOrder: [],
   hotkeys: {},
   settingsVersion: SETTINGS_VERSION,
 
@@ -87,17 +94,18 @@ export const DEFAULT_SETTINGS: VisualCanvasSettings = {
 
   penShape: { thinning: 0.5, streamline: 0.5, smoothing: 0.5, taperStart: 0, taperEnd: 0 },
 
-  defaultRoute: 'straight',
+  defaultRoute: 'elbow',
 
   panButton: 'middle',
   gridStyle: 'dots',
-  dotColor: '',
   dotSize: 1.5,
-  backgroundColor: '',
+  background: 'theme',
+  gridContrast: 25,
   snapToGrid: false,
   gridSize: 20,
 
-  arrangeGap: 16,
+  arrangeGapMode: 'grid',
+  arrangeGap: 20,
   normalizeBase: 'first',
 
   exportFolder: '',
@@ -108,7 +116,7 @@ export const DEFAULT_SETTINGS: VisualCanvasSettings = {
 };
 
 export function normalizeSettings(raw: unknown): VisualCanvasSettings {
-  const s: VisualCanvasSettings = { ...DEFAULT_SETTINGS, hotkeys: {}, toolbarTools: [...DEFAULT_SETTINGS.toolbarTools] };
+  const s: VisualCanvasSettings = { ...DEFAULT_SETTINGS, hotkeys: {}, toolbarTools: [...DEFAULT_SETTINGS.toolbarTools], toolbarOrder: [] };
   if (!raw || typeof raw !== 'object') return s;
   const r = raw as Record<string, unknown>;
   for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof VisualCanvasSettings)[]) {
@@ -134,13 +142,24 @@ export function normalizeSettings(raw: unknown): VisualCanvasSettings {
   if (typeof r.settingsVersion !== 'number' || r.settingsVersion < 3) {
     if (s.defaultStickyColor.toUpperCase() === '#D2BA23') s.defaultStickyColor = '#F4D81E';
   }
+  // Version 4: elbow connections by default; the arranging gap follows the grid.
+  if (typeof r.settingsVersion !== 'number' || r.settingsVersion < 4) {
+    if (r.defaultRoute === undefined || r.defaultRoute === 'straight') s.defaultRoute = 'elbow';
+    s.arrangeGapMode = 'grid';
+    s.arrangeGap = s.gridSize;
+  }
   s.toolbarTools = s.toolbarTools.filter(id => id !== 'select' && id !== 'hand');
+  s.toolbarOrder = s.toolbarOrder.filter(id => id !== 'select' && id !== 'hand');
   s.settingsVersion = SETTINGS_VERSION;
   if (![1, 2, 3].includes(s.pngScale)) s.pngScale = 2;
   if (!['lines', 'dots'].includes(s.gridStyle)) s.gridStyle = 'dots';
-  if (!['straight', 'curve', 'elbow'].includes(s.defaultRoute)) s.defaultRoute = 'straight';
+  if (!['straight', 'curve', 'elbow'].includes(s.defaultRoute)) s.defaultRoute = 'elbow';
+  if (!['theme', 'pure'].includes(s.background)) s.background = 'theme';
+  if (!['grid', 'custom'].includes(s.arrangeGapMode)) s.arrangeGapMode = 'grid';
+  s.gridContrast = Math.min(100, Math.max(0, Math.round(s.gridContrast)));
+  s.arrangeGap = Math.min(400, Math.max(0, Math.round(s.arrangeGap)));
   s.defaultTextSize = Math.min(96, Math.max(8, s.defaultTextSize));
-  s.gridSize = Math.min(200, Math.max(4, s.gridSize));
+  s.gridSize = Math.min(200, Math.max(4, Math.round(s.gridSize)));
   s.imageRadius = Math.min(40, Math.max(0, s.imageRadius));
   for (const k of ['noteSize', 'stickySize', 'calloutSize'] as const) {
     const v = r[k] as { width?: unknown; height?: unknown } | undefined;
@@ -152,4 +171,9 @@ export function normalizeSettings(raw: unknown): VisualCanvasSettings {
   const dp = DEFAULT_SETTINGS.penShape as unknown as Record<string, number>;
   s.penShape = Object.fromEntries(Object.keys(dp).map(k => [k, typeof ps?.[k] === 'number' ? ps[k] : dp[k]])) as VisualCanvasSettings['penShape'];
   return s;
+}
+
+/** The spacing arrangements use: the grid size when they follow the grid. */
+export function arrangeGapOf(s: VisualCanvasSettings): number {
+  return s.arrangeGapMode === 'grid' ? s.gridSize : s.arrangeGap;
 }

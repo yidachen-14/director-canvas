@@ -554,4 +554,9 @@ export const ZH_CN: Record<string, string> = {
   "Tidy up, keeping positions": "整齐排列（保持位置）",
   "Same as Obsidian": "跟随 Obsidian",
   "Mono sound": "单声道",
+  "Grid contrast": "网格对比度",
+  "How strongly the dots or lines stand out, in percent. It follows the light or dark mode.": "点或线条的明显程度（百分比），会跟随明亮或深色模式。",
+  "Pure white or black": "纯白或纯黑",
+  "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "单位为像素。排列可使用相同间距，让卡片与网格对齐。",
+  "Same as the grid": "与网格相同",
 };

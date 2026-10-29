@@ -1,7 +1,7 @@
 import { App, ColorComponent, PluginSettingTab, Setting, setIcon } from 'obsidian';
 import type VisualCanvasPlugin from './main';
-import { DEFAULT_SETTINGS, type TextCardKind, type ToolbarPosition, type ToolbarSize } from './settings';
-import { availableTools, FIXED_TOOLS } from './board/tools';
+import { arrangeGapOf, DEFAULT_SETTINGS, type TextCardKind, type ToolbarPosition, type ToolbarSize } from './settings';
+import { orderedTools } from './board/tools';
 import { LANGUAGE_OPTIONS, setLanguage, t, type LanguageSetting } from './i18n';
 import { ShortcutsModal } from './shortcuts-modal';
 import { FolderPickModal } from './folder-picker';
@@ -159,6 +159,7 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
       .addToggle(tg => tg.setValue(s.autoRelink).onChange(async (v) => { s.autoRelink = v; await this.save(false); }));
 
     // ── Canvas ──
+    let gapSetting: (() => void) | null = null;
     new Setting(el).setName(t('Board')).setHeading();
     new Setting(el)
       .setName(t('Pan with mouse button'))
@@ -174,22 +175,55 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
     new Setting(el)
       .setName(t('Dot size'))
       .setDesc(t('0 hides the grid.'))
-      .addSlider(sl => sl.setLimits(0, 4, 0.5).setValue(s.dotSize).onChange(async (v) => { s.dotSize = v; await this.save(); }));
-    this.colorSetting(el, t('Dot colour'), 'dotColor');
-    this.colorSetting(el, t('Background colour'), 'backgroundColor');
+      .addSlider(sl => sl.setLimits(0, 4, 0.5).setDynamicTooltip().setValue(s.dotSize).onChange(async (v) => { s.dotSize = v; await this.save(); }));
+    new Setting(el)
+      .setName(t('Grid contrast'))
+      .setDesc(t('How strongly the dots or lines stand out, in percent. It follows the light or dark mode.'))
+      .addSlider(sl => sl.setLimits(5, 60, 1).setDynamicTooltip().setValue(s.gridContrast).onChange(async (v) => { s.gridContrast = v; await this.save(); }));
+    new Setting(el)
+      .setName(t('Background'))
+      .addDropdown(d => d.addOption('theme', t('Follows the theme')).addOption('pure', t('Pure white or black'))
+        .setValue(s.background).onChange(async (v) => { s.background = v as typeof s.background; await this.save(); }));
     new Setting(el)
       .setName(t('Snap to grid'))
       .addToggle(tg => tg.setValue(s.snapToGrid).onChange(async (v) => { s.snapToGrid = v; await this.save(); }));
-    new Setting(el)
-      .setName(t('Grid size'))
-      .addSlider(sl => sl.setLimits(10, 80, 5).setValue(s.gridSize).onChange(async (v) => { s.gridSize = v; await this.save(); }));
+    this.numberSetting(el, t('Grid size'), t('In pixels. Arranging can use the same spacing, so cards line up with the grid.'), () => s.gridSize, 4, 200, async (n) => {
+      s.gridSize = n;
+      await this.save();
+      gapSetting?.(); // the gap shown follows a grid-sized gap
+    });
 
     // ── Arranging ──
     new Setting(el).setName(t('Arranging')).setHeading();
-    new Setting(el)
-      .setName(t('Gap between arranged cards'))
-      .setDesc(t('Used by pushing, rows, columns and the automatic arrangements (px).'))
-      .addSlider(sl => sl.setLimits(0, 80, 2).setValue(s.arrangeGap).onChange(async (v) => { s.arrangeGap = v; await this.save(false); }));
+    {
+      const setting = new Setting(el).setName(t('Gap between arranged cards')).setDesc(t('Used by pushing, rows, columns and the automatic arrangements (px).'));
+      let input: HTMLInputElement | null = null;
+      const paint = () => {
+        if (!input) return;
+        input.value = String(arrangeGapOf(s));
+        input.disabled = s.arrangeGapMode === 'grid';
+      };
+      setting.addDropdown(d => d.addOption('grid', t('Same as the grid')).addOption('custom', t('Custom'))
+        .setValue(s.arrangeGapMode).onChange(async (v) => {
+          if (v === 'custom' && s.arrangeGapMode === 'grid') s.arrangeGap = s.gridSize;
+          s.arrangeGapMode = v as typeof s.arrangeGapMode;
+          paint();
+          await this.save(false);
+        }));
+      setting.addText(tx => {
+        input = tx.inputEl;
+        input.type = 'number'; input.min = '0'; input.max = '400';
+        input.addClass('vc-number-input');
+        input.addEventListener('change', () => void (async () => {
+          const n = Math.round(Number(input!.value));
+          if (!Number.isFinite(n) || n < 0) { paint(); return; }
+          s.arrangeGap = Math.min(400, n);
+          await this.save(false);
+        })());
+      });
+      paint();
+      gapSetting = paint;
+    }
     new Setting(el)
       .setName(t('Same size: measure from'))
       .addDropdown(d => d
@@ -238,70 +272,84 @@ export class VisualCanvasSettingTab extends PluginSettingTab {
     }));
   }
 
-  /** An optional colour: a picker plus a button back to the theme's colour. */
-  private colorSetting(el: HTMLElement, name: string, key: 'dotColor' | 'backgroundColor'): void {
-    const s = this.plugin.settings;
-    let picker: ColorComponent | null = null;
-    const setting = new Setting(el).setName(name).setDesc(s[key] ? '' : t('Follows the theme'));
-    setting
-      .addColorPicker(c => { picker = c; c.setValue(s[key] || '#888888').onChange(async (v) => { s[key] = v; setting.setDesc(''); await this.save(); }); })
-      .addExtraButton(b => b.setIcon('rotate-ccw').setTooltip(t('Follow the theme')).onClick(async () => {
-        s[key] = '';
-        picker?.setValue('#888888');
-        setting.setDesc(t('Follows the theme'));
-        await this.save();
-      }));
+  /** A whole number typed in (applied when the field is left or Enter is pressed). */
+  private numberSetting(el: HTMLElement, name: string, desc: string, get: () => number, min: number, max: number, set: (n: number) => Promise<void>): void {
+    new Setting(el).setName(name).setDesc(desc).addText(tx => {
+      const input = tx.inputEl;
+      input.type = 'number'; input.min = String(min); input.max = String(max);
+      input.addClass('vc-number-input');
+      input.value = String(get());
+      input.addEventListener('change', () => void (async () => {
+        const n = Math.round(Number(input.value));
+        if (!Number.isFinite(n) || n < min) { input.value = String(get()); return; }
+        input.value = String(Math.min(max, n));
+        await set(Math.min(max, n));
+      })());
+    });
   }
 
-  /** Choose which tools sit on the toolbar and in what order. */
+  /** Choose which tools sit on the toolbar and in what order: tick to show, drag the handle to reorder. */
   private toolList(el: HTMLElement): void {
     const s = this.plugin.settings;
     new Setting(el)
       .setName(t('Tools on the toolbar'))
       .setDesc(t('Select and Hand always come first. Ticked tools follow in this order; the rest are under "…".'));
     const list = el.createDiv('vc-tool-list');
-    const render = () => {
-      list.empty();
-      const tools = availableTools().filter(x => !FIXED_TOOLS.includes(x.id));
-      const shown = s.toolbarTools.filter(id => tools.some(x => x.id === id));
-      const ordered = [...shown.map(id => tools.find(x => x.id === id)!), ...tools.filter(x => !shown.includes(x.id))];
-      ordered.forEach((tool) => {
-        const row = list.createDiv('vc-tool-row');
-        const cb = row.createEl('input', { type: 'checkbox' });
-        cb.checked = shown.includes(tool.id);
-        setIcon(row.createSpan('vc-tool-row-icon'), tool.icon);
-        row.createSpan({ cls: 'vc-tool-row-name', text: t(tool.label) });
-        cb.addEventListener('change', () => void (async () => {
-          if (cb.checked) s.toolbarTools = [...shown, tool.id];
-          else s.toolbarTools = shown.filter(id => id !== tool.id);
-          await this.save();
-          render();
-        })());
-        if (cb.checked) {
-          const i = shown.indexOf(tool.id);
-          const up = row.createDiv({ cls: 'clickable-icon', attr: { 'aria-label': t('Move up') } });
-          setIcon(up, 'chevron-up');
-          up.toggleClass('is-disabled', i === 0);
-          up.addEventListener('click', () => void (async () => {
-            if (i === 0) return;
-            const arr = [...shown];
-            [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]];
-            s.toolbarTools = arr;
-            await this.save(); render();
-          })());
-          const down = row.createDiv({ cls: 'clickable-icon', attr: { 'aria-label': t('Move down') } });
-          setIcon(down, 'chevron-down');
-          down.toggleClass('is-disabled', i === shown.length - 1);
-          down.addEventListener('click', () => void (async () => {
-            if (i >= shown.length - 1) return;
-            const arr = [...shown];
-            [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]];
-            s.toolbarTools = arr;
-            await this.save(); render();
-          })());
-        }
-      });
+    const ids = () => Array.from(list.children).map(r => (r as HTMLElement).dataset.id!).filter(Boolean);
+    const commit = async () => {
+      const order = ids();
+      s.toolbarOrder = order;
+      s.toolbarTools = order.filter(id => s.toolbarTools.includes(id));
+      await this.save();
     };
-    render();
+    for (const tool of orderedTools(s)) {
+      const row = list.createDiv({ cls: 'vc-tool-row', attr: { 'data-id': tool.id } });
+      const grip = row.createDiv({ cls: 'vc-tool-row-grip', attr: { 'aria-label': t('Drag to move') } });
+      setIcon(grip, 'grip-vertical');
+      const cb = row.createEl('input', { type: 'checkbox' });
+      cb.checked = s.toolbarTools.includes(tool.id);
+      setIcon(row.createSpan('vc-tool-row-icon'), tool.icon);
+      row.createSpan({ cls: 'vc-tool-row-name', text: t(tool.label) });
+      // Ticking only shows or hides the tool: it keeps its place in the list.
+      cb.addEventListener('change', () => void (async () => {
+        const on = new Set(s.toolbarTools);
+        if (cb.checked) on.add(tool.id); else on.delete(tool.id);
+        s.toolbarTools = ids().filter(id => on.has(id));
+        s.toolbarOrder = ids();
+        await this.save();
+      })());
+      grip.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        const startY = e.clientY;
+        const pid = e.pointerId;
+        row.addClass('is-dragging');
+        // On the window: moving the row in the list would drop a pointer capture on the handle.
+        const win = grip.ownerDocument.defaultView ?? window;
+        let offset = 0;
+        const move = (ev: PointerEvent) => {
+          if (ev.pointerId !== pid) return;
+          // Swap places with a neighbour once the row passes its middle.
+          const y = ev.clientY;
+          const prev = row.previousElementSibling as HTMLElement | null;
+          const next = row.nextElementSibling as HTMLElement | null;
+          if (prev && y < prev.getBoundingClientRect().top + prev.offsetHeight / 2) { offset += prev.offsetHeight + 2; list.insertBefore(row, prev); }
+          else if (next && y > next.getBoundingClientRect().top + next.offsetHeight / 2) { offset -= next.offsetHeight + 2; list.insertBefore(next, row); }
+          row.style.transform = `translateY(${y - startY + offset}px)`;
+        };
+        const up = (ev: PointerEvent) => {
+          if (ev.pointerId !== pid) return;
+          win.removeEventListener('pointermove', move, true);
+          win.removeEventListener('pointerup', up, true);
+          win.removeEventListener('pointercancel', up, true);
+          row.removeClass('is-dragging');
+          row.setCssStyles({ transform: '' });
+          void commit();
+        };
+        win.addEventListener('pointermove', move, true);
+        win.addEventListener('pointerup', up, true);
+        win.addEventListener('pointercancel', up, true);
+      });
+    }
   }
 }

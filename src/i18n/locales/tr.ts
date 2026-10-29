@@ -553,4 +553,9 @@ export const TR: Record<string, string> = {
   "Tidy up, keeping positions": "Konumları koruyarak düzenle",
   "Same as Obsidian": "Obsidian ile aynı",
   "Mono sound": "Mono",
+  "Grid contrast": "Izgara kontrastı",
+  "How strongly the dots or lines stand out, in percent. It follows the light or dark mode.": "Noktaların veya çizgilerin ne kadar belirgin olduğu, yüzde olarak. Açık veya koyu modu izler.",
+  "Pure white or black": "Saf beyaz veya siyah",
+  "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "Piksel cinsinden. Düzenleme aynı aralığı kullanabilir, böylece kartlar ızgarayla hizalanır.",
+  "Same as the grid": "Izgarayla aynı",
 };

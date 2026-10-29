@@ -553,4 +553,9 @@ export const VI: Record<string, string> = {
   "Tidy up, keeping positions": "Sắp gọn, giữ nguyên vị trí",
   "Same as Obsidian": "Giống Obsidian",
   "Mono sound": "Mono",
+  "Grid contrast": "Độ tương phản lưới",
+  "How strongly the dots or lines stand out, in percent. It follows the light or dark mode.": "Mức nổi bật của chấm hoặc đường, tính theo phần trăm. Theo chế độ sáng hoặc tối.",
+  "Pure white or black": "Trắng hoặc đen thuần",
+  "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "Tính bằng pixel. Sắp xếp có thể dùng cùng khoảng cách để thẻ thẳng hàng với lưới.",
+  "Same as the grid": "Giống lưới",
 };

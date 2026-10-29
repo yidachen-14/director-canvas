@@ -553,4 +553,9 @@ export const FR: Record<string, string> = {
   "Tidy up, keeping positions": "Ranger en gardant les positions",
   "Same as Obsidian": "Comme Obsidian",
   "Mono sound": "Mono",
+  "Grid contrast": "Contraste de la grille",
+  "How strongly the dots or lines stand out, in percent. It follows the light or dark mode.": "Intensité des points ou des lignes, en pourcentage. Suit le mode clair ou sombre.",
+  "Pure white or black": "Blanc ou noir pur",
+  "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "En pixels. La disposition peut utiliser le même espacement pour aligner les cartes sur la grille.",
+  "Same as the grid": "Comme la grille",
 };

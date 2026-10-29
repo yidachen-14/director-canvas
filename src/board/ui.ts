@@ -1,6 +1,6 @@
 import { Menu, setIcon, setTooltip } from 'obsidian';
 import type { Board } from './board';
-import { availableTools, FIXED_TOOLS, toolById, type Tool } from './tools';
+import { FIXED_TOOLS, orderedTools, toolById, type Tool } from './tools';
 import { ZOOM_STEPS } from './board';
 import { shortcutLabel, toolTip } from './shortcuts';
 import { getCardType } from '../cards/registry';
@@ -121,9 +121,9 @@ export function attachToolbar(board: Board): void {
     bar.empty();
     const s = board.settings;
     bar.setAttr('data-size', s.toolbarSize);
-    const avail = availableTools();
     const fixed = FIXED_TOOLS.map(id => toolById(id)!).filter(Boolean);
-    const chosen = s.toolbarTools.filter(id => !FIXED_TOOLS.includes(id)).map(id => avail.find(x => x.id === id)).filter((x): x is Tool => !!x);
+    const ordered = orderedTools(s);
+    const chosen = ordered.filter(x => s.toolbarTools.includes(x.id));
     const tip = { placement: ({ top: 'bottom', bottom: 'top', left: 'right', right: 'left' } as const)[s.toolbarPosition] };
     const button = (tool: Tool) => {
       const b = bar.createDiv({ cls: 'vc-tool', attr: { 'data-tool': tool.id, role: 'button', 'aria-label': t(tool.label) } });
@@ -143,7 +143,7 @@ export function attachToolbar(board: Board): void {
     setTooltip(more, t('More'), tip);
     more.addEventListener('click', () => {
       if (panel) { panel.close(); return; }
-      const rest = avail.filter(x => !FIXED_TOOLS.includes(x.id) && !chosen.includes(x));
+      const rest = ordered.filter(x => !chosen.includes(x));
       panel = new OverflowPanel(board, more, rest, activate, () => { panel = null; more.removeClass('is-active'); });
       more.addClass('is-active');
     });

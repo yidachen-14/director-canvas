@@ -7,6 +7,8 @@ import {
   type AlignEdge, type Box, type Direction, type Normalize, type Placement,
 } from './arrange';
 import { t } from '../i18n';
+import { arrangeGapOf } from '../settings';
+import { snap } from './board';
 
 export type ArrangeCommand =
   | 'optimal' | 'tidy' | 'by-name' | 'by-added' | 'by-path' | 'random'
@@ -89,8 +91,10 @@ export function runArrange(board: Board, cmd: ArrangeCommand): void {
     return;
   }
   const boxes: Box[] = nodes.map(n => ({ id: n.id, x: n.x, y: n.y, w: n.width, h: n.height }));
-  const gap = board.settings.arrangeGap;
+  const gap = arrangeGapOf(board.settings);
   const origin = { x: Math.min(...boxes.map(b => b.x)), y: Math.min(...boxes.map(b => b.y)) };
+  // With snapping on, layouts start on a grid line, so their rows and columns sit on the grid too.
+  if (board.settings.snapToGrid) { origin.x = snap(origin.x, board.settings.gridSize); origin.y = snap(origin.y, board.settings.gridSize); }
   const { width, height } = board.screenSize();
   const aspect = Math.max(0.2, width / Math.max(1, height));
 

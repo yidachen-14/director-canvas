@@ -553,4 +553,9 @@ export const UK: Record<string, string> = {
   "Tidy up, keeping positions": "Впорядкувати, зберігши положення",
   "Same as Obsidian": "Як в Obsidian",
   "Mono sound": "Моно",
+  "Grid contrast": "Контраст сітки",
+  "How strongly the dots or lines stand out, in percent. It follows the light or dark mode.": "Наскільки помітні точки або лінії, у відсотках. Слідує світлій або темній темі.",
+  "Pure white or black": "Чисто білий або чорний",
+  "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "У пікселях. Упорядкування може використовувати той самий інтервал, щоб картки вирівнювалися за сіткою.",
+  "Same as the grid": "Як у сітки",
 };

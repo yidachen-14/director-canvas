@@ -568,4 +568,9 @@ export const ZH_TW: Record<string, string> = {
   'Tidy up, keeping positions': '整齊排列（保持位置）',
   'Same as Obsidian': '跟隨 Obsidian',
   'Mono sound': '單聲道',
+  "Grid contrast": "網格對比度",
+  "How strongly the dots or lines stand out, in percent. It follows the light or dark mode.": "點或線條的明顯程度（百分比），會跟隨明亮或深色模式。",
+  "Pure white or black": "純白或純黑",
+  "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "單位為像素。排列可使用相同間距，讓卡片與網格對齊。",
+  "Same as the grid": "與網格相同",
 };

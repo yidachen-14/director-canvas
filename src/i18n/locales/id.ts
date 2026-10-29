@@ -553,4 +553,9 @@ export const ID: Record<string, string> = {
   "Tidy up, keeping positions": "Rapikan, pertahankan posisi",
   "Same as Obsidian": "Sama dengan Obsidian",
   "Mono sound": "Mono",
+  "Grid contrast": "Kontras kisi",
+  "How strongly the dots or lines stand out, in percent. It follows the light or dark mode.": "Seberapa jelas titik atau garis terlihat, dalam persen. Mengikuti mode terang atau gelap.",
+  "Pure white or black": "Putih atau hitam murni",
+  "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "Dalam piksel. Penyusunan dapat memakai jarak yang sama agar kartu sejajar dengan kisi.",
+  "Same as the grid": "Sama dengan kisi",
 };

@@ -160,11 +160,11 @@ export class Board {
 
   applyAppearance(): void {
     const s = this.settings;
-    this.root.style.setProperty('--vc-dot-color', s.dotColor || 'var(--vc-dot-default)');
+    // Both follow Obsidian's light or dark mode: the grid is a share of the text colour, the ground the theme's or plain.
+    this.root.style.setProperty('--vc-dot-color', `color-mix(in srgb, var(--text-normal) ${s.gridContrast}%, transparent)`);
     this.root.style.setProperty('--vc-dot-size', `${s.dotSize}px`);
-    this.root.setAttr('data-grid', s.dotSize > 0 ? s.gridStyle : 'none');
-    if (s.backgroundColor) this.root.style.setProperty('--vc-bg', s.backgroundColor);
-    else this.root.style.removeProperty('--vc-bg');
+    this.root.setAttr('data-grid', s.dotSize > 0 && s.gridContrast > 0 ? s.gridStyle : 'none');
+    this.root.setAttr('data-bg', s.background);
     this.root.setAttr('data-toolbar-size', s.toolbarSize);
     this.root.style.setProperty('--vc-img-radius', `${s.imageRadius}px`);
     this.root.style.setProperty('--vc-img-radius-on', s.imageRadius > 0 ? '1' : '0');

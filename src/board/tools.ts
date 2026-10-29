@@ -50,3 +50,14 @@ export function toolById(id: string): Tool | undefined {
 export function availableTools(): Tool[] {
   return TOOLS.filter(x => !x.available || x.available());
 }
+
+/**
+ * Every tool except Select and Hand, in the order the user arranged them (settings), the ones
+ * never arranged after: first those on the toolbar, then the rest in their usual order.
+ */
+export function orderedTools(s: { toolbarTools: string[]; toolbarOrder: string[] }): Tool[] {
+  const tools = availableTools().filter(x => !FIXED_TOOLS.includes(x.id));
+  const order = [...s.toolbarOrder, ...s.toolbarTools];
+  const rank = (id: string) => { const i = order.indexOf(id); return i < 0 ? order.length + tools.findIndex(x => x.id === id) : i; };
+  return [...tools].sort((a, b) => rank(a.id) - rank(b.id));
+}

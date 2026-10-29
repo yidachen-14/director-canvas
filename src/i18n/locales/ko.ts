@@ -553,4 +553,9 @@ export const KO: Record<string, string> = {
   "Tidy up, keeping positions": "위치를 유지하며 정리",
   "Same as Obsidian": "Obsidian과 같게",
   "Mono sound": "모노",
+  "Grid contrast": "격자 대비",
+  "How strongly the dots or lines stand out, in percent. It follows the light or dark mode.": "점이나 선이 드러나는 정도(퍼센트)입니다. 라이트/다크 모드를 따릅니다.",
+  "Pure white or black": "순백 또는 순흑",
+  "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "픽셀 단위. 정렬에 같은 간격을 쓰면 카드가 격자에 맞춰집니다.",
+  "Same as the grid": "격자와 동일",
 };

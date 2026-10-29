@@ -7,8 +7,8 @@
 }
 
 .vc-board {
-  --vc-dot-default: color-mix(in srgb, var(--text-faint) 55%, transparent);
-  --vc-line-color: color-mix(in srgb, var(--vc-dot-color, var(--text-faint)) 45%, transparent);
+  --vc-dot-color: color-mix(in srgb, var(--text-normal) 25%, transparent);
+  --vc-line-color: color-mix(in srgb, var(--vc-dot-color) 60%, transparent);
   --vc-select: var(--interactive-accent);
   position: absolute;
   inset: 0;
@@ -702,7 +702,11 @@ body.vc-tool-dragging, body.vc-tool-dragging * { cursor: grabbing !important; }
 .vc-tool-row-icon { display: flex; color: var(--text-muted); }
 .vc-tool-row-icon svg { width: 16px; height: 16px; }
 .vc-tool-row-name { flex: 1; }
-.vc-tool-row .clickable-icon.is-disabled { opacity: 0.3; pointer-events: none; }
+.vc-tool-row-grip { display: flex; color: var(--text-faint); cursor: grab; touch-action: none; padding: 2px; margin-left: -4px; }
+.vc-tool-row-grip svg { width: 16px; height: 16px; }
+.vc-tool-row-grip:hover { color: var(--text-muted); }
+.vc-tool-row.is-dragging { position: relative; z-index: 2; background: var(--background-secondary); box-shadow: var(--shadow-s); }
+.vc-tool-row.is-dragging .vc-tool-row-grip { cursor: grabbing; }
 
 /* ── text cards (rich text) ── */
 
@@ -1877,3 +1881,10 @@ body.is-mobile .vc-ctx-pop { max-width: calc(100% - 16px); }
 body.is-phone .vc-corner { left: 8px; bottom: 8px; }
 body.is-phone .vc-board[data-toolbar-pos='bottom'] .vc-toolbar { bottom: 58px; }
 body.is-phone .vc-board[data-toolbar-pos='top'] .vc-toolbar { top: 8px; }
+
+/* Plain ground: white in light mode, black in dark mode. */
+.theme-light .vc-board[data-bg='pure'] { --vc-bg: #ffffff; }
+.theme-dark .vc-board[data-bg='pure'] { --vc-bg: #000000; }
+.vc-number-input { width: 80px; }
+/* Settings: a square colour well, so its round hover ring isn't cut off at the top and bottom. */
+.vc-settings .setting-item-control input[type='color'] { width: 26px; height: 26px; min-height: 26px; }

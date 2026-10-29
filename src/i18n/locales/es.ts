@@ -553,4 +553,9 @@ export const ES: Record<string, string> = {
   "Tidy up, keeping positions": "Ordenar manteniendo las posiciones",
   "Same as Obsidian": "Igual que Obsidian",
   "Mono sound": "Mono",
+  "Grid contrast": "Contraste de la cuadrícula",
+  "How strongly the dots or lines stand out, in percent. It follows the light or dark mode.": "Cuánto destacan los puntos o líneas, en porcentaje. Sigue el modo claro u oscuro.",
+  "Pure white or black": "Blanco o negro puro",
+  "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "En píxeles. Al organizar se puede usar el mismo espaciado para que las tarjetas se alineen con la cuadrícula.",
+  "Same as the grid": "Igual que la cuadrícula",
 };

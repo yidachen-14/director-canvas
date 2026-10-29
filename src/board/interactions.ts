@@ -200,8 +200,9 @@ export function attachInteractions(board: Board): void {
       if (board.selection.has(n.id)) startMove(e);
       return;
     }
-    // A finger on an empty spot moves the board; holding it still first draws a selection box.
-    if (touch) { if (!e.shiftKey) board.clearSelection(); startPan(e); return; }
+    // One finger on an empty spot only taps (clearing the selection): moving the board takes two
+    // fingers, so a swipe never fights the app's own side panels. Holding still draws a selection box.
+    if (touch) { if (!e.shiftKey) board.clearSelection(); return; }
     startMarquee(e);
   });
 
@@ -221,8 +222,9 @@ export function attachInteractions(board: Board): void {
   // ── touch: pinch, long press, double tap ───────────────
 
   /**
-   * Phones and tablets: two fingers pinch and pan; a long press opens the menu (on an empty spot,
-   * holding then dragging draws a selection box); a double tap does what a double-click does.
+   * Phones and tablets: two fingers pinch and pan (one finger never moves the board); a long press
+   * opens the menu (on an empty spot, holding then dragging draws a selection box); a double tap
+   * does what a double-click does.
    */
   function attachTouch(): void {
     const LONG_PRESS = 480, SLOP = 10, DOUBLE_TAP = 350;
@@ -351,6 +353,9 @@ export function attachInteractions(board: Board): void {
     const doc = root.ownerDocument;
     const swallow = (e: MouseEvent) => { if (Date.now() < swallowClickUntil) { swallowClickUntil = 0; e.preventDefault(); e.stopImmediatePropagation(); } };
     doc.addEventListener('click', swallow, true);
+    // Obsidian opens its side panels on a sideways swipe: touches on the board are the board's own.
+    const keep = (e: TouchEvent) => e.stopPropagation();
+    for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel'] as const) root.addEventListener(type, keep, { passive: true });
     board.addDisposer(() => { cancelHold(); doc.removeEventListener('click', swallow, true); });
   }
 

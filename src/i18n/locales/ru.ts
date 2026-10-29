@@ -553,4 +553,9 @@ export const RU: Record<string, string> = {
   "Tidy up, keeping positions": "Упорядочить, сохранив положение",
   "Same as Obsidian": "Как в Obsidian",
   "Mono sound": "Моно",
+  "Grid contrast": "Контраст сетки",
+  "How strongly the dots or lines stand out, in percent. It follows the light or dark mode.": "Насколько заметны точки или линии, в процентах. Следует светлой или тёмной теме.",
+  "Pure white or black": "Чисто белый или чёрный",
+  "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "В пикселях. Упорядочивание может использовать тот же интервал, чтобы карточки выравнивались по сетке.",
+  "Same as the grid": "Как у сетки",
 };

@@ -553,4 +553,9 @@ export const TH: Record<string, string> = {
   "Tidy up, keeping positions": "จัดให้เป็นระเบียบ คงตำแหน่งไว้",
   "Same as Obsidian": "เหมือน Obsidian",
   "Mono sound": "โมโน",
+  "Grid contrast": "คอนทราสต์ของกริด",
+  "How strongly the dots or lines stand out, in percent. It follows the light or dark mode.": "ความชัดของจุดหรือเส้น เป็นเปอร์เซ็นต์ จะตามโหมดสว่างหรือมืด",
+  "Pure white or black": "ขาวล้วนหรือดำล้วน",
+  "In pixels. Arranging can use the same spacing, so cards line up with the grid.": "เป็นพิกเซล การจัดเรียงใช้ระยะเดียวกันได้ เพื่อให้การ์ดตรงกับกริด",
+  "Same as the grid": "เหมือนกริด",
 };
