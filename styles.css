@@ -1936,8 +1936,8 @@ body.is-phone .vc-board[data-toolbar-pos='top'] .vc-toolbar { top: 8px; }
 
 /* GIFs (PureRef-like): a canvas over the picture once paused or stepped, a small bar when selected. */
 .vc-gif-canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: none; pointer-events: none; }
-.vc-media-frame.is-gif-canvas > img { display: none; }
-.vc-media-frame.is-gif-canvas > .vc-gif-canvas { display: block; }
+.vc-media-frame.is-gif-canvas img { display: none; }
+.vc-media-frame.is-gif-canvas .vc-gif-canvas { display: block; }
 .vc-gif-ui {
   position: absolute; left: 6px; right: 6px; bottom: 6px; z-index: 2; container-type: inline-size;
   display: none; flex-direction: column; gap: 2px; padding: 3px 4px; box-sizing: border-box; border-radius: 8px;
@@ -1961,3 +1961,34 @@ body.is-phone .vc-board[data-toolbar-pos='top'] .vc-toolbar { top: 8px; }
 /* Over a resize band, a player's bar shows the resize cursor too. */
 .vc-board.is-zone-hover .vc-video-ctrl, .vc-board.is-zone-hover .vc-gif-ui,
 .vc-board.is-zone-hover .vc-video-ctrl .vc-vc-btn, .vc-board.is-zone-hover .vc-gif-ui .vc-gif-btn { cursor: inherit; }
+
+/* Crop and flip (PureRef-like): the card shows part of the picture, the file is untouched. */
+.vc-crop-view { position: absolute; inset: 0; overflow: hidden; }
+.vc-crop-box { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.vc-crop-box > img { width: 100%; height: 100%; object-fit: fill; }
+.vc-node.is-cropping { visibility: hidden; }
+.vc-board.is-cropping .vc-ctx-bar { display: none; }
+.vc-crop-layer { position: absolute; z-index: 100001; pointer-events: auto; }
+.vc-crop-layer > img { position: absolute; inset: 0; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }
+.vc-crop-dim { opacity: 0.35; }
+.vc-crop-frame {
+  position: absolute; box-sizing: border-box; cursor: move;
+  outline: calc(2px / var(--vc-zoom, 1)) solid #fff; box-shadow: 0 0 0 calc(3px / var(--vc-zoom, 1)) rgba(0, 0, 0, 0.35);
+}
+.vc-crop-third { position: absolute; pointer-events: none; background: rgba(255, 255, 255, 0.45); }
+.vc-crop-third.is-v1, .vc-crop-third.is-v2 { top: 0; bottom: 0; width: calc(1px / var(--vc-zoom, 1)); }
+.vc-crop-third.is-v1 { left: 33.333%; } .vc-crop-third.is-v2 { left: 66.667%; }
+.vc-crop-third.is-h1, .vc-crop-third.is-h2 { left: 0; right: 0; height: calc(1px / var(--vc-zoom, 1)); }
+.vc-crop-third.is-h1 { top: 33.333%; } .vc-crop-third.is-h2 { top: 66.667%; }
+.vc-crop-handle {
+  position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; box-sizing: border-box; z-index: 1;
+  background: #fff; border: 1.5px solid var(--interactive-accent); border-radius: 2px; scale: calc(1 / var(--vc-zoom, 1));
+}
+.vc-crop-handle.is-nw { left: 0; top: 0; cursor: nwse-resize; }
+.vc-crop-handle.is-n { left: 50%; top: 0; cursor: ns-resize; }
+.vc-crop-handle.is-ne { left: 100%; top: 0; cursor: nesw-resize; }
+.vc-crop-handle.is-e { left: 100%; top: 50%; cursor: ew-resize; }
+.vc-crop-handle.is-se { left: 100%; top: 100%; cursor: nwse-resize; }
+.vc-crop-handle.is-s { left: 50%; top: 100%; cursor: ns-resize; }
+.vc-crop-handle.is-sw { left: 0; top: 100%; cursor: nesw-resize; }
+.vc-crop-handle.is-w { left: 0; top: 50%; cursor: ew-resize; }
