@@ -60,6 +60,8 @@ export class VideoPlayer {
   private raf = 0;
   private played = false;
   private dragging = false;
+  private scrubTo: number | null = null;
+  private afterScrub: (() => void) | null = null;
 
   constructor(host: HTMLElement, src: string, private ctx: CardContext, node: RawNode, private onSize: (w: number, h: number) => void) {
     this.node = node;
@@ -144,7 +146,7 @@ export class VideoPlayer {
       this.renderPlay();
       this.renderTime();
     });
-    v.addEventListener('seeked', () => this.renderTime());
+    v.addEventListener('seeked', () => { this.nextScrub(); this.renderTime(); });
     v.addEventListener('ratechange', () => this.renderRate());
     v.addEventListener('ended', () => this.renderPlay());
     v.addEventListener('volumechange', () => this.renderVolume());
@@ -236,6 +238,41 @@ export class VideoPlayer {
     this.renderTime();
   }
 
+  /**
+   * Dragging the timeline: one seek at a time, the next one as soon as its frame is shown. Asking
+   * for a new position on every mouse move cancels the seek in progress, and a video with far-apart
+   * keyframes then never gets to show a frame until the mouse stops.
+   */
+  private scrub(time: number): void {
+    const d = this.duration;
+    this.scrubTo = Math.max(0, d ? Math.min(time, d) : time);
+    this.renderScrubHead(this.scrubTo);
+    if (!this.video.seeking) this.nextScrub();
+  }
+
+  private nextScrub(): void {
+    const to = this.scrubTo;
+    if (to === null) {
+      const done = this.afterScrub;
+      this.afterScrub = null;
+      done?.();
+      return;
+    }
+    this.scrubTo = null;
+    if (Math.abs(this.video.currentTime - to) < 1e-3) { this.nextScrub(); return; }
+    this.video.currentTime = to;
+    this.renderTime();
+  }
+
+  /** The playhead follows the mouse right away, ahead of the picture. */
+  private renderScrubHead(time: number): void {
+    const d = this.duration;
+    if (!d) return;
+    const f = Math.max(0, Math.min(1, time / d));
+    this.fill.setCssStyles({ width: `${f * 100}%` });
+    this.head.setCssStyles({ left: `${f * 100}%` });
+  }
+
   /** Move by whole frames, landing in the middle of a frame so the browser shows the right one. */
   step(n: number): void {
     const v = this.video;
@@ -250,12 +287,12 @@ export class VideoPlayer {
     this.renderRate();
   }
 
-  /** L: play, then faster. */
+  /** L: play forwards at normal speed (pressing it again doesn't speed up). */
   private shuttle(): void {
     const v = this.video;
-    const i = RATES.indexOf(v.playbackRate);
-    if (v.paused) { if (v.playbackRate < 1) this.setRate(1); this.togglePlay(); return; }
-    this.setRate(RATES[Math.min(RATES.length - 1, (i < 0 ? 2 : i) + 1)]);
+    if (!v.paused) return;
+    if (v.playbackRate < 1) this.setRate(1);
+    this.togglePlay();
   }
 
   /**
@@ -491,8 +528,9 @@ export class VideoPlayer {
   private renderTime(): void {
     const now = this.video.currentTime;
     const d = this.duration;
-    this.fill.style.width = `${this.pct(now)}%`;
-    this.head.style.left = `${this.pct(now)}%`;
+    const at = this.scrubTo ?? now;
+    this.fill.style.width = `${this.pct(at)}%`;
+    this.head.style.left = `${this.pct(at)}%`;
     this.timeEl.setText(`${formatTime(now)} / ${formatTime(d)}`);
     // Notes of the marks under the playhead read like subtitles.
     const notes = this.sortedMarks()
@@ -532,12 +570,13 @@ export class VideoPlayer {
       this.closePop();
       const wasPlaying = !this.video.paused;
       if (wasPlaying) this.video.pause();
-      this.seek(this.timeAt(e.clientX));
-      const move = (ev: PointerEvent) => this.seek(this.timeAt(ev.clientX));
+      this.scrub(this.timeAt(e.clientX));
+      const move = (ev: PointerEvent) => this.scrub(this.timeAt(ev.clientX));
       const up = () => {
         this.track.removeEventListener('pointermove', move);
         this.track.removeEventListener('pointerup', up);
-        if (wasPlaying) void this.video.play();
+        const done = () => { if (wasPlaying) void this.video.play(); };
+        if (this.scrubTo === null) done(); else this.afterScrub = done;
       };
       this.track.addEventListener('pointermove', move);
       this.track.addEventListener('pointerup', up);
