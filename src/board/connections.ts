@@ -56,7 +56,14 @@ export function routeOf(e: RawEdge): Route {
   return r === 'straight' || r === 'elbow' || r === 'curve' ? r : 'curve';
 }
 
+/** Empty margin a mind map card keeps around its topics (the card's PAD). */
+const MINDMAP_MARGIN = 24;
+
+/** Where connections attach to a card: its box, or for a mind map the topics inside its margin. */
 export function rectOf(n: RawNode): Rect {
+  if (n.vc?.kind === 'mindmap' && n.width > MINDMAP_MARGIN * 2 && n.height > MINDMAP_MARGIN * 2) {
+    return { x: n.x + MINDMAP_MARGIN, y: n.y + MINDMAP_MARGIN, width: n.width - MINDMAP_MARGIN * 2, height: n.height - MINDMAP_MARGIN * 2 };
+  }
   return { x: n.x, y: n.y, width: n.width, height: n.height };
 }
 
