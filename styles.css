@@ -1331,10 +1331,6 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-board[data-tool='pen'] .vc-node { cursor: crosshair; }
 .vc-board[data-tool='pen'] .vc-edge-hit { pointer-events: none; }
 .vc-pen-banner {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1351,16 +1347,13 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-pen-banner-icon svg { width: 15px; height: 15px; }
 .vc-pen-banner-done { padding: 3px 10px; border-radius: 999px; background: var(--interactive-accent); color: var(--text-on-accent); cursor: pointer; }
 .vc-pen-picker {
-  position: absolute;
-  left: 50%;
-  bottom: 84px;
-  transform: translateX(-50%);
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
   box-sizing: border-box;
-  width: 224px;
-  padding: 8px;
+  width: 264px;
+  padding: 8px 10px 10px;
   border-radius: 12px;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
@@ -1376,13 +1369,32 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-pen-swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--text-normal) 18%, transparent); }
 .vc-pen-swatch.is-auto { background: linear-gradient(135deg, var(--text-normal) 50%, var(--background-primary) 50%); }
 .vc-pen-swatch.is-active { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
-.vc-pen-width { flex: 1; text-align: center; padding: 3px 8px; font-size: var(--font-ui-smaller); border-radius: 6px; cursor: pointer; color: var(--text-muted); border: 1px solid var(--background-modifier-border); }
-.vc-pen-width.is-active { color: var(--interactive-accent); border-color: var(--interactive-accent); }
+.vc-pen-instruments { align-items: flex-end; height: 50px; gap: 6px; padding: 0 2px; border-bottom: 1px solid var(--background-modifier-border); margin-bottom: 2px; overflow: hidden; }
+.vc-pen-instrument { --ink: var(--text-normal); width: 30px; height: 50px; flex: none; display: flex; align-items: flex-end; justify-content: center; cursor: pointer; transform: translateY(12px); transition: transform 0.15s ease; }
+.vc-pen-instrument:hover { transform: translateY(8px); }
+.vc-pen-instrument.is-active { transform: translateY(1px); }
+.vc-pen-instrument svg { width: 20px; height: 40px; overflow: visible; }
+.vc-pen-instrument svg .b { fill: var(--background-primary); stroke: var(--text-muted); stroke-width: 1.2; stroke-linejoin: round; }
+.vc-pen-instrument svg .l { fill: none; stroke: var(--text-faint); stroke-width: 1; }
+.vc-pen-instrument svg .w { fill: color-mix(in srgb, #d8b07a 70%, var(--background-primary)); stroke: var(--text-muted); stroke-width: 1.2; stroke-linejoin: round; }
+.vc-pen-instrument svg .e { fill: #f28b9a; stroke: var(--text-muted); stroke-width: 1.2; }
+.vc-pen-instrument svg .i { fill: var(--ink); stroke: none; }
+.vc-pen-instrument.is-highlighter svg .i { opacity: 0.85; }
+.vc-pen-instruments .vc-pen-tool { margin-left: auto; align-self: center; }
+.vc-pen-colors { flex-wrap: wrap; gap: 6px; }
+.vc-pen-custom { position: relative; background: conic-gradient(#ff4d4d, #ffd84d, #5bd65b, #4dd2ff, #6b5bff, #ff4dd8, #ff4d4d); }
+.vc-pen-custom::after { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: var(--custom, transparent); box-shadow: 0 0 0 1.5px var(--background-primary); }
+.vc-pen-custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; padding: 0; border: 0; }
+.vc-pen-widths { justify-content: space-between; gap: 4px; }
+.vc-pen-width { flex: 1; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 7px; cursor: pointer; border: 1px solid transparent; }
+.vc-pen-width:hover { background: var(--background-modifier-hover); }
+.vc-pen-width.is-active { border-color: var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 10%, transparent); }
+.vc-pen-width-dot { border-radius: 50%; background: var(--text-normal); }
 .vc-pen-options {
   position: absolute;
-  /* Just right of the picker (224px wide, centred). */
-  left: min(calc(50% + 120px), calc(100% - 296px));
-  bottom: 84px;
+  /* Just right of the picker, level with it. */
+  left: calc(100% + 8px);
+  top: 0;
   width: 280px;
   box-sizing: border-box;
   padding: 10px 12px;
@@ -1639,12 +1651,20 @@ body.vc-block-drag-active, body.vc-block-drag-active * { cursor: grabbing !impor
 .vc-board { --vc-tb-clear: 90px; }
 .vc-board[data-toolbar-size='S'] { --vc-tb-clear: 66px; }
 .vc-board[data-toolbar-size='L'] { --vc-tb-clear: 100px; }
-.vc-pen-picker, .vc-pen-options, .vc-edge-panel { top: auto; bottom: var(--vc-tb-clear); }
-.vc-board[data-toolbar-pos='top'] :is(.vc-pen-picker, .vc-pen-options, .vc-edge-panel) { top: var(--vc-tb-clear); bottom: auto; }
-.vc-board[data-toolbar-pos='left'] :is(.vc-pen-picker, .vc-pen-options, .vc-edge-panel),
-.vc-board[data-toolbar-pos='right'] :is(.vc-pen-picker, .vc-pen-options, .vc-edge-panel) { top: auto; bottom: 16px; }
-/* The "Drawing" banner goes to the edge away from the toolbar. */
-.vc-board[data-toolbar-pos='top'] .vc-pen-banner { top: auto; bottom: 16px; }
+.vc-pen-dock, .vc-edge-panel { top: auto; bottom: var(--vc-tb-clear); }
+.vc-board[data-toolbar-pos='top'] :is(.vc-pen-dock, .vc-edge-panel) { top: var(--vc-tb-clear); bottom: auto; }
+.vc-board[data-toolbar-pos='left'] :is(.vc-pen-dock, .vc-edge-panel),
+.vc-board[data-toolbar-pos='right'] :is(.vc-pen-dock, .vc-edge-panel) { top: auto; bottom: 16px; }
+/* The pen's banner sits between the toolbar and the picker. */
+.vc-pen-dock {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column-reverse; align-items: center; gap: 8px;
+  pointer-events: none;
+}
+.vc-pen-dock > * { pointer-events: auto; }
+.vc-board[data-toolbar-pos='top'] .vc-pen-dock { flex-direction: column; }
+.vc-pen-main { position: relative; }
+.vc-board:not([data-toolbar-pos='top']) .vc-pen-options { top: auto; bottom: 0; }
 
 /* picture / video description: rich text, compact */
 .vc-media-desc { white-space: normal; }
@@ -1774,6 +1794,7 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 .vc-node.is-join-target { z-index: 100000 !important; }
 .vc-node.is-joining { opacity: 0.35; }
 .vc-board path.is-highlight, .vc-pen-live.is-highlight { fill-opacity: 0.45; }
+.vc-board path.is-pencil, .vc-pen-live.is-pencil { fill-opacity: 0.9; }
 .vc-link-input { width: 100%; }
 /* PDF export: while printing, only the stage shows. */
 @media print {
