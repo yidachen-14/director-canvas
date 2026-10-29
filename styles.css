@@ -1736,6 +1736,9 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 /* Video player: a light review player. Its controls hang under the selected card. */
 .vc-video-stage { position: absolute; inset: 0; background: #000; overflow: hidden; }
 .vc-video-stage video { pointer-events: none; }
+/* The card has the video's proportions: fill it, so rounding at some zoom levels never shows a black hairline at its edges. */
+.vc-video-stage video { object-fit: cover; }
+.vc-video-stage:fullscreen video, .vc-node:fullscreen .vc-video-stage video { object-fit: contain; }
 .vc-video-stage:fullscreen video { pointer-events: auto; }
 .vc-video-sub {
   position: absolute; left: 8%; right: 8%; bottom: 12px; text-align: center; pointer-events: none;
@@ -1870,6 +1873,8 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 .vc-node.vc-kind-video:fullscreen .vc-vc-btn svg { width: 20px; height: 20px; }
 .vc-node.vc-kind-video:fullscreen .vc-vc-time, .vc-node.vc-kind-video:fullscreen .vc-vc-rate { font-size: 14px; }
 .vc-ctx-size-orig { width: 100%; margin-top: 8px; font-size: 12px; }
+.vc-ctx-size-pcts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; }
+.vc-ctx-size-pcts button { font-size: 12px; font-variant-numeric: tabular-nums; padding: 0 6px; }
 .vc-info { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: var(--font-ui-small); user-select: text; }
 .vc-info-section { grid-column: 1 / -1; margin-top: 10px; font-weight: 600; color: var(--text-normal); border-bottom: 1px solid var(--background-modifier-border); padding-bottom: 4px; }
 .vc-info-section:first-child { margin-top: 0; }
