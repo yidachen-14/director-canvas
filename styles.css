@@ -1744,10 +1744,17 @@ input.vc-mm-bnd-label.is-input { min-width: 140px; border: none; outline: 2px so
 }
 .vc-video-ctrl {
   position: relative; flex: none; z-index: 2; container-type: inline-size;
-  display: flex; flex-direction: column; gap: 1px; padding: 4px 6px 3px; box-sizing: border-box;
+  display: flex; flex-direction: row; align-items: center; gap: 2px; padding: 2px 6px; box-sizing: border-box;
   background: var(--background-primary); color: var(--text-normal);
   border-top: 1px solid var(--background-modifier-border); cursor: default;
 }
+/* One slim row: play, the track (with its marks), then the time and the other buttons. */
+.vc-video-ctrl > .vc-vc-row { display: contents; }
+.vc-video-ctrl .vc-vc-spacer { display: none; }
+.vc-video-ctrl > .vc-vt { order: 1; flex: 1 1 auto; min-width: 60px; margin: 0 4px; }
+.vc-video-ctrl > .vc-vc-row > * { order: 2; }
+.vc-video-ctrl > .vc-vc-row > :first-child { order: 0; }
+.vc-video-ctrl .vc-vc-time { margin-left: 2px; }
 /* Narrow cards keep the essentials: play, time, marks, speed, volume and full screen. */
 @container (max-width: 380px) { .vc-video-ctrl .vc-vc-sm { display: none; } }
 @container (max-width: 250px) { .vc-video-ctrl .vc-vc-xs { display: none; } }
