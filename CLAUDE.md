@@ -79,7 +79,7 @@ for (let i = 0; i < 8; i++) { try { console.warn('INSTALLED', await dcI('<完整
 2. build、test、lint 通过后提交，推送到 `main`。
 3. 在 GitHub 建 Release：tag 就是版本号（不加 v），选择"Create new tag on publish"，target 选 `main`，说明用英文写。
    - 云端会话的 GitHub 代理不能建 Release、推 tag、删分支。电脑操作里 Safari 只给"只读"权限（不能点），Claude in Chrome 也未必连得上。
-   - 可行的做法：Claude 桌面应用的内置浏览器（Claude_Browser 工具）。用户需要在里面登录一次 GitHub，之后登录状态会保留。
+   - 可行的做法：Claude 桌面应用的内置浏览器（Claude_Browser 工具）。用户已在里面登录 GitHub（2026-10-30），登录状态会保留。2.1.1 就是这样发布的：打开 `releases/new?tag=X&target=main&title=X`，用 JS 填 `release[body]`，再点 Publish release。
    - 如果都不行，就把步骤和英文说明整理好交给用户，并说明原因。
 4. `.github/workflows/release.yml` 会自动 build，并把三个文件附加到 Release 上。确认 Release 页面上有 main.js、manifest.json、styles.css，而且 manifest 里的版本号正确。
 5. 已经上架，不用再提交 obsidian-releases。用户在 Obsidian 里"检查更新"就能拿到。
