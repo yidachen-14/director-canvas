@@ -367,6 +367,7 @@ export const JA: Record<string, string> = {
   "Brace": "中括弧",
   "Dotted": "点線",
   "Long dashes": "長い破線",
+  "Short dashes": "短い破線",
   "Dash and dot": "一点鎖線",
   "Custom": "カスタム",
   "Layout": "レイアウト",

@@ -367,6 +367,7 @@ export const TR: Record<string, string> = {
   "Brace": "Küme parantezi",
   "Dotted": "Noktalı",
   "Long dashes": "Uzun çizgiler",
+  "Short dashes": "Kısa çizgiler",
   "Dash and dot": "Çizgi ve nokta",
   "Custom": "Özel",
   "Layout": "Yerleşim",

@@ -218,6 +218,8 @@ class MediaCard implements CardHandle {
    * the card is kept in vc.descH, so this stays right across reloads.
    */
   private fitDescription(): void {
+    // Not laid out (a board in a background tab): everything measures 0, so wait until it shows.
+    if (!this.el.getClientRects().length) return;
     const ctrl = this.el.querySelector<HTMLElement>(':scope > .vc-video-ctrl');
     const h = (this.desc.isShown() ? Math.ceil(this.desc.offsetHeight) : 0) + (this.linkBar.isShown() ? Math.ceil(this.linkBar.offsetHeight) : 0)
       + (ctrl && ctrl.isShown() ? Math.ceil(ctrl.offsetHeight) : 0);

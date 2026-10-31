@@ -367,6 +367,7 @@ export const UK: Record<string, string> = {
   "Brace": "Фігурна дужка",
   "Dotted": "Пунктир",
   "Long dashes": "Довгі штрихи",
+  "Short dashes": "Короткі штрихи",
   "Dash and dot": "Штрих-пунктир",
   "Custom": "Власний",
   "Layout": "Макет",

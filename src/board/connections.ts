@@ -27,6 +27,9 @@ export interface EdgeVc {
   toT?: number;
   fromFloat?: boolean;
   toFloat?: boolean;
+  /** A topic inside a mind map card that the end attaches to (the edge itself joins the card). */
+  fromTopic?: string;
+  toTopic?: string;
   /** Free end positions (when fromNode / toNode is empty). */
   from?: Point;
   to?: Point;
@@ -48,6 +51,16 @@ export const SIDES: Side[] = ['top', 'right', 'bottom', 'left'];
 
 export function vcOf(e: RawEdge): EdgeVc {
   return (e.vc ?? {});
+}
+
+/**
+ * Point the connection the other way: the arrowheads swap ends. The ends stay where they are
+ * attached, so the line keeps its exact path (swapping the ends themselves would re-route elbows).
+ */
+export function reverseEdge(e: RawEdge): void {
+  const from = e.fromEnd ?? 'none', to = e.toEnd ?? 'arrow';
+  e.fromEnd = to;
+  e.toEnd = from;
 }
 
 /** Edges imported from the core Canvas have no route: they keep its curved look. */
@@ -126,8 +139,26 @@ export function pinTs(len: number, zoom: number): number[] {
   return Array.from({ length: k }, (_, i) => (i + 1) / (k + 1));
 }
 
+/**
+ * A pin anywhere along the outline of `r`, for a pointer at world point `p`: the nearest outline
+ * point when it is within `reach` screen pixels, pulled onto one of the regular pin positions
+ * (`pinTs`) within `snap` screen pixels so lines still line up easily. Stored as side + t, so the
+ * pin keeps its relative place when the card is resized.
+ */
+export function pinOnOutline(r: Rect, p: Point, zoom: number, reach: number, snap: number): { side: Side; t: number } | null {
+  const near = nearestOnOutline(r, p);
+  if (near.dist * zoom > reach) return null;
+  const len = near.side === 'top' || near.side === 'bottom' ? r.width : r.height;
+  let t = near.t;
+  for (const tt of pinTs(len, zoom)) if (Math.abs(tt - t) * len * zoom <= snap) { t = tt; break; }
+  return { side: near.side, t };
+}
+
+/** Where a topic inside a card sits on the board (mind maps), or null to use the whole card. */
+export type AreaOf = (n: RawNode, topic: string) => Rect | null;
+
 /** Resolve one end of an edge against the current nodes. */
-export function endOf(e: RawEdge, which: 'from' | 'to', node: (id: string) => RawNode | undefined): End | null {
+export function endOf(e: RawEdge, which: 'from' | 'to', node: (id: string) => RawNode | undefined, areaOf?: AreaOf): End | null {
   const vc = vcOf(e);
   const id = which === 'from' ? e.fromNode : e.toNode;
   if (!id) {
@@ -138,9 +169,11 @@ export function endOf(e: RawEdge, which: 'from' | 'to', node: (id: string) => Ra
   if (!n) return null;
   const side = which === 'from' ? e.fromSide : e.toSide;
   const float = which === 'from' ? vc.fromFloat : vc.toFloat;
-  if (float || !side) return { kind: 'float', rect: rectOf(n), id };
+  const topic = which === 'from' ? vc.fromTopic : vc.toTopic;
+  const rect = (topic && areaOf?.(n, topic)) || rectOf(n);
+  if (float || !side) return { kind: 'float', rect, id };
   const t = which === 'from' ? vc.fromT : vc.toT;
-  return { kind: 'pin', rect: rectOf(n), side, t: typeof t === 'number' ? Math.min(1, Math.max(0, t)) : 0.5, id };
+  return { kind: 'pin', rect, side, t: typeof t === 'number' ? Math.min(1, Math.max(0, t)) : 0.5, id };
 }
 
 function refPoint(end: End): Point {
@@ -392,8 +425,8 @@ function roundedPath(pts: Point[], radius: number): string {
 }
 
 /** Everything needed to draw an edge, or null when an end is missing. */
-export function edgeGeometry(e: RawEdge, node: (id: string) => RawNode | undefined): (Shape & { a: End; b: End; s1: Side | null; s2: Side | null }) | null {
-  const a = endOf(e, 'from', node), b = endOf(e, 'to', node);
+export function edgeGeometry(e: RawEdge, node: (id: string) => RawNode | undefined, areaOf?: AreaOf): (Shape & { a: End; b: End; s1: Side | null; s2: Side | null }) | null {
+  const a = endOf(e, 'from', node, areaOf), b = endOf(e, 'to', node, areaOf);
   if (!a || !b) return null;
   const vc = vcOf(e);
   const route = routeOf(e);

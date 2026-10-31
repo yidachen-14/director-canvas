@@ -2,7 +2,7 @@ import { addIcon, setIcon, setTooltip } from 'obsidian';
 import type { BarItem } from '../cards/types';
 import { t } from '../i18n';
 import {
-  type MMDash, type MMData, type MMLayout, type MMLine, type MMShape, type MMSize, type MMTopic, type MMStyle,
+  type MMBoundary, type MMDash, type MMData, type MMLayout, type MMLine, type MMShape, type MMSize, type MMTopic, type MMStyle,
   MM_THEMES, anyTopic, branchSideways, eachTopic, findIn, resolveStyles, themeById,
 } from './model';
 import type { MindMapControl } from './card';
@@ -19,7 +19,8 @@ const ICONS: Record<string, string> = {
     + S('M48 14 Q56 14 56 22 V42 Q56 50 64 50 Q56 50 56 58 V78 Q56 86 48 86', 6) + R(70, 41, 26, 18, 6, 6),
   'vc-mm-boundary': `<rect x="8" y="16" width="84" height="68" rx="14" fill="none" stroke="currentColor" stroke-width="6" stroke-dasharray="12 9"/>` + R(24, 32, 52, 14, 5, 6) + R(24, 56, 52, 14, 5, 6),
   'vc-mm-theme': R(6, 40, 28, 20, 10) + S('M34 50 C48 50 46 22 60 22 M34 50 H60 M34 50 C48 50 46 78 60 78') + R(62, 14, 30, 16, 6, 6) + R(62, 42, 30, 16, 6, 6) + R(62, 70, 30, 16, 6, 6),
-  'vc-mm-border': R(12, 24, 76, 52, 14, 9),
+  // A frame drawn in different strokes (dashed sides, a heavy base): "the outline", not a shape.
+  'vc-mm-border': `<path d="M14 72 V30 Q14 22 22 22 H78 Q86 22 86 30 V72" fill="none" stroke="currentColor" style="stroke-width:6px" stroke-dasharray="9 8" stroke-linecap="round"/>` + S('M12 80 H88', 11),
   'vc-mm-shape': R(10, 30, 80, 40, 20, 8),
   'vc-mm-line': S('M12 50 C40 50 40 18 88 18 M12 50 H88 M12 50 C40 50 40 82 88 82'),
   'vc-mm-branch': S('M14 30 H38 C52 30 52 14 66 14 H88 M38 30 C52 30 52 46 66 46 H88') + `<rect x="12" y="68" width="76" height="16" rx="4" fill="currentColor"/>`,
@@ -42,12 +43,19 @@ const ICONS: Record<string, string> = {
   'vc-mm-ln-elbow': S('M10 50 H40 V16 H90 M40 50 V84 H90'),
   'vc-mm-ln-rounded': S('M10 50 H40 V30 Q40 16 54 16 H90 M40 50 V70 Q40 84 54 84 H90'),
   'vc-mm-ln-brace': S('M10 50 H34 M50 16 Q40 16 40 26 V44 Q40 50 34 50 Q40 50 40 56 V74 Q40 84 50 84 M50 16 H90 M50 84 H90'),
-  // Border dashes
+  // Border dashes (same proportions as drawn on a topic)
   'vc-mm-d-solid': S('M8 50 H92', 8),
-  'vc-mm-d-dashed': `<path d="M8 50 H92" fill="none" stroke="currentColor" style="stroke-width:8px" stroke-dasharray="14 10"/>`,
   'vc-mm-d-dotted': `<path d="M10 50 H92" fill="none" stroke="currentColor" style="stroke-width:8px" stroke-dasharray="0.1 14" stroke-linecap="round"/>`,
-  'vc-mm-d-long': `<path d="M8 50 H92" fill="none" stroke="currentColor" style="stroke-width:8px" stroke-dasharray="28 10"/>`,
-  'vc-mm-d-dashdot': `<path d="M8 50 H92" fill="none" stroke="currentColor" style="stroke-width:8px" stroke-dasharray="18 8 0.1 8" stroke-linecap="round"/>`,
+  'vc-mm-d-short': `<path d="M8 50 H92" fill="none" stroke="currentColor" style="stroke-width:8px" stroke-dasharray="7 7"/>`,
+  'vc-mm-d-dashed': `<path d="M8 50 H92" fill="none" stroke="currentColor" style="stroke-width:8px" stroke-dasharray="13 8"/>`,
+  'vc-mm-d-long': `<path d="M8 50 H92" fill="none" stroke="currentColor" style="stroke-width:8px" stroke-dasharray="21 9"/>`,
+  'vc-mm-d-dashdot': `<path d="M8 50 H92" fill="none" stroke="currentColor" style="stroke-width:8px" stroke-dasharray="14 8 0.1 8" stroke-linecap="round"/>`,
+  // Border thickness
+  'vc-mm-w-1': S('M10 50 H90', 3),
+  'vc-mm-w-2': S('M10 50 H90', 6),
+  'vc-mm-w-3': S('M10 50 H90', 9),
+  'vc-mm-w-4': S('M10 50 H90', 12),
+  'vc-mm-w-5': S('M10 50 H90', 15),
 };
 
 let iconsAdded = false;
@@ -83,10 +91,13 @@ const LINES: { id: MMLine; label: string }[] = [
   { id: 'curve', label: 'Curve' }, { id: 'straight', label: 'Straight' }, { id: 'arc', label: 'Arc' },
   { id: 'elbow', label: 'Right angle' }, { id: 'rounded', label: 'Rounded corner' }, { id: 'brace', label: 'Brace' },
 ];
+// Solid, dotted, then dashes from short to long.
 const DASHES: { id: MMDash; label: string }[] = [
-  { id: 'solid', label: 'Solid' }, { id: 'dashed', label: 'Dashed' }, { id: 'dotted', label: 'Dotted' },
-  { id: 'long', label: 'Long dashes' }, { id: 'dashdot', label: 'Dash and dot' },
+  { id: 'solid', label: 'Solid' }, { id: 'dotted', label: 'Dotted' }, { id: 'short', label: 'Short dashes' },
+  { id: 'dashed', label: 'Dashed' }, { id: 'long', label: 'Long dashes' },
 ];
+/** Border thickness choices, shown as lines of that weight. */
+const BORDER_WIDTHS = [1, 2, 3, 4, 5];
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -180,13 +191,15 @@ function customColor(pop: HTMLElement, row: HTMLElement, key: string, current: s
   chip.createSpan({ text: t('Custom') });
   let picker: HTMLElement | null = null;
   const show = () => { picker = colorPicker(pop, current, { onInput: c => set(c, true), onCommit: c => set(c, false) }); };
-  chip.toggleClass('is-active', openPicker === key);
+  const isCustom = !!current && /^#/.test(current) && !PALETTE.some(p => same(p, current));
+  chip.toggleClass('is-active', openPicker === key || isCustom);
   if (openPicker === key) show();
   chip.addEventListener('click', () => {
-    if (openPicker === key) { openPicker = null; picker?.remove(); picker = null; chip.removeClass('is-active'); return; }
+    if (openPicker === key) { openPicker = null; picker?.remove(); picker = null; chip.toggleClass('is-active', isCustom); return; }
     openPicker = key;
-    chip.addClass('is-active');
-    show();
+    // Choosing "Custom" uses a custom colour at once (the current one, or the picker's), so the
+    // other choices ("Theme default", "No fill") stop being the selected ones straight away.
+    set(current && /^#[0-9a-f]{6}$/i.test(current) ? current : '#8B5CF6', false);
   });
 }
 
@@ -317,8 +330,8 @@ function borderPanel(pop: HTMLElement, ctl: MindMapControl): void {
   if (!res.border) return;
 
   section(pop, t('Thickness'));
-  const widths = pop.createDiv('vc-mm-row');
-  for (const w of [1, 2, 3, 4, 6]) chip(widths, `${w}`, Math.abs(res.borderWidth - w) < 0.01, () => styleSelected(ctl, s => { s.borderWidth = w; }));
+  const near = BORDER_WIDTHS.reduce((a, b) => (Math.abs(b - res.borderWidth) < Math.abs(a - res.borderWidth) ? b : a));
+  iconGrid(pop, BORDER_WIDTHS.length, BORDER_WIDTHS.map(w => ({ id: String(w), icon: `vc-mm-w-${w}`, label: t('Thickness {n}', { n: w }) })), String(near), (id) => styleSelected(ctl, s => { s.borderWidth = Number(id); }));
   section(pop, t('Line style'));
   iconGrid(pop, 5, DASHES.map(x => ({ id: x.id, icon: `vc-mm-d-${x.id}`, label: t(x.label) })), res.borderDash, (id) => styleSelected(ctl, s => { s.borderDash = id === 'solid' ? undefined : id as MMDash; }));
   slider(pop, t('Opacity'), raw.borderOpacity ?? 1, v => styleSelected(ctl, s => { s.borderOpacity = v >= 1 ? undefined : v; }));
@@ -401,31 +414,110 @@ function textColorPanel(pop: HTMLElement, ctl: MindMapControl): void {
   customColor(pop, row, 'text', raw.textColor, (c, pv) => styleSelected(ctl, s => { s.textColor = c; }, pv));
 }
 
+/** Bold, italic, underline and strikethrough as toggles, then the text colour. */
+function textPanel(pop: HTMLElement, ctl: MindMapControl): void {
+  pop.addClass('vc-mm-pop');
+  const res = resolved(ctl);
+  const grid = pop.createDiv('vc-mm-icon-grid is-toggles');
+  const toggles: [key: 'bold' | 'italic' | 'underline' | 'strike', icon: string, label: string, on: boolean][] = [
+    ['bold', 'bold', t('Bold'), res.bold], ['italic', 'italic', t('Italic'), !!res.italic],
+    ['underline', 'underline', t('Underline'), !!res.underline], ['strike', 'strikethrough', t('Strikethrough'), !!res.strike],
+  ];
+  for (const [key, icon, label, on] of toggles) {
+    const cell = grid.createDiv({ cls: 'vc-mm-icon-cell is-small', attr: { role: 'button', 'aria-label': label } });
+    setIcon(cell, icon);
+    setTooltip(cell, label, { placement: 'top' });
+    cell.toggleClass('is-active', on);
+    cell.addEventListener('click', () => styleSelected(ctl, s => { s[key] = on ? (key === 'bold' ? false : undefined) : true; }));
+  }
+  textColorPanel(pop, ctl);
+}
+
 /**
- * The bar while topics are selected, in Boardmix's order: map style | fill, border |
- * topic shape, branch lines, branch colour | text size, bold, italic, underline, strikethrough, text colour.
+ * The bar while topics are selected, grouped by what they change: map style | the topic's
+ * shape, fill and border | its branch (lines and colour) | text size, then text style and colour
+ * | summary and boundary for a run of siblings.
  */
 export function mindMapBarItems(ctl: MindMapControl): BarItem[] {
   const res = resolved(ctl);
   const sep: BarItem = { id: '@sep', icon: '', label: '' };
-  const toggle = (id: string, icon: string, label: string, on: boolean, key: 'bold' | 'italic' | 'underline' | 'strike'): BarItem =>
-    ({ id, icon, label, active: on, run: () => styleSelected(ctl, s => { s[key] = on ? (key === 'bold' ? false : undefined) : true; }) });
+  const styled = res.bold || !!res.italic || !!res.underline || !!res.strike;
   return [
     themeItem(ctl),
     sep,
-    { id: 'mm-fill', icon: 'paint-bucket', label: t('Fill colour'), swatch: res.fill, dropdown: (pop) => fillPanel(pop, ctl) },
-    { id: 'mm-border', icon: 'vc-mm-border', label: t('Border'), active: res.border && res.shape !== 'underline', dropdown: (pop) => borderPanel(pop, ctl) },
-    sep,
     { id: 'mm-shape', icon: `vc-mm-s-${res.shape}`, label: t('Topic shape'), dropdown: (pop) => shapePanel(pop, ctl) },
-    { id: 'mm-line', icon: `vc-mm-ln-${res.line}`, label: t('Branch lines'), dropdown: (pop) => linePanel(pop, ctl) },
-    { id: 'mm-branch', icon: 'vc-mm-branch', label: t('Branch colour'), swatch: res.branchColor, dropdown: (pop) => branchColorPanel(pop, ctl) },
+    { id: 'mm-fill', icon: 'paint-bucket', label: t('Fill colour'), swatch: res.fill, dropdown: (pop) => fillPanel(pop, ctl) },
+    { id: 'mm-border', icon: 'vc-mm-border', label: t('Border'), swatch: res.border ? res.borderColor : 'none', dropdown: (pop) => borderPanel(pop, ctl) },
+    sep,
+    { id: 'mm-branch', icon: `vc-mm-ln-${res.line}`, label: t('Branch lines'), swatch: res.branchColor, dropdown: (pop) => { linePanel(pop, ctl); branchColorPanel(pop, ctl); } },
     sep,
     { id: 'mm-size', icon: 'type', label: t('Font size'), text: `${Math.round(res.fontSize)}`, dropdown: (pop, close) => fontSizePanel(pop, ctl, close) },
-    toggle('mm-bold', 'bold', t('Bold'), res.bold, 'bold'),
-    toggle('mm-italic', 'italic', t('Italic'), !!res.italic, 'italic'),
-    toggle('mm-underline', 'underline', t('Underline'), !!res.underline, 'underline'),
-    toggle('mm-strike', 'strikethrough', t('Strikethrough'), !!res.strike, 'strike'),
-    { id: 'mm-text', icon: 'baseline', label: t('Text colour'), swatch: res.text, dropdown: (pop) => textColorPanel(pop, ctl) },
+    { id: 'mm-text', icon: 'case-sensitive', label: t('Text'), swatch: res.text, active: styled, dropdown: (pop) => textPanel(pop, ctl) },
+    // Only when the selection is a run of siblings (as in the right-click menu).
+    ...(ctl.canWrap() ? [
+      sep,
+      { id: 'mm-summary', icon: 'vc-mm-summary', label: t('Add summary'), run: () => ctl.addSummary() },
+      { id: 'mm-boundary', icon: 'vc-mm-boundary', label: t('Add boundary'), run: () => ctl.addBoundary() },
+    ] : []),
+  ];
+}
+
+// ── Boundary bar ──────────────────────────────────────────────────────
+
+function boundarySet(ctl: MindMapControl, id: string, fn: (b: MMBoundary) => void, preview = false): void {
+  const change = (d: MMData) => { const b = d.boundaries?.find(x => x.id === id); if (b) fn(b); };
+  if (preview) ctl.preview(change); else ctl.apply(change);
+}
+
+function boundaryOf(ctl: MindMapControl, id: string): MMBoundary | undefined {
+  return ctl.mapData().boundaries?.find(x => x.id === id);
+}
+
+/** The bar while a boundary is selected: its line, frame colour and fill, then delete. */
+export function boundaryBarItems(ctl: MindMapControl, id: string, color: string, remove: () => void): BarItem[] {
+  const b = boundaryOf(ctl, id);
+  const sep: BarItem = { id: '@sep', icon: '', label: '' };
+  return [
+    {
+      id: 'mm-bnd-line', icon: `vc-mm-d-${b?.dash ?? 'dashed'}`, label: t('Line style'),
+      dropdown: (pop) => {
+        pop.addClass('vc-mm-pop');
+        const cur = boundaryOf(ctl, id);
+        const w = cur?.width ?? 1.5;
+        section(pop, t('Thickness'));
+        const near = BORDER_WIDTHS.reduce((a, x) => (Math.abs(x - w) < Math.abs(a - w) ? x : a));
+        iconGrid(pop, BORDER_WIDTHS.length, BORDER_WIDTHS.map(x => ({ id: String(x), icon: `vc-mm-w-${x}`, label: t('Thickness {n}', { n: x }) })), String(near), (v) => boundarySet(ctl, id, x => { x.width = Number(v); }));
+        section(pop, t('Line style'));
+        iconGrid(pop, 5, DASHES.map(x => ({ id: x.id, icon: `vc-mm-d-${x.id}`, label: t(x.label) })), cur?.dash ?? 'dashed', (v) => boundarySet(ctl, id, x => { if (v === 'dashed') delete x.dash; else x.dash = v as MMDash; }));
+      },
+    },
+    {
+      id: 'mm-bnd-color', icon: 'vc-mm-border', label: t('Border colour'), swatch: color,
+      dropdown: (pop) => {
+        pop.addClass('vc-mm-pop');
+        const cur = boundaryOf(ctl, id)?.color;
+        section(pop, t('Border colour'));
+        palette(pop, cur, c => boundarySet(ctl, id, x => { x.color = c; }));
+        const row = pop.createDiv('vc-mm-row');
+        chip(row, t('Theme default'), !cur, () => boundarySet(ctl, id, x => { delete x.color; }));
+        customColor(pop, row, 'bnd-color', cur, (c, pv) => boundarySet(ctl, id, x => { x.color = c; }, pv));
+      },
+    },
+    {
+      id: 'mm-bnd-fill', icon: 'paint-bucket', label: t('Fill colour'), swatch: b?.fill ?? 'none',
+      dropdown: (pop) => {
+        pop.addClass('vc-mm-pop');
+        const cur = boundaryOf(ctl, id)?.fill;
+        section(pop, t('Fill colour'));
+        palette(pop, cur, c => boundarySet(ctl, id, x => { x.fill = c; }));
+        const row = pop.createDiv('vc-mm-row');
+        chip(row, t('No fill'), cur === 'none', () => boundarySet(ctl, id, x => { x.fill = 'none'; }));
+        chip(row, t('Theme default'), !cur, () => boundarySet(ctl, id, x => { delete x.fill; }));
+        customColor(pop, row, 'bnd-fill', cur, (c, pv) => boundarySet(ctl, id, x => { x.fill = c; }, pv));
+      },
+    },
+    sep,
+    { id: 'mm-bnd-del', icon: 'trash-2', label: t('Remove boundary'), run: remove },
   ];
 }
 

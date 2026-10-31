@@ -111,10 +111,7 @@ export class ContextBar {
     const a = vp.toScreen(r.x, r.y), b = vp.toScreen(r.x + r.width, r.y + r.height);
     const { width, height } = this.board.screenSize();
     const w = this.el.offsetWidth, h = this.el.offsetHeight;
-    // Over a part of a card (a mind map topic) the bar keeps a little more room, like Boardmix.
-    const nodes0 = this.board.selectedNodes();
-    const part = nodes0.length === 1 && !!this.board.cards.get(nodes0[0].id)?.handle.barAnchor?.();
-    const gap = part ? 24 : 14;
+    const gap = 14;
     let x = (a.x + b.x) / 2 - w / 2;
     let y = a.y - h - gap;
     // A group's name sits above it; keep clear of it.
@@ -232,26 +229,11 @@ export class ContextBar {
     if (it.text) btn.createDiv({ cls: 'vc-ctx-text', text: it.text });
     btn.toggleClass('is-active', !!it.active);
     setTooltip(btn, it.label, { placement: 'top' });
-    let timer = 0;
+    // Panels open on a click only, never on hover: dragging across the bar must not pop them up.
     btn.addEventListener('click', () => {
-      // A click decides; a hover-open still waiting must not undo it.
-      window.clearTimeout(timer);
-      if (it.dropdown) { if (this.popAnchor !== btn || !this.hoverOpened) this.togglePop(btn, it.dropdown); this.hoverOpened = false; }
+      if (it.dropdown) this.togglePop(btn, it.dropdown);
       else { this.closePop(); it.run?.(); }
     });
-    if (it.dropdown) {
-      // Like Boardmix: resting the pointer on a button opens its panel.
-      btn.addEventListener('mouseenter', () => {
-        window.clearTimeout(timer);
-        timer = window.setTimeout(() => {
-          if (this.popAnchor === btn) return;
-          this.togglePop(btn, it.dropdown!);
-          this.hoverOpened = true;
-          window.setTimeout(() => { this.hoverOpened = false; }, 400);
-        }, this.pop ? 60 : 220);
-      });
-      btn.addEventListener('mouseleave', () => window.clearTimeout(timer));
-    }
     return btn;
   }
 
@@ -301,8 +283,6 @@ export class ContextBar {
   // ── dropdown panels ─────────────────────────────────────
 
   private popAnchor: HTMLElement | null = null;
-  /** A panel just opened by hovering: the click that follows should not close it. */
-  private hoverOpened = false;
 
   private togglePop(anchor: HTMLElement, build: (pop: HTMLElement, close: () => void) => void): void {
     if (this.pop && this.popAnchor === anchor) { this.closePop(); return; }

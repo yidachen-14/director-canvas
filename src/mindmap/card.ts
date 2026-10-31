@@ -1,16 +1,17 @@
 import type { Menu } from 'obsidian';
 import type { RawNode } from '../model/canvas-file';
+import type { Rect } from '../model/board-model';
 import type { BarItem, CardContext, CardHandle, CardType, MapDrop } from '../cards/types';
 import { commitNode } from '../cards/basic';
 import { t } from '../i18n';
 import {
   type DropMode, type MMData, type MMTopic, type Placed, type Resolved, type Size,
   addBoundary, addChild, addSibling, addSummary, anyTopic, boundsOf, braceDownPath, bracePath, branchDown, branchSideways,
-  cloneData, countTopics, extrasCovering, findIn, respanBoundary, extrasSupported, gapsFor, isInside, layoutExtras, layoutMindMap,
-  moveTopic, newMindMap, normalizeData, pruneExtras, removeTopics, resolveStyles, siblingRange, SIZE_SCALE, summaryOfTopic,
+  cloneData, cloneTopic, countTopics, extrasCovering, findIn, respanBoundary, extrasSupported, gapsFor, isInside, layoutExtras, layoutMindMap,
+  dashesAround, movedTopics, moveTopics, newMindMap, normalizeData, pruneExtras, removeTopics, resolveStyles, siblingRange, SIZE_SCALE, summaryOfTopic,
   toMarkdown, type ExtrasLayout,
 } from './model';
-import { mindMapBarItems, themeItem } from './panels';
+import { boundaryBarItems, mindMapBarItems, themeItem } from './panels';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 /** Room around the topics for the fold buttons and selection rings. */
@@ -26,13 +27,16 @@ function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string,
   return el;
 }
 
-const DASH: Record<string, (w: number) => string> = {
-  solid: () => '',
-  dashed: (w) => `${4 * w + 2} ${3 * w + 2}`,
-  dotted: (w) => `0.1 ${2.4 * w + 1}`,
-  long: (w) => `${9 * w + 4} ${4 * w + 2}`,
-  dashdot: (w) => `${6 * w + 3} ${3 * w + 2} 0.1 ${3 * w + 2}`,
+/** Border dash patterns for a line `w` wide: dotted, then dashes from short to long. */
+const DASH: Record<string, (w: number) => number[]> = {
+  solid: () => [],
+  dotted: (w) => [0.1, 2 * w + 2],
+  short: (w) => [1.5 * w + 1.5, 1.5 * w + 2],
+  dashed: (w) => [3 * w + 2, 2 * w + 2],
+  long: (w) => [5.5 * w + 3, 2.5 * w + 2],
+  dashdot: (w) => [4 * w + 2, 2 * w + 2, 0.1, 2 * w + 2],
 };
+
 
 /** The mind map controller the bar panels talk to. */
 export interface MindMapControl {
@@ -82,6 +86,12 @@ export class MindMapCard implements CardHandle, MindMapControl {
   private relayoutFrame = 0;
   private dragCleanup: (() => void) | null = null;
   private joinHint: HTMLElement | null = null;
+
+  /**
+   * The card as it is on the board now. `node` can be an older copy of it (undo and quiet resizes
+   * replace or move the model's node without remounting), so positions are always read from here.
+   */
+  private get live(): RawNode { return this.ctx.board.model.node(this.node.id) ?? this.node; }
 
   constructor(private node: RawNode, private body: HTMLElement, private ctx: CardContext) {
     this.cardEl = body.parentElement ?? body;
@@ -221,11 +231,93 @@ export class MindMapCard implements CardHandle, MindMapControl {
     return false;
   }
 
+  // ── connections to topics ────────────────────────────────
+
+  topicRect(topic: string): Rect | null {
+    // A topic folded away: the connection goes to the nearest one still showing above it.
+    let id: string | undefined = topic;
+    while (id && !this.placed.has(id)) id = findIn(this.data, id)?.parent?.id;
+    const p = id ? this.placed.get(id) : undefined;
+    if (!p) return null;
+    const n = this.live;
+    return { x: n.x + this.shift.x + p.x, y: n.y + this.shift.y + p.y, width: p.w, height: p.h };
+  }
+
+  topicAt(wx: number, wy: number, margin: number): string | null {
+    const n = this.live;
+    const x = wx - n.x - this.shift.x, y = wy - n.y - this.shift.y;
+    let best: { id: string; d: number } | null = null;
+    for (const [id, p] of this.placed) {
+      const dx = Math.max(p.x - x, 0, x - (p.x + p.w)), dy = Math.max(p.y - y, 0, y - (p.y + p.h));
+      const d = Math.hypot(dx, dy);
+      if (d <= margin && (!best || d < best.d)) best = { id, d };
+    }
+    return best?.id ?? null;
+  }
+
+  // ── duplicate, copy ──────────────────────────────────────
+
+  duplicateParts(): boolean {
+    const ids = movedTopics(this.data, [...this.sel]).map(tp => tp.id);
+    if (!ids.length) return false;
+    const made: string[] = [];
+    this.apply(d => {
+      for (const id of ids) {
+        const f = findIn(d, id);
+        if (!f?.parent) continue;
+        // The copy (with everything under it) goes right after the original, under the same parent.
+        const copy = cloneTopic(f.topic, true);
+        f.parent.children.splice(f.index + 1, 0, copy);
+        made.push(copy.id);
+      }
+    });
+    if (made.length) this.setSel(made);
+    return made.length > 0;
+  }
+
+  copyParts(cut: boolean): RawNode[] | null {
+    const topics = movedTopics(cloneData(this.data), [...this.sel]);
+    if (!topics.length) return null;
+    const n = this.live;
+    const out: RawNode[] = [];
+    for (const topic of topics) {
+      const p = this.placed.get(topic.id);
+      delete topic.side;
+      const mm: MMData = { root: cloneTopic(topic, true), layout: this.data.layout, theme: this.data.theme, size: this.data.size, align: this.data.align, line: this.data.line, branchColor: this.data.branchColor };
+      // Where the topic is now, so several pasted together keep their places around each other.
+      out.push({
+        id: '', type: 'text', text: toMarkdown(mm.root),
+        x: n.x + this.shift.x + (p?.x ?? 0), y: n.y + this.shift.y + (p?.y ?? 0), width: (p?.w ?? 120) + 48, height: (p?.h ?? 40) + 48,
+        vc: { kind: 'mindmap', mm },
+      });
+    }
+    if (cut) {
+      this.apply(d => { removeTopics(d, topics.map(tp => tp.id)); });
+      this.setSel([]);
+    }
+    return out;
+  }
+
+  pasteParts(nodes: RawNode[]): boolean {
+    const at = this.primary ?? [...this.sel][0];
+    if (!at || summaryOfTopic(this.data, at) || !nodes.length || nodes.some(n => n.vc?.kind !== 'mindmap')) return false;
+    // Each pasted map comes in whole (its central topic and everything under it), as children.
+    const topics = nodes.map(n => cloneTopic(normalizeData(n.vc?.mm, n.text ?? '').root, true));
+    this.apply(d => {
+      const f = findIn(d, at);
+      if (!f) return;
+      f.topic.collapsed = false;
+      for (const tp of topics) { delete tp.side; f.topic.children.push(tp); }
+    });
+    this.setSel(topics.map(tp => tp.id));
+    return true;
+  }
+
   // ── joining maps ─────────────────────────────────────────
 
   dropTargetAt(wx: number, wy: number): MapDrop | null {
-    const x = wx - this.node.x - this.shift.x, y = wy - this.node.y - this.shift.y;
-    const spot = this.dropAt(x, y, '');
+    const x = wx - this.live.x - this.shift.x, y = wy - this.live.y - this.shift.y;
+    const spot = this.dropAt(x, y, []);
     return spot ? { topic: spot.target, mode: spot.mode, side: spot.side } : null;
   }
 
@@ -345,8 +437,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
       el.style.transform = `translate(${q.x + sx}px, ${q.y + sy}px)`;
       el.style.width = `${q.w}px`;
       el.style.height = `${q.h}px`;
-      const color = this.styles.get(q.from)?.branchColor ?? 'var(--text-muted)';
-      el.style.setProperty('--vc-bnd-color', color);
+      el.style.setProperty('--vc-bnd-color', this.boundaryColor(q.id, q.from));
       if (q.label) el.createDiv({ cls: 'vc-mm-bnd-label', text: q.label });
       for (const edge of ['start', 'end'] as const) {
         const h = el.createDiv({ cls: `vc-mm-bnd-handle is-${edge}${down ? ' is-x' : ''}`, attr: { 'data-edge': edge } });
@@ -355,6 +446,11 @@ export class MindMapCard implements CardHandle, MindMapControl {
       el.addEventListener('dblclick', (ev) => { ev.stopPropagation(); ev.preventDefault(); this.editBoundaryLabel(q.id); });
     }
     this.paintBoundaries();
+  }
+
+  /** A boundary's frame colour: its own, or its run's branch colour. */
+  private boundaryColor(id: string, from: string): string {
+    return this.data.boundaries?.find(x => x.id === id)?.color ?? this.styles.get(from)?.branchColor ?? 'var(--text-muted)';
   }
 
   private paintBoundaries(): void {
@@ -441,7 +537,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
 
   /** Only the topics (and their buttons) are the map; the room between them is board. */
   hitTest(wx: number, wy: number): boolean {
-    const x = wx - this.node.x - this.shift.x, y = wy - this.node.y - this.shift.y;
+    const x = wx - this.live.x - this.shift.x, y = wy - this.live.y - this.shift.y;
     const m = 6;
     for (const p of this.placed.values()) {
       if (x >= p.x - m && x <= p.x + p.w + m && y >= p.y - m && y <= p.y + p.h + m) return true;
@@ -454,7 +550,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
   }
 
   partsIn(r: { x: number; y: number; width: number; height: number }): { ids: string[]; all: boolean } {
-    const ox = this.node.x + this.shift.x, oy = this.node.y + this.shift.y;
+    const ox = this.live.x + this.shift.x, oy = this.live.y + this.shift.y;
     const ids: string[] = [];
     for (const [id, p] of this.placed) {
       const x = p.x + ox, y = p.y + oy;
@@ -472,13 +568,13 @@ export class MindMapCard implements CardHandle, MindMapControl {
   barExclusive(): boolean { return this.sel.size > 0 || !!this.bndSel; }
   barAnchor(): { x: number; y: number; width: number; height: number } | null {
     const q = this.bndSel ? this.extras.boundaries.find(b => b.id === this.bndSel) : null;
-    if (q) return { x: this.node.x + this.shift.x + q.x, y: this.node.y + this.shift.y + q.y - (q.label ? 24 : 0), width: q.w, height: q.h + (q.label ? 24 : 0) };
+    if (q) return { x: this.live.x + this.shift.x + q.x, y: this.live.y + this.shift.y + q.y - (q.label ? 24 : 0), width: q.w, height: q.h + (q.label ? 24 : 0) };
     if (!this.sel.size) return null;
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const id of this.sel) {
       const p = this.placed.get(id);
       if (!p) continue;
-      const x = this.node.x + p.x + this.shift.x, y = this.node.y + p.y + this.shift.y;
+      const x = this.live.x + p.x + this.shift.x, y = this.live.y + p.y + this.shift.y;
       x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + p.w); y1 = Math.max(y1, y + p.h);
     }
     return Number.isFinite(x0) ? { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } : null;
@@ -490,10 +586,10 @@ export class MindMapCard implements CardHandle, MindMapControl {
     if (!this.bndSel) return [];
     const out: { x: number; y: number; width: number; height: number }[] = [];
     for (const q of this.extras.boundaries) {
-      if (q.label && q.id !== this.bndSel) out.push({ x: this.node.x + this.shift.x + q.x, y: this.node.y + this.shift.y + q.y - 24, width: q.w, height: 24 });
+      if (q.label && q.id !== this.bndSel) out.push({ x: this.live.x + this.shift.x + q.x, y: this.live.y + this.shift.y + q.y - 24, width: q.w, height: 24 });
     }
     for (const [id, p] of this.placed) {
-      const x = this.node.x + p.x + this.shift.x, y = this.node.y + p.y + this.shift.y;
+      const x = this.live.x + p.x + this.shift.x, y = this.live.y + p.y + this.shift.y;
       // The selected topic's "+" buttons sit just outside it.
       const grow = id === this.primary ? 22 : 0;
       out.push({ x: x - grow, y, width: p.w + grow * 2, height: p.h + grow });
@@ -504,11 +600,9 @@ export class MindMapCard implements CardHandle, MindMapControl {
   barItems(): BarItem[] {
     if (this.bndSel) {
       const id = this.bndSel;
-      const label = this.data.boundaries?.find(b => b.id === id)?.label;
-      return [
-        { id: 'mm-bnd-label', icon: 'tag', label: t(label ? 'Edit boundary title' : 'Add boundary title'), text: label, run: () => this.editBoundaryLabel(id) },
-        { id: 'mm-bnd-del', icon: 'trash-2', label: t('Remove boundary'), run: () => this.removeBoundary(id) },
-      ];
+      const b = this.data.boundaries?.find(x => x.id === id);
+      // The title is edited by double-clicking it (or Enter), so the bar only styles the frame.
+      return boundaryBarItems(this, id, this.boundaryColor(id, b?.from ?? ''), () => this.removeBoundary(id));
     }
     if (!this.sel.size) return [themeItem(this)];
     return mindMapBarItems(this);
@@ -779,6 +873,10 @@ export class MindMapCard implements CardHandle, MindMapControl {
     this.svgEl.setAttribute('width', String(w));
     this.svgEl.setAttribute('height', String(h));
     this.drawLines();
+    // Connections attached to topics follow them.
+    if (this.ctx.board.model.edges.some(e => (e.fromNode === this.node.id && e.vc?.fromTopic) || (e.toNode === this.node.id && e.vc?.toTopic))) {
+      window.requestAnimationFrame(() => { this.ctx.board.renderEdges(); this.ctx.board.connections?.refreshHandles(); });
+    }
     this.drawBoundaries();
     this.drawOverlay();
     const r = this.placed.get(d.root.id)!;
@@ -802,7 +900,8 @@ export class MindMapCard implements CardHandle, MindMapControl {
   }
 
   private fitQuietly(): void {
-    if (!this.body.isConnected || this.editingId) return;
+    // Not laid out (a board in a background tab): the topics measure 0, so wait until it shows.
+    if (!this.body.isConnected || !this.body.getClientRects().length || this.editingId) return;
     const m = this.ctx.board.model;
     const n = m.node(this.node.id);
     if (!n || !this.placed.size) return;
@@ -893,12 +992,18 @@ export class MindMapCard implements CardHandle, MindMapControl {
     walk(d.root, 0);
     for (const sm of d.summaries ?? []) if (this.placed.has(sm.topic.id)) walk(sm.topic, 1);
 
-    // Boundaries: a soft dashed frame in the run's branch colour.
+    // Boundaries: a soft dashed frame in the run's branch colour, unless given a look of its own.
     for (const q of this.extras.boundaries) {
-      const c = S(q.from)?.branchColor ?? 'var(--text-muted)';
+      const b = this.data.boundaries?.find(x => x.id === q.id);
+      const c = this.boundaryColor(q.id, q.from);
+      const w = b?.width ?? 1.5;
+      const fill = b?.fill === 'none' ? 'none' : b?.fill ? `color-mix(in srgb, ${b.fill} 30%, transparent)` : `color-mix(in srgb, ${c} 7%, transparent)`;
+      const r = Math.min(12, q.w / 2, q.h / 2);
+      const dash = dashesAround(b?.dash ? DASH[b.dash]?.(w) ?? [] : [6, 4], 2 * (q.w + q.h) - (8 - 2 * Math.PI) * r);
       svg('rect', {
-        x: q.x + sx, y: q.y + sy, width: q.w, height: q.h, rx: 12,
-        style: `fill:color-mix(in srgb, ${c} 7%, transparent);stroke:${c};stroke-width:1.5px`, 'stroke-dasharray': '6 4',
+        x: q.x + sx, y: q.y + sy, width: q.w, height: q.h, rx: r,
+        style: `fill:${fill};stroke:${c};stroke-width:${w}px`, 'stroke-dasharray': dash,
+        'stroke-linecap': b?.dash === 'dotted' ? 'round' : 'butt',
       }, frames);
     }
     // Summaries: a brace beside the run, pointing at the summary topic.
@@ -914,8 +1019,9 @@ export class MindMapCard implements CardHandle, MindMapControl {
     for (const [id] of this.placed) {
       const p = P(id)!, st = S(id);
       const bw = st.border ? st.borderWidth : 0;
-      const dash = DASH[st.borderDash]?.(bw) ?? '';
+      const pattern = DASH[st.borderDash]?.(bw) ?? [];
       if (st.shape === 'underline') {
+        const dash = pattern.join(' ');
         if (st.fill !== 'none') svg('rect', { x: p.x, y: p.y, width: p.w, height: p.h, rx: 4, style: `fill:${st.fill}` }, shapes);
         if (st.border) {
           const y = p.y + p.h - bw / 2;
@@ -924,6 +1030,9 @@ export class MindMapCard implements CardHandle, MindMapControl {
         continue;
       }
       const rx = st.shape === 'rect' ? 0 : st.shape === 'rounded-sm' ? 4 : st.shape === 'rounded' ? 10 : (p.h - bw) / 2;
+      const rw = Math.max(0, p.w - bw), rh = Math.max(0, p.h - bw), r = Math.min(Math.max(0, rx), rw / 2, rh / 2);
+      // The outline's length: straight sides plus the quarter circles of the corners.
+      const dash = dashesAround(pattern, 2 * (rw + rh) - (8 - 2 * Math.PI) * r);
       svg('rect', {
         x: p.x + bw / 2, y: p.y + bw / 2, width: Math.max(0, p.w - bw), height: Math.max(0, p.h - bw), rx: Math.max(0, rx),
         style: `fill:${st.fill === 'none' ? 'none' : st.fill};stroke:${st.border ? st.borderColor : 'none'};stroke-width:${bw}px`,
@@ -947,6 +1056,8 @@ export class MindMapCard implements CardHandle, MindMapControl {
       return b;
     };
     const g = gapsFor(d.size);
+    // How wide each folded topic's count badge came out ("+" buttons keep clear of it).
+    const badgeW = new Map<string, number>();
     const walk = (tp: MMTopic, depth: number) => {
       const p0 = this.placed.get(tp.id);
       if (!p0) return;
@@ -963,6 +1074,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
         }
         const fold = btn(`vc-mm-fold${tp.collapsed ? ' is-collapsed' : ''}`, fx, fy, tp.id, tp.collapsed ? String(countTopics(tp)) : '−');
         fold.setAttr('aria-label', tp.collapsed ? t('Expand') : t('Collapse'));
+        if (tp.collapsed) badgeW.set(tp.id, fold.offsetWidth);
       }
       if (!tp.collapsed) for (const c of tp.children) walk(c, depth + 1);
     };
@@ -985,7 +1097,8 @@ export class MindMapCard implements CardHandle, MindMapControl {
     }
     const isRoot = this.primary === d.root.id;
     const hasKids = !!findIn(d, this.primary)?.topic.children.length;
-    const off = hasKids ? 30 : 12;
+    // Past the fold switch; past a folded topic's count badge, which grows with the number.
+    const off = hasKids ? Math.max(30, (badgeW.get(this.primary) ?? 0) + 15) : 12;
     if (d.layout === 'down') {
       btn('vc-mm-add is-child', p.x + p.w / 2, p.y + p.h + off, this.primary);
       if (!isRoot) btn('vc-mm-add is-sibling', p.x + p.w + 12, p.y + p.h / 2, this.primary);
@@ -1204,6 +1317,9 @@ export class MindMapCard implements CardHandle, MindMapControl {
       b.notifySelection();
       return;
     }
+    // This map is one of several selected cards: pressing any of its topics drags them all,
+    // like any other card (the board does that); a click without dragging then selects the map.
+    if (b.selection.size > 1 && b.selection.has(this.node.id)) return;
     if (!this.isSole()) b.select([this.node.id]);
     if (!(this.sel.size > 1 && this.sel.has(id))) this.setSel([id]);
     if (summaryOfTopic(this.data, id)) { e.stopPropagation(); e.preventDefault(); return; } // stays beside its run
@@ -1221,7 +1337,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
 
   private toLocal(clientX: number, clientY: number): { x: number; y: number } {
     const w = this.ctx.board.clientToWorld(clientX, clientY);
-    return { x: w.x - this.node.x - this.shift.x, y: w.y - this.node.y - this.shift.y };
+    return { x: w.x - this.live.x - this.shift.x, y: w.y - this.live.y - this.shift.y };
   }
 
   private startTopicDrag(e: PointerEvent, id: string): void {
@@ -1238,7 +1354,11 @@ export class MindMapCard implements CardHandle, MindMapControl {
       !!u && !!v && u.id === v.id && u.spot.topic === v.spot.topic && u.spot.mode === v.spot.mode && u.spot.side === v.spot.side;
     let lastClient = { x: sx, y: sy };
     const dragged = findIn(this.data, id)?.topic;
-    const srcEl = this.topicEls.get(id);
+    // Several topics selected and one of them grabbed: they all go together (within this map).
+    const moving = this.sel.size > 1 && this.sel.has(id)
+      ? [...this.sel].filter(x => x !== this.data.root.id && !summaryOfTopic(this.data, x))
+      : [id];
+    const srcEls = moving.map(x => this.topicEls.get(x)).filter((el): el is HTMLElement => !!el);
     const clearMarks = () => { for (const el of this.topicEls.values()) el.removeClass('is-drop-target'); };
 
     const move = (ev: PointerEvent) => {
@@ -1246,14 +1366,15 @@ export class MindMapCard implements CardHandle, MindMapControl {
       if (!dragging) {
         if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return;
         dragging = true;
-        srcEl?.addClass('is-dragging');
-        ghost = this.overlay.createDiv({ cls: 'vc-mm-ghost', text: dragged?.text || ' ' });
+        for (const el of srcEls) el.addClass('is-dragging');
+        const label = (dragged?.text || ' ') + (moving.length > 1 ? `  +${moving.length - 1}` : '');
+        ghost = this.overlay.createDiv({ cls: 'vc-mm-ghost', text: label });
         hint = this.overlay.createDiv('vc-mm-drop');
         hint.hide();
       }
       const l = this.toLocal(ev.clientX, ev.clientY);
       ghost!.style.transform = `translate(${Math.round(l.x + this.shift.x + 8)}px, ${Math.round(l.y + this.shift.y + 8)}px)`;
-      drop = this.dropAt(l.x, l.y, id);
+      drop = this.dropAt(l.x, l.y, moving);
       clearMarks();
       // Away from the map: onto another map's topic (joins it), or onto the board (a topic of its own).
       detach = !drop && this.outsideMap(l.x, l.y);
@@ -1270,19 +1391,21 @@ export class MindMapCard implements CardHandle, MindMapControl {
       win.removeEventListener('pointerup', up, true);
       win.removeEventListener('keydown', key, true);
       this.dragCleanup = null;
-      srcEl?.removeClass('is-dragging');
+      for (const el of srcEls) el.removeClass('is-dragging');
       clearMarks();
       ghost?.remove(); hint?.remove();
       if (commit && dragging && drop) {
         const dd = drop;
-        this.apply(d => { moveTopic(d, id, dd.target, dd.mode, dd.side); });
-        this.setSel([id]);
+        this.apply(d => { moveTopics(d, moving, dd.target, dd.mode, dd.side); });
+        this.setSel(moving);
       } else if (commit && dragging && detach && joinTarget) {
-        this.moveToOtherMap(id, joinTarget);
+        this.moveToOtherMap(moving, joinTarget);
       } else if (commit && dragging && detach) {
-        this.detachTopic(id, lastClient);
+        this.detachTopics(moving, id, lastClient);
       }
       if (joinTarget) this.ctx.board.cards.get(joinTarget.id)?.handle.markDropTarget?.(null);
+      // The dragged topic's element may be gone now; keep the keys (⌘Z) on the board.
+      if (commit && dragging && !this.ctx.board.root.contains(doc.activeElement)) this.ctx.board.root.focus({ preventScroll: true });
     };
     const up = () => finish(true);
     const key = (ev: KeyboardEvent) => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finish(false); } };
@@ -1302,44 +1425,58 @@ export class MindMapCard implements CardHandle, MindMapControl {
   }
 
   /**
-   * Take a topic (and everything under it) out of this map and put it on the board where it was
-   * dropped, as a mind map of its own with the same look, like a floating topic in Boardmix.
+   * Take topics (and everything under them) out of this map and put them on the board where they
+   * were dropped, each as a mind map of its own with the same look, like a floating topic in
+   * Boardmix. The grabbed topic lands at the drop point; the others keep their places around it.
    */
-  private detachTopic(id: string, at: { x: number; y: number }): void {
-    const f = findIn(this.data, id);
-    if (!f || !f.parent) return;
+  private detachTopics(ids: string[], grabbed: string, at: { x: number; y: number }): void {
     const sub = cloneData(this.data);
-    const topic = findIn(sub, id)!.topic;
-    delete topic.side;
+    const topics = movedTopics(sub, ids);
+    if (!topics.length) return;
     const b = this.ctx.board;
+    const drop = b.clientToWorld(at.x, at.y);
+    // Read where they sit now: removing them lays the map out again.
+    const origin = this.placed.get(grabbed) ?? this.placed.get(topics[0].id);
+    const spots = new Map(topics.map(tp => {
+      const p = this.placed.get(tp.id);
+      return [tp.id, p && origin ? { x: drop.x + p.x - origin.x, y: drop.y + p.y - origin.y } : drop] as const;
+    }));
+    const made: string[] = [];
     b.model.transact(() => {
-      this.apply(d => { removeTopics(d, [id]); });
-      const mm: MMData = { root: topic, layout: this.data.layout, theme: this.data.theme, size: this.data.size, align: this.data.align, line: this.data.line, branchColor: this.data.branchColor };
-      const w = b.clientToWorld(at.x, at.y);
-      b.createCard('mindmap', w, { data: { type: 'text', text: toMarkdown(topic), vc: { kind: 'mindmap', mm } } });
+      this.apply(d => { removeTopics(d, topics.map(tp => tp.id)); });
+      for (const topic of topics) {
+        delete topic.side;
+        const w = spots.get(topic.id) ?? drop;
+        const mm: MMData = { root: topic, layout: this.data.layout, theme: this.data.theme, size: this.data.size, align: this.data.align, line: this.data.line, branchColor: this.data.branchColor };
+        const n = b.createCard('mindmap', w, { data: { type: 'text', text: toMarkdown(topic), vc: { kind: 'mindmap', mm } } });
+        if (n) made.push(n.id);
+      }
     });
+    if (made.length > 1) b.select(made);
   }
 
-  /** Move a topic (and what is under it) out of this map, under a topic of another map. */
-  private moveToOtherMap(id: string, to: { id: string; spot: MapDrop }): void {
-    const f = findIn(this.data, id);
+  /** Move topics (and what is under them) out of this map into another map, keeping their order. */
+  private moveToOtherMap(ids: string[], to: { id: string; spot: MapDrop }): void {
     const target = this.ctx.board.cards.get(to.id)?.handle;
-    if (!f || !f.parent || !target?.adoptMap) return;
-    const sub = cloneData(this.data);
-    const topic = findIn(sub, id)!.topic;
-    const mm: MMData = { root: topic, layout: this.data.layout, theme: this.data.theme, size: this.data.size, align: false };
+    const topics = movedTopics(cloneData(this.data), ids);
+    if (!topics.length || !target?.adoptMap) return;
+    // Each one goes in at the same spot: "after" a topic would reverse them, so those go in last first.
+    const inOrder = to.spot.mode === 'after' ? [...topics].reverse() : topics;
     this.ctx.board.model.transact(() => {
-      this.apply(d => { removeTopics(d, [id]); });
-      target.adoptMap!(to.spot, mm, topic.text);
+      this.apply(d => { removeTopics(d, topics.map(tp => tp.id)); });
+      for (const topic of inOrder) {
+        const mm: MMData = { root: topic, layout: this.data.layout, theme: this.data.theme, size: this.data.size, align: false };
+        target.adoptMap!(to.spot, mm, topic.text);
+      }
     });
   }
 
   /** What dropping a dragged topic at a local point would do. */
-  private dropAt(x: number, y: number, dragId: string): { target: string; mode: DropMode; side?: 'left' | 'right' } | null {
-    const dragged = findIn(this.data, dragId)?.topic;
+  private dropAt(x: number, y: number, dragIds: string[]): { target: string; mode: DropMode; side?: 'left' | 'right' } | null {
+    const dragged = dragIds.map(d => findIn(this.data, d)?.topic).filter((t): t is MMTopic => !!t);
     let best: { id: string; p: Placed; dist: number } | null = null;
     for (const [id, p] of this.placed) {
-      if (id === dragId || (dragged && isInside(dragged, id))) continue;
+      if (dragIds.includes(id) || dragged.some(t => isInside(t, id))) continue;
       const m = 10;
       if (x < p.x - m || x > p.x + p.w + m || y < p.y - m || y > p.y + p.h + m) continue;
       const dist = Math.hypot(x - (p.x + p.w / 2), y - (p.y + p.h / 2));

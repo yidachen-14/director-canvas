@@ -4,7 +4,7 @@ import type { CanvasView } from '../view/canvas-view';
 import { BoardModel, nodeRect, unionRect, type ChangeEvent, type Rect } from '../model/board-model';
 import { newId, type CanvasFile, type RawEdge, type RawNode } from '../model/canvas-file';
 import { Viewport, gridStep, type Point } from './viewport';
-import { edgeGeometry, edgeWidth, vcOf } from './connections';
+import { edgeGeometry, edgeWidth, vcOf, type AreaOf } from './connections';
 import type { ConnectController } from './connect-ui';
 import { drawingHit, recolorDrawing } from '../cards/drawing';
 import { cardKindOf, cssColor } from '../cards/util';
@@ -103,6 +103,14 @@ export class Board {
     this.overlayEl = this.root.createDiv('vc-overlay');
     this.uiEl = this.root.createDiv('vc-ui');
     this.disposers.push(this.model.onChange(e => this.onModelChange(e)));
+    // The board pans through the viewport only. If the browser scrolls the
+    // board or its host anyway (a caret in growing text, focus), every
+    // pointer-to-world conversion goes off by that amount: undo it at once.
+    for (const el of [this.root, host]) {
+      const unscroll = () => { if (el.scrollLeft || el.scrollTop) el.scrollTo(0, 0); };
+      el.addEventListener('scroll', unscroll);
+      this.disposers.push(() => el.removeEventListener('scroll', unscroll));
+    }
     this.applyAppearance();
     this.applyViewport();
   }
@@ -504,13 +512,16 @@ export class Board {
   /** Geometry of an edge as currently drawn (null when an end is missing). */
   edgeGeometry(id: string): ReturnType<typeof edgeGeometry> {
     const e = this.model.edge(id);
-    return e ? edgeGeometry(e, nid => this.model.node(nid)) : null;
+    return e ? edgeGeometry(e, nid => this.model.node(nid), this.areaOf) : null;
   }
+
+  /** A mind map topic's place on the board, for connections attached to it. */
+  readonly areaOf: AreaOf = (n, topic) => this.cards.get(n.id)?.handle.topicRect?.(topic) ?? null;
 
   renderEdges(): void {
     const seen = new Set<string>();
     for (const e of this.model.edges) {
-      const shape = edgeGeometry(e, nid => this.model.node(nid));
+      const shape = edgeGeometry(e, nid => this.model.node(nid), this.areaOf);
       if (!shape) continue;
       seen.add(e.id);
       let g = this.edgeEls.get(e.id);

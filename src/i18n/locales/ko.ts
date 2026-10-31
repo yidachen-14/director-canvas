@@ -367,6 +367,7 @@ export const KO: Record<string, string> = {
   "Brace": "중괄호",
   "Dotted": "점선",
   "Long dashes": "긴 점선",
+  "Short dashes": "짧은 점선",
   "Dash and dot": "일점쇄선",
   "Custom": "사용자 지정",
   "Layout": "레이아웃",

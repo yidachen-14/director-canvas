@@ -367,6 +367,7 @@ export const PL: Record<string, string> = {
   "Brace": "Nawias klamrowy",
   "Dotted": "Kropkowana",
   "Long dashes": "Długie kreski",
+  "Short dashes": "Krótkie kreski",
   "Dash and dot": "Kreska-kropka",
   "Custom": "Własny",
   "Layout": "Układ",

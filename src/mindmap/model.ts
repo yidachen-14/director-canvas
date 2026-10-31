@@ -6,7 +6,7 @@ export type MMLayout = 'right' | 'both' | 'down' | 'timeline' | 'list';
 export type MMSize = 'compact' | 'normal' | 'large';
 export type MMLine = 'curve' | 'straight' | 'arc' | 'elbow' | 'rounded' | 'brace';
 export type MMShape = 'rect' | 'rounded-sm' | 'rounded' | 'pill' | 'underline';
-export type MMDash = 'solid' | 'dashed' | 'dotted' | 'long' | 'dashdot';
+export type MMDash = 'solid' | 'dotted' | 'short' | 'dashed' | 'long' | 'dashdot';
 
 /** Per-topic overrides of the theme. */
 export interface MMStyle {
@@ -47,7 +47,17 @@ export interface MMTopic {
  */
 export interface MMSummary { id: string; parent: string; from: string; to: string; topic: MMTopic }
 /** A boundary (Boardmix 外框): a frame drawn around a run of sibling topics and their subtrees. */
-export interface MMBoundary { id: string; parent: string; from: string; to: string; /** A title shown on a tab above the frame (XMind). */ label?: string }
+export interface MMBoundary {
+  id: string; parent: string; from: string; to: string;
+  /** A title shown on a tab above the frame (XMind). */
+  label?: string;
+  /** The frame's own look; unset follows the run's branch colour, dashed, 1.5px. */
+  color?: string;
+  width?: number;
+  dash?: MMDash;
+  /** A fill colour, or 'none'; unset is a faint tint of the frame's colour. */
+  fill?: string;
+}
 
 export interface MMData {
   summaries?: MMSummary[];
@@ -475,6 +485,66 @@ export function moveTopic(d: MMData, id: string, targetId: string, mode: DropMod
   return true;
 }
 
+/**
+ * The topics that actually move when `ids` are dragged together, in the order they have in the
+ * map: a topic under another one of them travels with it, and the central topic and summary
+ * topics never move.
+ */
+export function movedTopics(d: MMData, ids: string[]): MMTopic[] {
+  const want = new Set(ids);
+  const order: MMTopic[] = [];
+  const visit = (t: MMTopic, carried: boolean) => {
+    for (const c of t.children) {
+      const take = !carried && want.has(c.id);
+      if (take) order.push(c);
+      visit(c, carried || take);
+    }
+  };
+  visit(d.root, false);
+  return order;
+}
+
+/**
+ * Move several topics together, in the order they have in the map: under `targetId` (after its
+ * children) or side by side just before / after it. A topic under another moved topic travels
+ * with it; the central topic and summary topics stay where they are.
+ */
+export function moveTopics(d: MMData, ids: string[], targetId: string, mode: DropMode, side?: 'left' | 'right'): boolean {
+  const order = movedTopics(d, ids);
+  if (!order.length || order.some(t => t.id === targetId || isInside(t, targetId))) return false;
+  if (order.length === 1) return moveTopic(d, order[0].id, targetId, mode, side);
+  const dst = findIn(d, targetId);
+  if (!dst || dst.summary) return false;
+  if (mode !== 'child' && !dst.parent) mode = 'child';
+  for (const t of order) {
+    const f = findIn(d, t.id)!;
+    f.parent!.children.splice(f.index, 1);
+  }
+  if (mode === 'child') {
+    dst.topic.collapsed = false;
+    dst.topic.children.push(...order);
+    for (const t of order) { if (dst.topic === d.root) { if (side) t.side = side; } else delete t.side; }
+  } else {
+    const parent = dst.parent!;
+    const at = parent.children.indexOf(dst.topic) + (mode === 'after' ? 1 : 0);
+    parent.children.splice(at, 0, ...order);
+    for (const t of order) { if (parent === d.root) t.side = dst.topic.side ?? side; else delete t.side; }
+  }
+  return true;
+}
+
+/**
+ * A dash pattern stretched a little so it repeats a whole number of times round a closed outline
+ * `length` long: where the line meets itself the gap is the same as everywhere else.
+ */
+export function dashesAround(pattern: number[], length: number): string {
+  if (!pattern.length) return '';
+  const unit = pattern.reduce((a, b) => a + b, 0);
+  const n = Math.max(1, Math.round(length / unit));
+  const k = length / (n * unit);
+  return pattern.map(v => +(v * k).toFixed(3)).join(' ');
+}
+
 // ── Style resolution ──────────────────────────────────────────────────
 
 export interface Resolved {
@@ -643,59 +713,82 @@ export function layoutMindMap(d: MMData, sizes: Map<string, Size>): Map<string, 
     before.set(b.from, (before.get(b.from) ?? 0) + 10 + (b.label && d.layout !== 'down' ? 24 : 0));
     after.set(b.to, (after.get(b.to) ?? 0) + 10);
   }
-  const extra = (c: MMTopic) => (before.get(c.id) ?? 0) + (after.get(c.id) ?? 0);
+
+  /**
+   * Stack subtrees along one axis without overlap and centre the parent between the first and the
+   * last child itself (not the whole block of their descendants), like XMind and Boardmix. Works
+   * on the axis the siblings line up on: y for the sideways layouts, x for the org chart.
+   * `ext` is how far a subtree reaches before and after its topic's centre on that axis.
+   */
+  const stacker = (len: (t: MMTopic) => number, gap: number) => {
+    const ext = new Map<string, { a: number; b: number }>();
+    const rel = new Map<string, number[]>();
+    const spread = (k: MMTopic[]): { centers: number[]; a: number; b: number } => {
+      const centers: number[] = [];
+      let pos = 0, prevB = 0;
+      k.forEach((c, i) => {
+        const e = measure(c);
+        if (i > 0) pos += prevB + (after.get(k[i - 1].id) ?? 0) + gap + (before.get(c.id) ?? 0) + e.a;
+        centers.push(pos);
+        prevB = e.b;
+      });
+      const mid = (centers[0] + centers[centers.length - 1]) / 2;
+      const r = centers.map(c => c - mid);
+      const first = k[0], last = k[k.length - 1];
+      return { centers: r, a: -r[0] + measure(first).a + (before.get(first.id) ?? 0), b: r[r.length - 1] + measure(last).b + (after.get(last.id) ?? 0) };
+    };
+    const measure = (t: MMTopic): { a: number; b: number } => {
+      const known = ext.get(t.id);
+      if (known) return known;
+      const half = len(t) / 2;
+      const k = kids(t);
+      let e = { a: half, b: half };
+      if (k.length) {
+        const sp = spread(k);
+        rel.set(t.id, sp.centers);
+        e = { a: Math.max(half, sp.a), b: Math.max(half, sp.b) };
+      }
+      ext.set(t.id, e);
+      return e;
+    };
+    return { measure, spread, rel };
+  };
 
   if (d.layout === 'right' || d.layout === 'both') {
-    const hOf = new Map<string, number>();
-    const subH = (t: MMTopic): number => {
-      const k = kids(t);
-      const sum = k.reduce((s, c) => s + subH(c) + extra(c), 0) + Math.max(0, k.length - 1) * g.v;
-      const v = Math.max(size(t).h, sum);
-      hOf.set(t.id, v);
-      return v;
-    };
     // Column widths per depth and side, for aligned siblings.
     const colW = { left: new Map<number, number>(), right: new Map<number, number>() };
-    const measure = (t: MMTopic, depth: number, side: 'left' | 'right') => {
+    const measureW = (t: MMTopic, depth: number, side: 'left' | 'right') => {
       const m = colW[side];
       m.set(depth, Math.max(m.get(depth) ?? 0, size(t).w));
-      for (const c of kids(t)) measure(c, depth + 1, side);
+      for (const c of kids(t)) measureW(c, depth + 1, side);
     };
     const sides = sidesOf(d);
     const right = kids(root).filter(c => sides.get(c.id) !== 'left');
     const left = kids(root).filter(c => sides.get(c.id) === 'left');
-    for (const c of right) measure(c, 1, 'right');
-    for (const c of left) measure(c, 1, 'left');
+    for (const c of right) measureW(c, 1, 'right');
+    for (const c of left) measureW(c, 1, 'left');
     const colX = { left: new Map<number, number>(), right: new Map<number, number>() };
     let ax = rs.w + g.h, bx = -g.h;
     for (let dd = 1; colW.right.has(dd); dd++) { colX.right.set(dd, ax); ax += (colW.right.get(dd) ?? 0) + g.h; }
     for (let dd = 1; colW.left.has(dd); dd++) { colX.left.set(dd, bx); bx -= (colW.left.get(dd) ?? 0) + g.h; }
 
-    const place = (t: MMTopic, x: number, top: number, depth: number, side: 'left' | 'right') => {
+    const st = stacker(t => size(t).h, g.v);
+    // `cy` is the topic's vertical centre.
+    const place = (t: MMTopic, x: number, cy: number, depth: number, side: 'left' | 'right') => {
       const s = size(t);
-      const total = hOf.get(t.id) ?? s.h;
-      out.set(t.id, { x: side === 'left' ? x - s.w : x, y: top + total / 2 - s.h / 2, w: s.w, h: s.h, depth, side });
-      const k = kids(t);
-      const sum = k.reduce((acc, c) => acc + (hOf.get(c.id) ?? 0) + extra(c), 0) + Math.max(0, k.length - 1) * g.v;
-      let cy = top + (total - sum) / 2;
-      for (const c of k) {
+      out.set(t.id, { x: side === 'left' ? x - s.w : x, y: cy - s.h / 2, w: s.w, h: s.h, depth, side });
+      const r = st.rel.get(t.id) ?? [];
+      kids(t).forEach((c, i) => {
         const cx = d.align ? colX[side].get(depth + 1)! : side === 'left' ? x - s.w - g.h : x + s.w + g.h;
-        cy += before.get(c.id) ?? 0;
-        place(c, cx, cy, depth + 1, side);
-        cy += (hOf.get(c.id) ?? 0) + (after.get(c.id) ?? 0) + g.v;
-      }
+        place(c, cx, cy + r[i], depth + 1, side);
+      });
     };
     out.set(root.id, { x: 0, y: 0, w: rs.w, h: rs.h, depth: 0, side: 'right' });
     const stack = (list: MMTopic[], side: 'left' | 'right') => {
-      for (const c of list) subH(c);
-      const total = list.reduce((s, c) => s + (hOf.get(c.id) ?? 0) + extra(c), 0) + Math.max(0, list.length - 1) * g.v;
-      let top = rs.h / 2 - total / 2;
-      for (const c of list) {
-        const x = d.align ? colX[side].get(1)! : side === 'left' ? -g.h : rs.w + g.h;
-        top += before.get(c.id) ?? 0;
-        place(c, x, top, 1, side);
-        top += (hOf.get(c.id) ?? 0) + (after.get(c.id) ?? 0) + g.v;
-      }
+      if (!list.length) return;
+      const sp = st.spread(list);
+      const x = d.align ? colX[side].get(1)! : side === 'left' ? -g.h : rs.w + g.h;
+      list.forEach((c, i) => place(c, x, rs.h / 2 + sp.centers[i], 1, side));
     };
     stack(right, 'right');
     stack(left, 'left');
@@ -704,15 +797,6 @@ export function layoutMindMap(d: MMData, sizes: Map<string, Size>): Map<string, 
 
   if (d.layout === 'down') {
     const sib = g.h * 0.5;
-    const wOf = new Map<string, number>();
-    const subW = (t: MMTopic): number => {
-      const k = kids(t);
-      const sum = k.reduce((s, c) => s + subW(c) + extra(c), 0) + Math.max(0, k.length - 1) * sib;
-      const v = Math.max(size(t).w, sum);
-      wOf.set(t.id, v);
-      return v;
-    };
-    subW(root);
     const rowH = new Map<number, number>();
     const rows = (t: MMTopic, depth: number) => {
       rowH.set(depth, Math.max(rowH.get(depth) ?? 0, size(t).h));
@@ -722,24 +806,17 @@ export function layoutMindMap(d: MMData, sizes: Map<string, Size>): Map<string, 
     const rowY = new Map<number, number>();
     let y = 0;
     for (let dd = 0; rowH.has(dd); dd++) { rowY.set(dd, y); y += (rowH.get(dd) ?? 0) + g.level; }
-    const place = (t: MMTopic, left: number, top: number, depth: number) => {
+    const st = stacker(t => size(t).w, sib);
+    st.measure(root);
+    // `cx` is the topic's horizontal centre.
+    const place = (t: MMTopic, cx: number, top: number, depth: number) => {
       const s = size(t);
-      const total = wOf.get(t.id) ?? s.w;
       const ty = d.align ? (rowY.get(depth) ?? 0) : top;
-      out.set(t.id, { x: left + total / 2 - s.w / 2, y: ty, w: s.w, h: s.h, depth, side: 'right' });
-      const k = kids(t);
-      const sum = k.reduce((acc, c) => acc + (wOf.get(c.id) ?? 0) + extra(c), 0) + Math.max(0, k.length - 1) * sib;
-      let cx = left + (total - sum) / 2;
-      for (const c of k) {
-        cx += before.get(c.id) ?? 0;
-        place(c, cx, ty + s.h + g.level, depth + 1);
-        cx += (wOf.get(c.id) ?? 0) + (after.get(c.id) ?? 0) + sib;
-      }
+      out.set(t.id, { x: cx - s.w / 2, y: ty, w: s.w, h: s.h, depth, side: 'right' });
+      const r = st.rel.get(t.id) ?? [];
+      kids(t).forEach((c, i) => place(c, cx + r[i], ty + s.h + g.level, depth + 1));
     };
-    place(root, 0, 0, 0);
-    const r = out.get(root.id)!;
-    const dx = r.x;
-    for (const p of out.values()) p.x -= dx;
+    place(root, rs.w / 2, 0, 0);
     return out;
   }
 
@@ -800,7 +877,8 @@ export function layoutExtras(d: MMData, sizes: Map<string, Size>, placed: Map<st
   if (!extrasSupported(d.layout)) return out;
   const down = d.layout === 'down';
   const g = gapsFor(d.size);
-  const PADB = 8, BRACE = 14, GAPT = 10;
+  // BRACE_GAP: room between the run and its brace, so the summary does not crowd the topics.
+  const PADB = 8, BRACE = 14, GAPT = 12, BRACE_GAP = 18;
   // Extras already placed, by the topic whose children they wrap (and which of them).
   const done: { parent: string; lo: number; hi: number; box: Bounds }[] = [];
   const indexIn = (parent: MMTopic, id: string) => parent.children.findIndex(c => c.id === id);
@@ -875,12 +953,12 @@ export function layoutExtras(d: MMData, sizes: Map<string, Size>, placed: Map<st
     }
     let ext: Bounds;
     if (down) {
-      const at = box.y + box.h + 6, mid = box.x + box.w / 2;
+      const at = box.y + box.h + BRACE_GAP, mid = box.x + box.w / 2;
       ext = placeSubtreeDown(sm.topic, mid, at + BRACE + GAPT, depth);
       out.braces.push({ id: sm.id, from: first.id, vertical: false, dir: 1, at, a: box.x, b: box.x + box.w, mid });
     } else {
       const dir: 1 | -1 = side === 'left' ? -1 : 1;
-      const at = dir === 1 ? box.x + box.w + 6 : box.x - 6;
+      const at = dir === 1 ? box.x + box.w + BRACE_GAP : box.x - BRACE_GAP;
       const mid = box.y + box.h / 2;
       ext = placeSubtreeSideways(sm.topic, dir === 1 ? at + BRACE + GAPT : at - BRACE - GAPT, mid, depth, side);
       out.braces.push({ id: sm.id, from: first.id, vertical: true, dir, at, a: box.y, b: box.y + box.h, mid });

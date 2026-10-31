@@ -367,6 +367,7 @@ export const FR: Record<string, string> = {
   "Brace": "Accolade",
   "Dotted": "Pointillé",
   "Long dashes": "Longs tirets",
+  "Short dashes": "Tirets courts",
   "Dash and dot": "Tiret-point",
   "Custom": "Personnalisé",
   "Layout": "Disposition",

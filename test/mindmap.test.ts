@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  addBoundary, findIn, respanBoundary, addChild, addSibling, addSummary, anyTopic, boundsOf, layoutExtras, siblingRange, findTopic, fromMarkdown, layoutMindMap, moveTopic, newMindMap, normalizeData,
+  addBoundary, dashesAround, findIn, respanBoundary, addChild, addSibling, addSummary, anyTopic, boundsOf, layoutExtras, siblingRange, findTopic, fromMarkdown, layoutMindMap, moveTopic, movedTopics, moveTopics, newMindMap, normalizeData,
   removeTopics, resolveStyles, sidesOf, toMarkdown, type MMData, type Size,
 } from '../src/mindmap/model';
 
@@ -57,9 +57,67 @@ describe('mind map tree edits', () => {
     expect(moveTopic(d, byText(d, 'A2'), byText(d, 'B'), 'after')).toBe(true);
     expect(d.root.children.map(c => c.text)).toEqual(['C', 'A', 'B', 'A2']);
   });
+
+  it('moves several selected topics together, keeping their order', () => {
+    const d = sample();
+    // Picked in a different order than they appear: they keep the map's order.
+    expect(moveTopics(d, [byText(d, 'B1'), byText(d, 'A1'), byText(d, 'C')], byText(d, 'A2'), 'child')).toBe(true);
+    expect(findTopic(d.root, byText(d, 'A2'))!.topic.children.map(c => c.text)).toEqual(['A1', 'B1', 'C']);
+    expect(d.root.children.map(c => c.text)).toEqual(['A', 'B']);
+    // Side by side after a topic.
+    expect(moveTopics(d, [byText(d, 'A1'), byText(d, 'C')], byText(d, 'B'), 'after')).toBe(true);
+    expect(d.root.children.map(c => c.text)).toEqual(['A', 'B', 'A1', 'C']);
+  });
+
+  it('the topics that move with a multi-selection: map order, no central topic, children ride along', () => {
+    const d = sample();
+    const moved = movedTopics(d, [byText(d, 'C'), d.root.id, byText(d, 'A1'), byText(d, 'A'), byText(d, 'B1')]);
+    expect(moved.map(t => t.text)).toEqual(['A', 'B1', 'C']);
+  });
+
+  it('a selected topic under another selected topic moves with it, and none moves into the moved ones', () => {
+    const d = sample();
+    expect(moveTopics(d, [byText(d, 'A'), byText(d, 'B')], byText(d, 'A1'), 'child')).toBe(false);
+    expect(moveTopics(d, [byText(d, 'A'), byText(d, 'A1'), byText(d, 'B1')], byText(d, 'C'), 'child')).toBe(true);
+    const c = findTopic(d.root, byText(d, 'C'))!.topic;
+    expect(c.children.map(x => x.text)).toEqual(['A', 'B1']);
+    expect(c.children[0].children.map(x => x.text)).toEqual(['A1', 'A2']);
+  });
 });
 
 describe('mind map layout', () => {
+  it('a parent sits midway between its first and last child, not the middle of everything below', () => {
+    // Like a library map: one big branch (two groups, one with five topics) and one lone topic.
+    const d = newMindMap('Lib');
+    const big = addChild(d, d.root.id, 'Big')!;
+    addChild(d, d.root.id, 'Lone');
+    const kinds = addChild(d, big.id, 'Kinds')!;
+    const state = addChild(d, big.id, 'State')!;
+    for (const k of ['K1', 'K2', 'K3', 'K4', 'K5']) addChild(d, kinds.id, k);
+    for (const k of ['S1', 'S2', 'S3']) addChild(d, state.id, k);
+    const p = layoutMindMap(d, sizes(d));
+    const mid = (id: string) => { const q = p.get(id)!; return q.y + q.h / 2; };
+    const between = (id: string) => { const k = findTopic(d.root, id)!.topic.children; return (mid(k[0].id) + mid(k[k.length - 1].id)) / 2; };
+    for (const id of [d.root.id, big.id, kinds.id, state.id]) expect(mid(id)).toBeCloseTo(between(id));
+    // Branches still never overlap: the lone topic is below everything under the big branch.
+    const lowest = Math.max(...['K5', 'S3', 'State'].map(t => { const q = p.get(byText(d, t))!; return q.y + q.h; }));
+    expect(p.get(byText(d, 'Lone'))!.y).toBeGreaterThan(lowest);
+  });
+
+  it('org chart: a parent sits midway between its first and last child', () => {
+    const d = sample();
+    d.layout = 'down';
+    addChild(d, byText(d, 'A1'), 'A1a');
+    addChild(d, byText(d, 'A1'), 'A1b');
+    addChild(d, byText(d, 'A1'), 'A1c');
+    const p = layoutMindMap(d, sizes(d));
+    const mid = (id: string) => { const q = p.get(id)!; return q.x + q.w / 2; };
+    for (const id of [d.root.id, byText(d, 'A')]) {
+      const k = findTopic(d.root, id)!.topic.children;
+      expect(mid(id)).toBeCloseTo((mid(k[0].id) + mid(k[k.length - 1].id)) / 2);
+    }
+  });
+
   it('right: children right of their parent, central topic at 0,0', () => {
     const d = sample();
     const p = layoutMindMap(d, sizes(d));
@@ -273,5 +331,18 @@ describe('topic text style', () => {
     const r = m.resolveStyles(d);
     expect(r.get('a')).toMatchObject({ bold: true, italic: true, fontSize: 20, text: '#ff0000' });
     expect(r.get('st')?.italic).toBeFalsy();
+  });
+});
+
+describe('topic borders', () => {
+  it('a dash pattern repeats a whole number of times round the outline, so the join looks like any other gap', () => {
+    const perimeter = 2 * (120 + 40) - (8 - 2 * Math.PI) * 20;
+    const parts = dashesAround([8, 6], perimeter).split(' ').map(Number);
+    const repeats = perimeter / (parts[0] + parts[1]);
+    expect(Math.abs(repeats - Math.round(repeats))).toBeLessThan(1e-3);
+    // Only stretched a little: the dash keeps its look.
+    expect(parts[0]).toBeGreaterThan(7);
+    expect(parts[0]).toBeLessThan(9);
+    expect(dashesAround([], perimeter)).toBe('');
   });
 });

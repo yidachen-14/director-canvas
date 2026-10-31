@@ -15,10 +15,20 @@ const MARK = 'director-canvas';
 
 interface ClipPayload { [MARK]?: number; nodes: RawNode[]; edges: RawEdge[]; }
 
-/** Copy the selection: JSON Canvas data the core Canvas can paste too. */
-export function copySelection(board: Board, e: ClipboardEvent): boolean {
+/**
+ * Copy the selection: JSON Canvas data the core Canvas can paste too. Topics selected in a mind
+ * map go as mind maps of their own (cut: taken out of their map). 'parts' when that happened.
+ */
+export function copySelection(board: Board, e: ClipboardEvent, cut = false): boolean | 'parts' {
   const nodes = board.selectedNodes();
   if (!nodes.length) return false;
+  const parts = nodes.length === 1 ? board.cards.get(nodes[0].id)?.handle.copyParts?.(cut) : null;
+  if (parts?.length) {
+    const payload: ClipPayload = { [MARK]: 1, nodes: parts, edges: [] };
+    e.clipboardData?.setData('text/plain', JSON.stringify(payload));
+    e.preventDefault();
+    return 'parts';
+  }
   const ids = new Set(nodes.map(n => n.id));
   const edges = board.model.edges.filter(ed => ids.has(ed.fromNode) && ids.has(ed.toNode));
   const payload: ClipPayload = { [MARK]: 1, nodes, edges };
@@ -40,6 +50,9 @@ function parsePayload(text: string): ClipPayload | null {
 export async function pasteInto(board: Board, data: DataTransfer, at: Point): Promise<void> {
   const text = data.getData('text/plain');
   const payload = text ? parsePayload(text) : null;
+  // A mind map topic selected: copied topics (mind maps) go in under it.
+  const sel = board.selectedNodes();
+  if (payload && sel.length === 1 && board.cards.get(sel[0].id)?.handle.pasteParts?.(payload.nodes)) return;
   if (payload) { pasteNodes(board, payload, at); return; }
 
   const files = Array.from(data.files ?? []);
@@ -180,7 +193,7 @@ export function attachClipboard(board: Board): void {
     && !(doc.activeElement as HTMLElement | null)?.closest('input, textarea, [contenteditable="true"], [contenteditable="plaintext-only"]:not([data-vc-armed])');
 
   const onCopy = (e: ClipboardEvent) => { if (focused()) copySelection(board, e); };
-  const onCut = (e: ClipboardEvent) => { if (focused() && copySelection(board, e)) board.deleteSelection(); };
+  const onCut = (e: ClipboardEvent) => { if (focused() && copySelection(board, e, true) === true) board.deleteSelection(); };
   const onPaste = (e: ClipboardEvent) => {
     if (!focused() || !e.clipboardData) return;
     e.preventDefault();

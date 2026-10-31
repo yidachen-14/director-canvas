@@ -367,6 +367,7 @@ export const DE: Record<string, string> = {
   "Brace": "Geschweifte Klammer",
   "Dotted": "Gepunktet",
   "Long dashes": "Lange Striche",
+  "Short dashes": "Kurze Striche",
   "Dash and dot": "Strich-Punkt",
   "Custom": "Benutzerdefiniert",
   "Layout": "Layout",

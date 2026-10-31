@@ -367,6 +367,7 @@ export const RU: Record<string, string> = {
   "Brace": "Фигурная скобка",
   "Dotted": "Пунктир",
   "Long dashes": "Длинные штрихи",
+  "Short dashes": "Короткие штрихи",
   "Dash and dot": "Штрих-пунктир",
   "Custom": "Свой",
   "Layout": "Макет",

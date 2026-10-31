@@ -835,7 +835,16 @@ export function attachInteractions(board: Board): void {
     const w = board.clientToWorld(e.clientX, e.clientY);
     const labelOf = t.closest('.vc-group-label')?.closest<HTMLElement>('.vc-node')?.dataset.id;
     if (labelOf) return; // groups are renamed from their bar, not by double-clicking
-    if (zoneAt(w.x, w.y)) return;
+    const z = zoneAt(w.x, w.y);
+    if (z) {
+      // Double-clicking a text card's bottom edge fits its height to the text, keeping the top in place.
+      const h = z.zone === 's' ? board.cards.get(z.id)?.handle.fitHeight?.() : undefined;
+      const node = board.model.node(z.id);
+      if (h && node && Math.abs(h - node.height) >= 1) {
+        board.model.transact(() => { node.height = Math.max(MIN_H, h); board.model.touch(z.id); });
+      }
+      return;
+    }
     const n = nodeAt(w.x, w.y);
     if (n) {
       // Double-clicking inside a group's empty area creates a card there, like on the board.
@@ -946,6 +955,8 @@ function scrollsInside(el: HTMLElement | null, dx: number, dy: number, stop: HTM
 export function duplicateSelection(board: Board, offset = 30): void {
   const nodes = board.selectedNodes();
   if (!nodes.length) return;
+  // Topics selected in a mind map: they are copied inside the map, beside themselves.
+  if (nodes.length === 1 && board.cards.get(nodes[0].id)?.handle.duplicateParts?.()) return;
   const ids = new Set(nodes.map(n => n.id));
   const map = new Map<string, string>();
   board.model.transact(() => {

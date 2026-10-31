@@ -3,6 +3,8 @@
 .workspace-leaf-content .view-content.vc-view {
   padding: 0;
   overflow: hidden;
+  /* clip, unlike hidden, cannot be scrolled by the browser (e.g. to follow a caret). */
+  overflow: clip;
   position: relative;
 }
 
@@ -13,6 +15,7 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
+  overflow: clip;
   background: var(--vc-bg, var(--background-primary));
   outline: none;
   touch-action: none;
@@ -437,31 +440,58 @@
   pointer-events: none;
 }
 
-/* connection properties bar */
+/* connection properties bar: one row of buttons, each group of choices in a small panel */
 .vc-edge-panel {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
   bottom: 84px;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
   align-items: center;
-  gap: 4px;
-  max-width: calc(100% - 32px);
-  padding: 5px 6px;
+  gap: 2px;
+  padding: 4px;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 12px;
   box-shadow: var(--shadow-s);
   z-index: 10;
 }
-.vc-ep-group { display: flex; align-items: center; gap: 2px; padding: 0 4px; }
-.vc-ep-group + .vc-ep-group { border-left: 1px solid var(--background-modifier-border); }
+.vc-ep-sep { width: 1px; height: 20px; margin: 0 4px; background: var(--background-modifier-border); }
 .vc-ep-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
 .vc-ep-btn.is-active { color: var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 15%, transparent); }
 .vc-ep-btn.is-danger:hover { color: var(--text-error); }
-.vc-ep-input { width: 120px; height: 28px; }
+.vc-ep-drop { position: relative; }
+.vc-ep-trigger { width: auto; padding: 0 4px 0 6px; gap: 2px; }
+.vc-ep-trigger.is-open { background: var(--background-modifier-hover); }
+.vc-ep-trigger.has-value { color: var(--interactive-accent); }
+.vc-ep-face { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; }
+.vc-ep-face svg { width: 18px; height: 18px; }
+.vc-ep-caret { display: flex; color: var(--text-faint); }
+.vc-ep-caret svg { width: 12px; height: 12px; }
+.vc-ep-dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--text-normal) 15%, transparent); box-sizing: border-box; }
+.vc-ep-dot.is-none { background: var(--text-muted); }
+.vc-ep-dot.is-mixed { background: conic-gradient(var(--color-red), var(--color-yellow), var(--color-green), var(--color-cyan), var(--color-purple), var(--color-red)); }
+.vc-ep-pop {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-s);
+  white-space: nowrap;
+}
+.vc-ep-pop.is-open { display: flex; }
+.vc-board[data-toolbar-pos='top'] .vc-ep-pop { bottom: auto; top: calc(100% + 10px); }
+.vc-ep-title { font-size: var(--font-ui-smaller); color: var(--text-muted); padding: 0 2px; }
+.vc-ep-row { display: flex; align-items: center; gap: 4px; }
+.vc-ep-pop-color .vc-ep-row { gap: 8px; padding: 2px; }
+.vc-ep-input { width: 160px; height: 28px; }
 .vc-ep-size { display: flex; align-items: center; gap: 0; }
 .vc-ep-step { width: 20px; height: 28px; display: flex; align-items: center; justify-content: center; }
 .vc-ep-step svg { width: 12px; height: 12px; }
@@ -731,6 +761,8 @@
   line-height: var(--line-height-normal);
   color: var(--text-normal);
 }
+/* Read for a moment to fit the card to its text. */
+.vc-rich.is-measuring { min-height: 0; }
 .vc-rich > :first-child { margin-top: 0; }
 .vc-rich > :last-child { margin-bottom: 0; }
 .vc-rich p { margin: 0 0 0.45em; }
@@ -1472,7 +1504,9 @@
   z-index: 2;
 }
 .vc-mm-fold { opacity: 0; transition: opacity 0.12s; }
-.vc-mm:hover .vc-mm-fold, .vc-node.is-selected .vc-mm-fold, .vc-mm-fold.is-collapsed { opacity: 1; }
+/* Fold switches show only while a topic is selected (folded ones always show their count). */
+.vc-node.has-topic-sel .vc-mm-fold, .vc-mm-fold.is-collapsed { opacity: 1; }
+.vc-node:not(.has-topic-sel) .vc-mm-fold:not(.is-collapsed) { pointer-events: none; }
 .vc-mm-fold:hover { color: var(--text-normal); border-color: var(--text-muted); }
 .vc-mm-fold.is-collapsed { width: auto; min-width: 16px; padding: 0 4px; color: var(--text-on-accent); background: var(--interactive-accent); border-color: transparent; }
 .vc-mm-add { background: var(--interactive-accent); border-color: transparent; color: var(--text-on-accent); }
@@ -1504,6 +1538,9 @@
 .vc-mm-icon-grid { display: grid; gap: 4px; }
 .vc-mm-icon-cell { height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 7px; color: var(--text-muted); cursor: pointer; }
 .vc-mm-icon-cell svg { width: 26px; height: 26px; }
+.vc-mm-icon-cell.is-small { height: 32px; }
+.vc-mm-icon-grid.is-toggles { grid-template-columns: repeat(4, 1fr); }
+.vc-mm-icon-cell.is-small svg { width: 18px; height: 18px; }
 .vc-mm-icon-cell:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
 .vc-mm-icon-cell.is-active { background: color-mix(in srgb, var(--interactive-accent) 16%, transparent); color: var(--interactive-accent); }
 .vc-mm-check { display: flex; align-items: center; gap: 6px; font-size: var(--font-ui-small); cursor: pointer; }
@@ -1713,7 +1750,8 @@
 .vc-mm-bnd.is-selected, .vc-mm-bnd.is-resizing { box-shadow: 0 0 0 calc(2px / var(--vc-zoom, 1)) var(--vc-select); }
 .vc-mm-bnd-label {
   position: absolute; left: 10px; bottom: 100%;
-  width: max-content; max-width: 320px; height: 22px; line-height: 22px; padding: 0 10px; box-sizing: border-box;
+  /* No wider than the frame: a long title ends in "…" at the frame's right edge. */
+  width: max-content; max-width: calc(100% - 20px); height: 22px; line-height: 22px; padding: 0 10px; box-sizing: border-box;
   border-radius: 6px 6px 0 0; background: var(--vc-bnd-color); color: #fff;
   font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }

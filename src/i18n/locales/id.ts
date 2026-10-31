@@ -367,6 +367,7 @@ export const ID: Record<string, string> = {
   "Brace": "Kurung kurawal",
   "Dotted": "Titik-titik",
   "Long dashes": "Garis panjang",
+  "Short dashes": "Garis pendek",
   "Dash and dot": "Garis dan titik",
   "Custom": "Kustom",
   "Layout": "Tata letak",

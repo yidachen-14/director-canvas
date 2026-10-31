@@ -154,7 +154,8 @@ class RichCard implements CardHandle {
       } else {
         n.text = md;
       }
-      if (f.autoSize) { const sz = this.contentSize(); n.width = sz.width; n.height = sz.height; }
+      const sz = f.autoSize ? this.contentSize() : null;
+      if (sz) { n.width = sz.width; n.height = sz.height; }
     });
     // Its text dragged out to elsewhere: an empty Text card is not kept.
     if (f.dropWhenEmpty && !this.rich.editing && !md.trim()) {
@@ -172,23 +173,24 @@ class RichCard implements CardHandle {
     }
   }
 
-  /** Natural size of the text (the host is laid out at max-content). */
-  private contentSize(): { width: number; height: number } {
+  /**
+   * Natural size of the text (the host is laid out at max-content), or null while it is not
+   * laid out at all (a board in a background tab): measuring then gives 0, never the real size.
+   */
+  private contentSize(): { width: number; height: number } | null {
+    if (!this.host.isConnected || !this.host.getClientRects().length) return null;
     return { width: Math.max(16, Math.ceil(this.host.offsetWidth)), height: Math.max(16, Math.ceil(this.host.offsetHeight)) };
   }
 
   /** Text cards: the box follows the text in both directions. */
   private fit(): void {
-    if (!this.f.autoSize || !this.host.isConnected) return;
-    const { width, height } = this.contentSize();
-    const n = this.ctx.board.model.node(this.node.id);
-    if (!n || (Math.abs(width - n.width) < 1 && Math.abs(height - n.height) < 1)) return;
-    n.width = width;
-    n.height = height;
-    const card = this.el.closest<HTMLElement>('.vc-node');
-    if (card) { card.style.width = `${width}px`; card.style.height = `${height}px`; }
-    this.ctx.board.renderEdges();
-    this.ctx.board.connections?.refreshHandles();
+    if (!this.f.autoSize) return;
+    const sz = this.contentSize();
+    const m = this.ctx.board.model;
+    const n = m.node(this.node.id);
+    if (!sz || !n || (Math.abs(sz.width - n.width) < 1 && Math.abs(sz.height - n.height) < 1)) return;
+    // Saved, but not an undo step: the size only follows the text (and repairs a wrong size on file).
+    m.quiet(() => { n.width = sz.width; n.height = sz.height; m.touch(n.id); });
   }
 
   private render(): void {
@@ -222,7 +224,19 @@ class RichCard implements CardHandle {
     if (!this.f.autoSize) return undefined;
     // The host carries the font size; make sure it has the latest one before measuring.
     this.host.style.fontSize = `${vcGet(this.node, 'fontSize', this.ctx.board.settings.defaultTextSize)}px`;
-    return this.contentSize();
+    return this.contentSize() ?? undefined;
+  }
+
+  fitHeight(): number | undefined {
+    const rich = this.host.querySelector<HTMLElement>('.vc-rich');
+    const card = this.el.closest<HTMLElement>('.vc-node');
+    if (this.f.autoSize || !rich || !card) return undefined;
+    // The text fills at least the card (min-height); lift that to read its own height.
+    rich.addClass('is-measuring');
+    const textH = rich.offsetHeight;
+    rich.removeClass('is-measuring');
+    // Whatever surrounds the text (callout title, borders) stays as it is.
+    return Math.ceil(card.offsetHeight - this.host.clientHeight + textH);
   }
 
   destroy(): void {

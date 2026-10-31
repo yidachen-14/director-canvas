@@ -17,7 +17,7 @@ Obsidian 插件：无限白板，直接打开并编辑原生 `.canvas` 文件。
 ```bash
 npm install
 npm run build      # tsc 检查 + esbuild 打包 → main.js
-npm test           # vitest，目前 98 项
+npm test           # vitest，目前 109 项
 node scripts/i18n-missing.mjs   # 列出缺繁中翻译的文字
 ```
 
@@ -27,7 +27,7 @@ node scripts/i18n-missing.mjs   # 列出缺繁中翻译的文字
 mkdir -p /tmp/lint && cd /tmp/lint
 cp -r <repo>/{src,tsconfig.json,package.json} .
 npm install --legacy-peer-deps
-npm install --legacy-peer-deps --no-save eslint@10.13.0 eslint-plugin-obsidianmd@0.4.2 typescript-eslint@8.72.1
+npm install --legacy-peer-deps --no-save eslint@10.13.0 eslint-plugin-obsidianmd@0.4.2 typescript-eslint@8.72.1 typescript@6.0   # typescript-eslint 不支持 TS 7，lint 目录里要换成 TS 6
 cat > eslint.config.mjs <<'EOF'
 import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
@@ -45,6 +45,13 @@ npx eslint src      # 要求 0 个 error；只剩 execCommand、keyCode、caretR
 ## 装进用户的 Obsidian 测试
 
 **在用户电脑本机开发时（推荐）**：把 `main.js`、`manifest.json`、`styles.css` 复制到 `<vault>/.obsidian/plugins/director-canvas/`，然后在 Obsidian 里停用再启用插件，或执行"重新加载"。
+
+停用插件会关掉所有打开着的白板分页。用控制台重新加载，并把分页原样恢复：
+
+```js
+dcR = async () => { const st = app.workspace.getLeavesOfType('director-canvas').map(l => [l, l.getViewState()]); await app.plugins.disablePlugin('director-canvas'); await app.plugins.enablePlugin('director-canvas'); for (const [l, s] of st) await l.setViewState(s); return st.length };
+await dcR()
+```
 
 **在云端开发时（无法直接写用户的文件）**：
 
@@ -118,6 +125,8 @@ for (let i = 0; i < 8; i++) { try { console.warn('INSTALLED', await dcI('<完整
 - 媒体卡的高度 = 画面高度 + `vc.descH`（描述、链接栏、播放条加起来的高度）。
 - `vc.ctrlIn` 和 `vc.ctrlH` 用于旧版播放条的迁移。迁移只会让卡片变窄，绝不能变宽、推动或盖住其他卡片。
   - 以前出过一次事：迁移把用户的 DLOVA 白板弄乱，后来用文件恢复还原到当天 16:46 的版本。
+- **背景分页里的白板没有排版，量出来的尺寸都是 0。** 凡是按量到的尺寸改写卡片（文字卡自动大小、媒体卡 descH、心智图），都要先用 `getClientRects().length` 确认已经排版，否则就跳过，等显示出来再量。2026-10-31 出过事：重新加载插件后，背景分页里的文字卡被存成 16×16，心智图和视频卡也被压扁。显示出来以后，会自动量出正确尺寸，并静默存回文件。
+- 在用户的 Obsidian 里测试时，背景分页的白板也要一起做快照、一起比对，不能只比对正在看的那一张。
 
 ## 还没做
 

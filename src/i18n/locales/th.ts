@@ -367,6 +367,7 @@ export const TH: Record<string, string> = {
   "Brace": "วงเล็บปีกกา",
   "Dotted": "จุดไข่ปลา",
   "Long dashes": "เส้นประยาว",
+  "Short dashes": "เส้นประสั้น",
   "Dash and dot": "เส้นประจุด",
   "Custom": "กำหนดเอง",
   "Layout": "เลย์เอาต์",

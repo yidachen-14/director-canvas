@@ -17,6 +17,10 @@ interface Snapshot { nodes: string; edges: string; extra: string; }
 
 const HISTORY_LIMIT = 200;
 
+function sameSnapshot(a: Snapshot | undefined, b: Snapshot): boolean {
+  return !!a && a.nodes === b.nodes && a.edges === b.edges && a.extra === b.extra;
+}
+
 /**
  * The board's data plus its undo history. Nodes are kept in paint order:
  * the last node is drawn on top. All mutations go through `transact`, which
@@ -261,6 +265,10 @@ export class BoardModel {
     if (!merge) {
       this.undoStack.push(before);
       if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift();
+    } else if (!this.txQuiet && this.txMerge?.startsWith('!') && sameSnapshot(this.undoStack[this.undoStack.length - 1], this.snapshot())) {
+      // The merged step has undone itself (a new card dropped while still empty): no step is left to undo.
+      this.undoStack.pop();
+      this.txMerge = null;
     }
     // A quiet change is not an undo step of its own and leaves merging and redo alone.
     if (!this.txQuiet) {

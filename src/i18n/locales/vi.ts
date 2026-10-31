@@ -367,6 +367,7 @@ export const VI: Record<string, string> = {
   "Brace": "Dấu ngoặc nhọn",
   "Dotted": "Chấm",
   "Long dashes": "Gạch dài",
+  "Short dashes": "Gạch ngắn",
   "Dash and dot": "Gạch chấm",
   "Custom": "Tùy chỉnh",
   "Layout": "Bố cục",

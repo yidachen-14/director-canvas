@@ -1,8 +1,7 @@
 import { Menu, type MenuItem } from 'obsidian';
 import type { Board } from './board';
 import { duplicateSelection, editEdgeLabel } from './interactions';
-import { reverseEdge } from './connect-ui';
-import { routeOf, type Route } from './connections';
+import { reverseEdge, routeOf, type Route } from './connections';
 import { pasteInto } from './clipboard';
 import { addArrangeMenu } from './arrange-commands';
 import { allCardTypes } from '../cards/registry';

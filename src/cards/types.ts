@@ -1,5 +1,6 @@
 import type { App, Component } from 'obsidian';
 import type { RawNode } from '../model/canvas-file';
+import type { Rect } from '../model/board-model';
 import type { Board } from '../board/board';
 
 /** What a card implementation gets to work with. */
@@ -63,6 +64,18 @@ export interface CardHandle {
   contentMarkdown?(): string;
   /** The content's own size right now (text cards: the box hugs the text). */
   measure?(): { width: number; height: number } | undefined;
+  /** Mind maps: where a topic is on the board (connections attach to topics), null if not shown. */
+  topicRect?(topic: string): Rect | null;
+  /** Mind maps: the topic at (or within `margin` of) a board point. */
+  topicAt?(wx: number, wy: number, margin: number): string | null;
+  /** Mind maps: duplicate the selected topics beside themselves (⌘D); false when there are none to copy. */
+  duplicateParts?(): boolean;
+  /** Mind maps: the selected topics as cards of their own, for the clipboard (removed from the map when `cut`). */
+  copyParts?(cut: boolean): RawNode[] | null;
+  /** Mind maps: pasted mind maps go in under the selected topic; false when this card does not take them. */
+  pasteParts?(nodes: RawNode[]): boolean;
+  /** Framed text cards: the card height at which the text fits exactly, at the current width. */
+  fitHeight?(): number | undefined;
   /** Card-specific entries for its right-click menu (only when it is the sole selection). */
   menu?(menu: import('obsidian').Menu): void;
 }

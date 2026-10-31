@@ -1,6 +1,6 @@
 {
   "name": "director-canvas",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "private": true,
   "description": "Director Canvas: an infinite whiteboard for Obsidian that reads and writes native .canvas files.",
   "scripts": {

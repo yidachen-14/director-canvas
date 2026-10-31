@@ -367,6 +367,7 @@ export const ES: Record<string, string> = {
   "Brace": "Llave",
   "Dotted": "Punteada",
   "Long dashes": "Rayas largas",
+  "Short dashes": "Rayas cortas",
   "Dash and dot": "Raya y punto",
   "Custom": "Personalizado",
   "Layout": "Diseño",

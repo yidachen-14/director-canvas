@@ -367,6 +367,7 @@ export const IT: Record<string, string> = {
   "Brace": "Graffa",
   "Dotted": "Punteggiata",
   "Long dashes": "Tratti lunghi",
+  "Short dashes": "Tratti corti",
   "Dash and dot": "Tratto e punto",
   "Custom": "Personalizzato",
   "Layout": "Layout",

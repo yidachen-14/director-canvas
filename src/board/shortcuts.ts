@@ -139,7 +139,9 @@ export function installShortcuts(scope: Scope, board: () => Board | null): void 
     const b = board();
     if (!b || b.editingId || e.defaultPrevented) return true;
     const el = document.activeElement as HTMLElement | null;
-    if (!el || !b.root.contains(el)) return true;
+    // Focus left on the page itself (the focused element was removed, e.g. a topic dragged out of
+    // its map): this view's scope only runs while the board's tab is active, so the keys are its.
+    if (!el || (!b.root.contains(el) && el !== el.ownerDocument.body)) return true;
     if (el !== b.root && el.closest('input, textarea, select, [contenteditable="true"], [contenteditable="plaintext-only"]:not([data-vc-armed])')) return true;
     const ks = keyString(e);
     if (!ks) return true;

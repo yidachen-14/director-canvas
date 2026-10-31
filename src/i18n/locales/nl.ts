@@ -367,6 +367,7 @@ export const NL: Record<string, string> = {
   "Brace": "Accolade",
   "Dotted": "Gestippeld",
   "Long dashes": "Lange streepjes",
+  "Short dashes": "Korte streepjes",
   "Dash and dot": "Streep-punt",
   "Custom": "Aangepast",
   "Layout": "Indeling",

@@ -2,26 +2,30 @@ import { Notice, setIcon, setTooltip } from 'obsidian';
 import type { Board } from './board';
 import type { RawEdge, RawNode, Side } from '../model/canvas-file';
 import type { Point } from './viewport';
+import type { Rect } from '../model/board-model';
 import {
-  SIDES, edgeGeometry, pinPoint, pinTs, rectOf, routeOf, vcOf,
+  edgeGeometry, pinOnOutline, pinPoint, rectOf, reverseEdge, routeOf, vcOf,
   type EdgeVc, type Route,
 } from './connections';
 import { cssColor } from '../cards/util';
 import { t } from '../i18n';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-/** How close (screen px) the pointer must be to a pin to snap to it. */
-const PIN_SNAP = 14;
+/** How close (screen px) the pointer must be to a card's edge to attach there. */
+const PIN_REACH = 14;
+/** Within this (screen px) along the edge, the point snaps to a regular pin (such as the middle). */
+const PIN_SNAP = 6;
 /** A press that moves less than this is a click. */
 const CLICK_SLOP = 4;
 
 /** What one end of a connection is being attached to. */
 type EndSpec =
   | { kind: 'free'; p: Point }
-  | { kind: 'pin'; id: string; side: Side; t: number }
-  | { kind: 'float'; id: string };
+  | { kind: 'pin'; id: string; side: Side; t: number; topic?: string }
+  | { kind: 'float'; id: string; topic?: string };
 
-type Pin = { side: Side; t: number };
+/** A point on a card's edge; `topic` when it is on a mind map topic's edge. */
+type Pin = { side: Side; t: number; topic?: string };
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -32,7 +36,9 @@ export function setEnd(e: RawEdge, which: 'from' | 'to', end: EndSpec): void {
   const sideKey = which === 'from' ? 'fromSide' : 'toSide';
   const tKey = which === 'from' ? 'fromT' : 'toT';
   const floatKey = which === 'from' ? 'fromFloat' : 'toFloat';
-  delete vc[which]; delete vc[tKey]; delete vc[floatKey];
+  const topicKey = which === 'from' ? 'fromTopic' : 'toTopic';
+  delete vc[which]; delete vc[tKey]; delete vc[floatKey]; delete vc[topicKey];
+  if (end.kind !== 'free' && end.topic) vc[topicKey] = end.topic;
   if (end.kind === 'free') {
     e[nodeKey] = '';
     delete e[sideKey];
@@ -49,30 +55,25 @@ export function setEnd(e: RawEdge, which: 'from' | 'to', end: EndSpec): void {
   e.vc = vc;
 }
 
-/** Swap a connection's direction (ends, sides, pins, arrowheads). */
-export function reverseEdge(e: RawEdge): void {
-  const vc = { ...(e.vc ?? {}) } as EdgeVc & Record<string, unknown>;
-  const swap = (a: string, b: string, obj: Record<string, unknown>) => {
-    const x = obj[a], y = obj[b];
-    if (y === undefined) delete obj[a]; else obj[a] = y;
-    if (x === undefined) delete obj[b]; else obj[b] = x;
-  };
-  e.fromEnd ??= 'none';
-  e.toEnd ??= 'arrow';
-  swap('fromNode', 'toNode', e);
-  swap('fromSide', 'toSide', e);
-  swap('fromEnd', 'toEnd', e);
-  swap('fromT', 'toT', vc);
-  swap('fromFloat', 'toFloat', vc);
-  swap('from', 'to', vc);
-  if (typeof vc.bend === 'number') vc.bend = -vc.bend;
-  e.vc = vc;
+/** An edge's end as an EndSpec (enough to compare cards and topics). */
+function endSpecOf(e: RawEdge, which: 'from' | 'to'): EndSpec {
+  const vc = vcOf(e);
+  const id = which === 'from' ? e.fromNode : e.toNode;
+  if (!id) return { kind: 'free', p: vc[which] ?? { x: 0, y: 0 } };
+  return { kind: 'float', id, topic: which === 'from' ? vc.fromTopic : vc.toTopic };
+}
+
+/** Both ends on one card is a loop, refused, unless they are two different topics of a mind map. */
+function sameCard(a: EndSpec, b: EndSpec): boolean {
+  if (a.kind === 'free' || b.kind === 'free' || a.id !== b.id) return false;
+  return !a.topic || !b.topic || a.topic === b.topic;
 }
 
 function sameEnd(e: RawEdge, which: 'from' | 'to', end: EndSpec): boolean {
   const id = which === 'from' ? e.fromNode : e.toNode;
   if (end.kind === 'free' || !id || id !== end.id) return false;
   const vc = vcOf(e);
+  if ((which === 'from' ? vc.fromTopic : vc.toTopic) !== end.topic) return false;
   const float = (which === 'from' ? vc.fromFloat : vc.toFloat) || !(which === 'from' ? e.fromSide : e.toSide);
   if (end.kind === 'float') return !!float;
   if (float) return false;
@@ -90,7 +91,9 @@ export class ConnectController {
   private handlesEl: HTMLElement;
   private panel: HTMLElement | null = null;
   private panelFor = '';
+  private panelCleanup: (() => void) | null = null;
   private pinHost: RawNode | null = null;
+  private pinActive: Pin | null = null;
   private busy = false;
 
   constructor(private board: Board) {
@@ -106,46 +109,47 @@ export class ConnectController {
 
   // ── pins (Connect tool) ─────────────────────────────────
 
-  /** Pins along every side of a card, or none. */
+  /** The dot where a connection would attach on a card (the pointer is near its edge), or none. */
   showPins(n: RawNode | null, active?: Pin | null): void {
     this.pinHost = n;
+    this.pinActive = active ?? null;
     this.pinsEl.empty();
-    if (!n) return;
-    const r = rectOf(n);
-    const zoom = this.board.vp.zoom;
-    for (const side of SIDES) {
-      const along = side === 'top' || side === 'bottom' ? r.width : r.height;
-      for (const tt of pinTs(along, zoom)) {
-        const p = pinPoint(r, side, tt);
-        const s = this.board.vp.toScreen(p.x, p.y);
-        const d = this.pinsEl.createDiv('vc-pin');
-        d.style.transform = `translate(${s.x}px, ${s.y}px)`;
-        if (active && active.side === side && Math.abs(active.t - tt) < 0.001) d.addClass('is-active');
-      }
-    }
+    if (!n || !active) return;
+    const p = pinPoint(this.areaRect(n, active.topic), active.side, active.t);
+    const s = this.board.vp.toScreen(p.x, p.y);
+    const d = this.pinsEl.createDiv('vc-pin is-active');
+    d.style.transform = `translate(${s.x}px, ${s.y}px)`;
   }
 
   private refreshPins(): void {
     if (this.pinHost) {
       const n = this.board.model.node(this.pinHost.id);
-      this.showPins(n && this.board.tool === 'connect' ? n : null);
+      this.showPins(n && this.board.tool === 'connect' ? n : null, this.pinActive);
     }
   }
 
-  /** The pin of `n` near a world point, if within snapping distance. */
+  /** The point on the edge of `n` near a world point (anywhere along it), if the pointer is close enough. */
   pinNear(n: RawNode, w: Point): Pin | null {
-    const r = rectOf(n);
-    const zoom = this.board.vp.zoom;
-    let best: (Pin & { d: number }) | null = null;
-    for (const side of SIDES) {
-      const along = side === 'top' || side === 'bottom' ? r.width : r.height;
-      for (const tt of pinTs(along, zoom)) {
-        const p = pinPoint(r, side, tt);
-        const d = Math.hypot(p.x - w.x, p.y - w.y) * zoom;
-        if (d <= PIN_SNAP && (!best || d < best.d)) best = { side, t: tt, d };
-      }
-    }
-    return best ? { side: best.side, t: best.t } : null;
+    const area = this.areaAt(n, w);
+    const pin = pinOnOutline(area.rect, w, this.board.vp.zoom, PIN_REACH, PIN_SNAP);
+    return pin ? { ...pin, topic: area.topic } : null;
+  }
+
+  /** What a connection end at a world point on `n` attaches to: a point on its edge, or the card (or topic) itself. */
+  private endAt(n: RawNode, w: Point, pin = this.pinNear(n, w)): EndSpec {
+    return pin ? { kind: 'pin', id: n.id, ...pin } : { kind: 'float', id: n.id, topic: this.areaAt(n, w).topic };
+  }
+
+  /** The part of `n` a connection attaches to at a world point: a mind map's topic there, else the card. */
+  private areaAt(n: RawNode, w: Point): { rect: Rect; topic?: string } {
+    const h = this.board.cards.get(n.id)?.handle;
+    const topic = h?.topicAt?.(w.x, w.y, PIN_REACH / this.board.vp.zoom);
+    const rect = topic ? h?.topicRect?.(topic) : null;
+    return rect && topic ? { rect, topic } : { rect: rectOf(n) };
+  }
+
+  private areaRect(n: RawNode, topic?: string): Rect {
+    return (topic && this.board.cards.get(n.id)?.handle.topicRect?.(topic)) || rectOf(n);
   }
 
   /**
@@ -183,7 +187,7 @@ export class ConnectController {
     let from: EndSpec;
     if (fromNode) {
       const pin = this.pinNear(fromNode, start);
-      from = pin ? { kind: 'pin', id: fromNode.id, ...pin } : { kind: 'float', id: fromNode.id };
+      from = this.endAt(fromNode, start, pin);
     } else {
       from = { kind: 'free', p: start };
     }
@@ -204,10 +208,12 @@ export class ConnectController {
       if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < CLICK_SLOP) return;
       moved = true;
       const w = board.clientToWorld(ev.clientX, ev.clientY);
-      const target = this.targetAt(w, from.kind === 'free' ? undefined : from.id);
-      if (target) {
-        const pin = this.pinNear(target, w);
-        to = pin ? { kind: 'pin', id: target.id, ...pin } : { kind: 'float', id: target.id };
+      // Another topic of the same mind map is a fine target too.
+      const target = this.targetAt(w, from.kind === 'free' || from.topic ? undefined : from.id);
+      const pin = target ? this.pinNear(target, w) : null;
+      const cand = target ? this.endAt(target, w, pin) : null;
+      if (target && cand && !sameCard(from, cand)) {
+        to = cand;
         this.showPins(target, pin);
       } else {
         to = { kind: 'free', p: w };
@@ -274,7 +280,7 @@ export class ConnectController {
 
   private create(from: EndSpec, to: EndSpec): void {
     const board = this.board;
-    if (from.kind !== 'free' && to.kind !== 'free' && from.id === to.id) return;
+    if (sameCard(from, to)) return;
     // The very same connection again (same cards, same pins) is refused.
     const dup = board.model.edges.find(ed => (sameEnd(ed, 'from', from) && sameEnd(ed, 'to', to)) || (sameEnd(ed, 'from', to) && sameEnd(ed, 'to', from)));
     if (dup) { new Notice(t('These two cards are already connected this way.')); board.selectEdges([dup.id]); return; }
@@ -301,7 +307,7 @@ export class ConnectController {
     this.board.edgeLayer.appendChild(g);
     return {
       draw: (ed) => {
-        const shape = edgeGeometry(ed, id => this.board.model.node(id));
+        const shape = edgeGeometry(ed, id => this.board.model.node(id), this.board.areaOf);
         if (!shape) return;
         line.setAttribute('d', shape.d);
         arrow.setAttribute('d', shape.endArrow);
@@ -340,7 +346,8 @@ export class ConnectController {
         e.stopPropagation();
         const ed = this.board.model.edge(edge.id);
         if (!ed || end.kind !== 'pin') return;
-        this.board.model.transact(() => { setEnd(ed, which, { kind: 'float', id: end.id }); this.board.model.touchEdges(); });
+        const topic = which === 'from' ? vcOf(ed).fromTopic : vcOf(ed).toTopic;
+        this.board.model.transact(() => { setEnd(ed, which, { kind: 'float', id: end.id, topic }); this.board.model.touchEdges(); });
       });
     }
     const bend = this.handlesEl.createDiv({ cls: 'vc-edge-bend' });
@@ -360,7 +367,7 @@ export class ConnectController {
     const board = this.board;
     const ed = board.model.edge(id);
     if (!ed) return;
-    const otherId = which === 'from' ? ed.toNode : ed.fromNode;
+    const other = which === 'from' ? endSpecOf(ed, 'to') : endSpecOf(ed, 'from');
     const gesture = board.model.beginGesture();
     this.busy = true;
     const doc = board.root.ownerDocument;
@@ -370,12 +377,12 @@ export class ConnectController {
       if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < CLICK_SLOP) return;
       moved = true;
       const w = board.clientToWorld(ev.clientX, ev.clientY);
-      const over = board.nodeAt(w.x, w.y, 10 / board.vp.zoom);
-      const target = over && over.id !== otherId ? over : null;
+      const target = board.nodeAt(w.x, w.y, 10 / board.vp.zoom);
+      const pin = target ? this.pinNear(target, w) : null;
+      const cand = target ? this.endAt(target, w, pin) : null;
       let end: EndSpec;
-      if (target) {
-        const pin = this.pinNear(target, w);
-        end = pin ? { kind: 'pin', id: target.id, ...pin } : { kind: 'float', id: target.id };
+      if (target && cand && !sameCard(cand, other)) {
+        end = cand;
         this.showPins(target, pin);
       } else {
         end = { kind: 'free', p: w };
@@ -487,6 +494,8 @@ export class ConnectController {
   }
 
   private closePanel(): void {
+    this.panelCleanup?.();
+    this.panelCleanup = null;
     this.panel?.remove();
     this.panel = null;
     this.panelFor = '';
@@ -502,13 +511,17 @@ export class ConnectController {
     }, mergeKey);
   }
 
+  /**
+   * One compact row, like Boardmix: each group of choices is a single button showing the current
+   * setting, opening a small panel of options above it (below it when the toolbar is at the top).
+   */
   private buildPanel(): void {
     const p = this.board.uiEl.createDiv('vc-edge-panel');
     this.panel = p;
     p.addEventListener('pointerdown', e => e.stopPropagation());
     p.addEventListener('dblclick', e => e.stopPropagation());
     p.addEventListener('wheel', e => e.stopPropagation());
-    const group = (cls = '') => p.createDiv(`vc-ep-group ${cls}`.trim());
+    const sep = () => p.createDiv('vc-ep-sep');
     const button = (host: HTMLElement, key: string, label: string, icon: string | ((el: HTMLElement) => void), onClick: () => void) => {
       const b = host.createDiv({ cls: 'vc-ep-btn clickable-icon', attr: { 'data-key': key, role: 'button', 'aria-label': label } });
       if (typeof icon === 'string') setIcon(b, icon); else icon(b);
@@ -517,15 +530,98 @@ export class ConnectController {
       return b;
     };
 
-    // Label
-    const lg = group('vc-ep-label');
-    const input = lg.createEl('input', { type: 'text', placeholder: t('Label'), cls: 'vc-ep-input' });
-    input.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter' || e.key === 'Escape') { input.blur(); this.board.root.focus({ preventScroll: true }); } });
-    input.addEventListener('input', () => {
-      const v = input.value;
+    // A trigger button and the panel of choices it opens.
+    const pops: HTMLElement[] = [];
+    const doc = p.ownerDocument;
+    const closePops = () => { for (const x of pops) x.removeClass('is-open'); p.querySelectorAll('.vc-ep-trigger').forEach(el => el.removeClass('is-open')); };
+    const outside = (e: PointerEvent) => { if (!p.contains(e.target as Node)) closePops(); };
+    doc.addEventListener('pointerdown', outside, true);
+    this.panelCleanup = () => doc.removeEventListener('pointerdown', outside, true);
+    const dropdown = (key: string, label: string, onOpen?: (pop: HTMLElement) => void) => {
+      const wrap = p.createDiv('vc-ep-drop');
+      const trig = wrap.createDiv({ cls: 'vc-ep-btn vc-ep-trigger clickable-icon', attr: { 'data-trigger': key, role: 'button', 'aria-label': label } });
+      trig.createDiv('vc-ep-face');
+      setIcon(trig.createDiv('vc-ep-caret'), 'chevron-down');
+      setTooltip(trig, label, { placement: 'top' });
+      const pop = wrap.createDiv(`vc-ep-pop vc-ep-pop-${key}`);
+      pops.push(pop);
+      trig.addEventListener('click', () => {
+        const open = !pop.hasClass('is-open');
+        closePops();
+        if (!open) return;
+        pop.addClass('is-open');
+        trig.addClass('is-open');
+        onOpen?.(pop);
+      });
+      // Picking an option closes the panel (the label panel stays open for typing).
+      if (key !== 'label') pop.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('.vc-ep-btn, .vc-ep-swatch:not(.is-custom)')) closePops(); });
+      return pop;
+    };
+    const row = (host: HTMLElement, title?: string) => {
+      if (title) host.createDiv({ cls: 'vc-ep-title', text: title });
+      return host.createDiv('vc-ep-row');
+    };
+
+    // Colour
+    const cp = row(dropdown('color', t('Colour')));
+    const sw = (c: string | undefined, label: string) => {
+      const b = cp.createDiv({ cls: 'vc-ep-swatch', attr: { 'data-key': `color:${c ?? ''}`, role: 'button', 'aria-label': label } });
+      if (c) b.style.background = cssColor(c) ?? ''; else b.addClass('is-none');
+      setTooltip(b, label, { placement: 'top' });
+      b.addEventListener('click', () => this.apply(e => { if (c) e.color = c; else delete e.color; }));
+    };
+    sw(undefined, t('Default'));
+    const names = ['Red', 'Orange', 'Yellow', 'Green', 'Cyan', 'Purple'];
+    for (let i = 1; i <= 6; i++) sw(String(i), t(names[i - 1]));
+    const custom = cp.createDiv({ cls: 'vc-ep-swatch is-custom', attr: { 'data-key': 'color:custom', 'aria-label': t('Custom colour') } });
+    setTooltip(custom, t('Custom colour'), { placement: 'top' });
+    const picker = custom.createEl('input', { type: 'color' });
+    picker.addEventListener('input', () => this.apply(e => { e.color = picker.value; }, `!edge-color:${this.panelFor}`));
+
+    // Line style: thickness, then solid or dashed
+    const lp = dropdown('line', t('Line style'));
+    const tg = row(lp, t('Thickness'));
+    for (const w of [2, 4, 6]) {
+      button(tg, `width:${w}`, t('Thickness {n}', { n: w }), el => lineIcon(el, { width: w / 1.3 }), () => this.apply(e => { if (w === 2) delete (e.vc as EdgeVc).width; else (e.vc as EdgeVc).width = w; }));
+    }
+    const dg = row(lp, t('Line style'));
+    button(dg, 'dash:0', t('Solid'), el => lineIcon(el, {}), () => this.apply(e => { delete (e.vc as EdgeVc).dash; }));
+    button(dg, 'dash:1', t('Dashed'), el => lineIcon(el, { dash: true }), () => this.apply(e => { (e.vc as EdgeVc).dash = true; }));
+
+    // Route
+    const rp = row(dropdown('route', t('Line shape')));
+    const routes: [Route, string][] = [['straight', 'Straight'], ['curve', 'Curved'], ['elbow', 'Elbow']];
+    for (const [r, label] of routes) {
+      button(rp, `route:${r}`, t(label), el => routeIcon(el, r), () => this.apply(e => { (e.vc as EdgeVc).route = r; delete (e.vc as EdgeVc).bend; }));
+    }
+
+    // Arrowheads
+    const ap = row(dropdown('ends', t('Arrows')));
+    const ends: [string, string, 'none' | 'arrow', 'none' | 'arrow'][] = [
+      ['none', 'No arrowheads', 'none', 'none'], ['end', 'Arrow at end', 'none', 'arrow'], ['both', 'Arrows at both ends', 'arrow', 'arrow'],
+    ];
+    for (const [k, label, fe, te] of ends) {
+      button(ap, `ends:${k}`, t(label), el => lineIcon(el, { start: fe === 'arrow', end: te === 'arrow' }), () => this.apply(e => {
+        // Already one arrowhead, at the start (a reversed line): keep it there.
+        if (k === 'end' && e.fromEnd === 'arrow' && (e.toEnd ?? 'arrow') === 'none') return;
+        e.fromEnd = fe; e.toEnd = te;
+      }));
+    }
+    button(p, 'reverse', t('Reverse direction'), 'arrow-left-right', () => this.apply(e => reverseEdge(e)));
+    sep();
+
+    // Label: its text and size
+    let input: HTMLInputElement | null = null;
+    const labelPop = dropdown('label', t('Label'), () => window.setTimeout(() => input?.focus(), 0));
+    const lr = row(labelPop);
+    input = lr.createEl('input', { type: 'text', placeholder: t('Label'), cls: 'vc-ep-input' });
+    const inp = input;
+    inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter' || e.key === 'Escape') { inp.blur(); closePops(); this.board.root.focus({ preventScroll: true }); } });
+    inp.addEventListener('input', () => {
+      const v = inp.value;
       this.apply(e => { if (v.trim()) e.label = v; else delete e.label; }, `!edge-label:${this.panelFor}`);
     });
-    const size = lg.createDiv('vc-ep-size');
+    const size = lr.createDiv('vc-ep-size');
     setTooltip(size, t('Label size'), { placement: 'top' });
     const sizeDown = size.createDiv({ cls: 'vc-ep-step clickable-icon', attr: { role: 'button' } });
     setIcon(sizeDown, 'minus');
@@ -539,53 +635,35 @@ export class ConnectController {
     };
     sizeDown.addEventListener('click', () => stepSize(-2));
     sizeUp.addEventListener('click', () => stepSize(2));
+    sep();
 
-    // Colour
-    const cg = group('vc-ep-colors');
-    const sw = (c: string | undefined, label: string) => {
-      const b = cg.createDiv({ cls: 'vc-ep-swatch', attr: { 'data-key': `color:${c ?? ''}`, role: 'button', 'aria-label': label } });
-      if (c) b.style.background = cssColor(c) ?? ''; else b.addClass('is-none');
-      setTooltip(b, label, { placement: 'top' });
-      b.addEventListener('click', () => this.apply(e => { if (c) e.color = c; else delete e.color; }));
-    };
-    sw(undefined, t('Default'));
-    const names = ['Red', 'Orange', 'Yellow', 'Green', 'Cyan', 'Purple'];
-    for (let i = 1; i <= 6; i++) sw(String(i), t(names[i - 1]));
-    const custom = cg.createDiv({ cls: 'vc-ep-swatch is-custom', attr: { 'data-key': 'color:custom', 'aria-label': t('Custom colour') } });
-    setTooltip(custom, t('Custom colour'), { placement: 'top' });
-    const picker = custom.createEl('input', { type: 'color' });
-    picker.addEventListener('input', () => this.apply(e => { e.color = picker.value; }, `!edge-color:${this.panelFor}`));
-
-    // Thickness and dash
-    const tg = group();
-    for (const w of [2, 4, 6]) {
-      button(tg, `width:${w}`, t('Thickness {n}', { n: w }), el => lineIcon(el, { width: w / 1.3 }), () => this.apply(e => { if (w === 2) delete (e.vc as EdgeVc).width; else (e.vc as EdgeVc).width = w; }));
-    }
-    const dg = group();
-    button(dg, 'dash:0', t('Solid'), el => lineIcon(el, {}), () => this.apply(e => { delete (e.vc as EdgeVc).dash; }));
-    button(dg, 'dash:1', t('Dashed'), el => lineIcon(el, { dash: true }), () => this.apply(e => { (e.vc as EdgeVc).dash = true; }));
-
-    // Arrowheads
-    const ag = group();
-    const ends: [string, string, 'none' | 'arrow', 'none' | 'arrow'][] = [
-      ['none', 'No arrowheads', 'none', 'none'], ['end', 'Arrow at end', 'none', 'arrow'], ['both', 'Arrows at both ends', 'arrow', 'arrow'],
-    ];
-    for (const [k, label, fe, te] of ends) {
-      button(ag, `ends:${k}`, t(label), el => lineIcon(el, { start: fe === 'arrow', end: te === 'arrow' }), () => this.apply(e => { e.fromEnd = fe; e.toEnd = te; }));
-    }
-    button(ag, 'reverse', t('Reverse direction'), 'arrow-left-right', () => this.apply(e => reverseEdge(e)));
-
-    // Route
-    const rg = group();
-    const routes: [Route, string][] = [['straight', 'Straight'], ['curve', 'Curved'], ['elbow', 'Elbow']];
-    for (const [r, label] of routes) {
-      button(rg, `route:${r}`, t(label), el => routeIcon(el, r), () => this.apply(e => { (e.vc as EdgeVc).route = r; delete (e.vc as EdgeVc).bend; }));
-    }
-
-    // Delete
-    const xg = group();
-    const del = button(xg, 'delete', t('Delete'), 'trash-2', () => this.board.deleteSelection());
+    const del = button(p, 'delete', t('Delete'), 'trash-2', () => this.board.deleteSelection());
     del.addClass('is-danger');
+  }
+
+  /** Each trigger shows the current choice (blank when the selected connections differ). */
+  private paintTriggers(p: HTMLElement, v: { color?: string; width?: number; dash?: boolean; route?: string; ends?: string; label?: string }): void {
+    const face = (key: string) => {
+      const f = p.querySelector<HTMLElement>(`[data-trigger="${key}"] .vc-ep-face`);
+      f?.empty();
+      return f;
+    };
+    const c = face('color');
+    if (c) {
+      const dot = c.createDiv('vc-ep-dot');
+      if (v.color === undefined) dot.addClass('is-mixed');
+      else if (v.color === '') dot.addClass('is-none');
+      else dot.style.background = cssColor(v.color) ?? v.color;
+    }
+    const l = face('line');
+    if (l) lineIcon(l, { width: (v.width ?? 2) / 1.3, dash: !!v.dash });
+    const r = face('route');
+    if (r) routeIcon(r, (v.route ?? 'straight') as Route);
+    const a = face('ends');
+    if (a) lineIcon(a, { start: v.ends === 'arrow-arrow' || v.ends === 'arrow-none', end: v.ends !== 'none-none' && v.ends !== 'arrow-none' });
+    const tx = face('label');
+    if (tx) setIcon(tx, 'type');
+    p.querySelector('[data-trigger="label"]')?.toggleClass('has-value', !!v.label);
   }
 
   private labelSize(e: RawEdge | undefined): number {
@@ -621,10 +699,11 @@ export class ConnectController {
     on('dash:1', dash === true);
     const ends = all(e => `${e.fromEnd ?? 'none'}-${e.toEnd ?? 'arrow'}`);
     on('ends:none', ends === 'none-none');
-    on('ends:end', ends === 'none-arrow');
+    on('ends:end', ends === 'none-arrow' || ends === 'arrow-none');
     on('ends:both', ends === 'arrow-arrow');
     const route = all(e => routeOf(e));
     for (const r of ['straight', 'curve', 'elbow']) on(`route:${r}`, route === r);
+    this.paintTriggers(p, { color, width, dash, route, ends, label: all(e => e.label ?? '') });
   }
 }
 
