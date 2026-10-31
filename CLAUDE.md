@@ -85,8 +85,9 @@ for (let i = 0; i < 8; i++) { try { console.warn('INSTALLED', await dcI('<完整
 1. 改版本号：`manifest.json`、`package.json`、`package-lock.json`（前两处 `"version"`），并在 `versions.json` 加上 `"x.y.z": "<minAppVersion>"`（2.1.1 起 minAppVersion 是 1.13.0）。
 2. build、test、lint 通过后提交，推送到 `main`。
 3. 在 GitHub 建 Release：tag 就是版本号（不加 v），选择"Create new tag on publish"，target 选 `main`，说明用英文写。
+   - **在用户的 Mac 本机（推荐）**：已装 GitHub CLI 并登入 yidachen-14（2026-10-31），git 也已用它的凭证。直接 `git push origin main`，再 `gh release create X --target main --title X --notes-file <英文说明>`；用 `gh release view X --json assets` 确认三个文件。2.2.0 就是这样发布的。用户开着 Astrill VPN，网络偶尔 TLS 超时，重试即可。
    - 云端会话的 GitHub 代理不能建 Release、推 tag、删分支。电脑操作里 Safari 只给"只读"权限（不能点），Claude in Chrome 也未必连得上。
-   - 可行的做法：Claude 桌面应用的内置浏览器（Claude_Browser 工具）。用户已在里面登录 GitHub（2026-10-30），登录状态会保留。2.1.1 就是这样发布的：打开 `releases/new?tag=X&target=main&title=X`，用 JS 填 `release[body]`，再点 Publish release。
+   - 云端时可行的做法：Claude 桌面应用的内置浏览器（Claude_Browser 工具）。它的 GitHub 登录在 2026-10-31 已过期；用户日常用的 ego lite 浏览器（`ego-browser` 技能）是登录着的。2.1.1 是用内置浏览器发布的：打开 `releases/new?tag=X&target=main&title=X`，用 JS 填 `release[body]`，再点 Publish release。
    - 如果都不行，就把步骤和英文说明整理好交给用户，并说明原因。
 4. `.github/workflows/release.yml` 会自动 build，并把三个文件附加到 Release 上。确认 Release 页面上有 main.js、manifest.json、styles.css，而且 manifest 里的版本号正确。
 5. 已经上架，不用再提交 obsidian-releases。用户在 Obsidian 里"检查更新"就能拿到。
