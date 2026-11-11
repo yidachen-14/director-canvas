@@ -237,8 +237,21 @@ export function cloneData(d: MMData): MMData {
 
 // ── Summaries and boundaries ──────────────────────────────────────────
 
-/** The run of siblings covering `ids`: they must all share one parent (not the central topic). */
+/**
+ * The parent of a summary's or boundary's run of topics. A run over the central topic itself (a
+ * summary or boundary of the whole map) has the parent WHOLE_MAP: a stand-in holding just the
+ * central topic.
+ */
+export const WHOLE_MAP = '';
+export function runParent(d: MMData, id: string): { topic: MMTopic; depth: number } | null {
+  if (id === WHOLE_MAP) return { topic: { id: WHOLE_MAP, text: '', children: [d.root] }, depth: -1 };
+  const f = findIn(d, id);
+  return f ? { topic: f.topic, depth: f.depth } : null;
+}
+
+/** The run of siblings covering `ids`: they must all share one parent, or be the central topic alone. */
 export function siblingRange(d: MMData, ids: string[]): { parent: MMTopic; from: number; to: number } | null {
+  if (ids.length === 1 && ids[0] === d.root.id) return { parent: runParent(d, WHOLE_MAP)!.topic, from: 0, to: 0 };
   let parent: MMTopic | null = null;
   let lo = Infinity, hi = -Infinity;
   for (const id of ids) {
@@ -289,7 +302,7 @@ export function anyTopic(d: MMData, id: string): MMTopic | null {
 export function extrasCovering(d: MMData, ids: string[]): { summaries: MMSummary[]; boundaries: MMBoundary[] } {
   const want = new Set(ids);
   const covers = (x: { parent: string; from: string; to: string }) => {
-    const p = findIn(d, x.parent)?.topic;
+    const p = runParent(d, x.parent)?.topic;
     if (!p) return false;
     const a = p.children.findIndex(c => c.id === x.from), b = p.children.findIndex(c => c.id === x.to);
     for (let i = Math.min(a, b); i <= Math.max(a, b); i++) if (p.children[i] && want.has(p.children[i].id)) return true;
@@ -304,7 +317,7 @@ export function extrasCovering(d: MMData, ids: string[]): { summaries: MMSummary
  */
 export function respanBoundary(d: MMData, id: string, placed: Map<string, Placed>, lo: number, hi: number, axis: 'y' | 'x'): boolean {
   const b = d.boundaries?.find(x => x.id === id);
-  const p = b && findIn(d, b.parent)?.topic;
+  const p = b && runParent(d, b.parent)?.topic;
   if (!b || !p) return false;
   const side = placed.get(b.from)?.side;
   const inside = p.children.filter((c) => {
@@ -322,7 +335,7 @@ export function respanBoundary(d: MMData, id: string, placed: Map<string, Placed
 /** Drop summaries and boundaries whose topics are gone or no longer siblings; keep runs in order. */
 export function pruneExtras(d: MMData): void {
   const fix = <T extends { parent: string; from: string; to: string }>(x: T): T | null => {
-    const p = findIn(d, x.parent)?.topic;
+    const p = runParent(d, x.parent)?.topic;
     if (!p) return null;
     const a = p.children.findIndex(c => c.id === x.from), b = p.children.findIndex(c => c.id === x.to);
     if (a < 0 && b < 0) return null;
@@ -404,6 +417,13 @@ export function countTopics(t: MMTopic): number {
 export function eachTopic(t: MMTopic, fn: (t: MMTopic, depth: number) => void, depth = 0): void {
   fn(t, depth);
   for (const c of t.children) eachTopic(c, fn, depth + 1);
+}
+
+/** Text pasted onto a topic: one topic per line, without blank lines or list markers. */
+export function topicLines(text: string): string[] {
+  return text.split(/\r?\n/)
+    .map(l => l.replace(/^\s*(?:[-*+•]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)/, '').trim())
+    .filter(l => l.length > 0);
 }
 
 /** Add a child at the end (or at `index`). In two-sided maps a new first-level topic goes to the emptier side. */
@@ -901,7 +921,7 @@ export function layoutExtras(d: MMData, sizes: Map<string, Size>, placed: Map<st
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   };
   const runOf = (x: { parent: string; from: string; to: string }) => {
-    const f = findIn(d, x.parent);
+    const f = runParent(d, x.parent);
     if (!f || f.topic.collapsed) return null;
     const kids = f.topic.children;
     const a = kids.findIndex(c => c.id === x.from), b = kids.findIndex(c => c.id === x.to);

@@ -1,11 +1,14 @@
-import { Menu, type MenuItem } from 'obsidian';
+import { Menu, Notice, type MenuItem } from 'obsidian';
 import type { Board } from './board';
 import { duplicateSelection, editEdgeLabel } from './interactions';
 import { reverseEdge, routeOf, type Route } from './connections';
 import { pasteInto } from './clipboard';
 import { addArrangeMenu } from './arrange-commands';
 import { allCardTypes } from '../cards/registry';
-import { presetColor } from '../cards/util';
+import { cardKindOf, presetColor } from '../cards/util';
+
+/** Card kinds whose content is text (for Copy as plain text). */
+const TEXT_KINDS = ['text', 'note', 'sticky', 'callout', 'checklist'];
 import type { Point } from './viewport';
 import { boardHasGifs, setBoardGifsPaused } from '../cards/gif-player';
 import { anyCropped, canCrop, flipSelection, hasFlippable, resetCrop, startCrop } from '../cards/crop';
@@ -138,6 +141,14 @@ function cardMenu(menu: Menu, board: Board, at: Point): void {
     menu.addItem(i => i.setTitle(t('Flip vertically')).setIcon('flip-vertical-2').setSection('picture').onClick(() => flipSelection(board, 'v')));
   }
   menu.addItem(i => i.setTitle(t('Copy')).setIcon('copy').setSection('edit').onClick(() => { board.root.focus(); document.execCommand('copy'); }));
+  // Text cards: just their words, without formatting.
+  const texts = nodes.filter(n => n.type === 'text' && TEXT_KINDS.includes(cardKindOf(n)));
+  if (texts.length) {
+    menu.addItem(i => i.setTitle(t('Copy as plain text')).setIcon('clipboard-type').setSection('edit').onClick(() => {
+      const plain = texts.map(n => board.cards.get(n.id)?.handle.searchText?.() ?? n.text ?? '').map(s => s.trim()).filter(Boolean).join('\n\n');
+      void navigator.clipboard.writeText(plain).then(() => new Notice(t('Copied.')));
+    }));
+  }
   menu.addItem(i => i.setTitle(t('Cut')).setIcon('scissors').setSection('edit').onClick(() => { board.root.focus(); document.execCommand('cut'); }));
   menu.addItem(i => i.setTitle(t('Duplicate')).setIcon('copy-plus').setSection('edit').onClick(() => duplicateSelection(board)));
   submenu(menu, t('Colour'), 'palette', 'style', m => colorItems(m, board));

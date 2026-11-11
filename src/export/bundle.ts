@@ -1,7 +1,7 @@
 import { TFile, type App } from 'obsidian';
 import { zipSync } from 'fflate';
 import type { Board } from '../board/board';
-import type { CanvasFile } from '../model/canvas-file';
+import type { CanvasFile, RawNode } from '../model/canvas-file';
 import type { OutFile } from './files';
 
 const LINK_RE = /!?\[\[([^\]|#^]+)(?:[#^][^\]|]*)?(?:\|[^\]]*)?\]\]|!?\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
@@ -56,6 +56,33 @@ export function filesUsed(app: App, board: Board, withEmbeds: boolean): TFile[] 
   }
   found.delete(board.sourcePath);
   return [...found.values()];
+}
+
+/**
+ * The attachments among some cards: pictures, videos, audio and other files on file cards.
+ * Notes, boards and what lives in card data (text, mind maps) are left out.
+ */
+export function attachmentsOf(app: App, nodes: RawNode[]): TFile[] {
+  const found = new Map<string, TFile>();
+  for (const n of nodes) {
+    if (n.type !== 'file' || !n.file) continue;
+    const f = app.vault.getAbstractFileByPath(n.file);
+    if (f instanceof TFile && f.extension !== 'md' && f.extension !== 'canvas') found.set(f.path, f);
+  }
+  return [...found.values()];
+}
+
+/** Files side by side in one folder, same-named ones numbered ("a.png", "a (2).png"). */
+export async function flatFiles(app: App, files: TFile[], top: string): Promise<OutFile[]> {
+  const used = new Set<string>();
+  const out: OutFile[] = [];
+  for (const f of files) {
+    let name = f.name;
+    for (let i = 2; used.has(name.toLowerCase()); i++) name = `${f.basename} (${i}).${f.extension}`;
+    used.add(name.toLowerCase());
+    out.push({ path: `${top}/${name}`, data: new Uint8Array(await app.vault.readBinary(f)) });
+  }
+  return out;
 }
 
 export interface Bundle { name: string; count: number; files(top: string): Promise<OutFile[]> }

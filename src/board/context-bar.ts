@@ -25,7 +25,7 @@ export function setIconSafe(el: HTMLElement, names: string | string[]): void {
 const ICON_FALLBACK: Record<string, string[]> = {
   'align-horizontal-space-around': ['align-horizontal-space-around', 'align-horizontal-distribute-center', 'columns-3'],
   'align-vertical-space-around': ['align-vertical-space-around', 'align-vertical-distribute-center', 'rows-3'],
-  'a-large-small': ['arrow-down-a-z', 'arrow-down-az', 'a-large-small'],
+  'a-large-small': ['a-large-small', 'type'],
   'ellipsis-vertical': ['ellipsis-vertical', 'more-vertical'],
   'more-horizontal': ['ellipsis', 'more-horizontal'],
   'arrow-left-to-line': ['arrow-left-to-line', 'chevrons-left'],

@@ -1,5 +1,5 @@
 import { setIcon, setTooltip } from 'obsidian';
-import { TextSelection, type EditorState } from 'prosemirror-state';
+import { AllSelection, TextSelection, type EditorState } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { schema } from './schema';
 import {
@@ -61,7 +61,7 @@ export class SelectionToolbar {
     this.button('code', t('Inline code'), () => this.run(toggle('code')), s => markActive(s, m.code));
     this.sep();
     const hl = this.button('highlighter', t('Highlight'), () => this.openColors(hl, 'highlight'), s => markActive(s, m.highlight));
-    const tc = this.button('baseline', t('Text colour'), () => this.openColors(tc, 'color'), s => markActive(s, m.color));
+    const tc = this.button('palette', t('Text colour'), () => this.openColors(tc, 'color'), s => markActive(s, m.color));
     const sz = this.button('a-large-small', t('Font size'), () => {
       const cur = markAttrs(this.view.state, m.size)?.size as number | undefined;
       this.openList(sz, [['', t('Default size')], ...SIZES.map(v => [String(v), `${v}`] as [string, string])], cur ? String(cur) : '', v => {
@@ -88,7 +88,8 @@ export class SelectionToolbar {
   update(): void {
     const state = this.view.state;
     const sel = state.selection;
-    const show = this.view.hasFocus() && sel instanceof TextSelection && !sel.empty && this.view.editable;
+    // A dragged selection or ⌘A (which selects the whole text as one block).
+    const show = this.view.hasFocus() && (sel instanceof TextSelection || sel instanceof AllSelection) && !sel.empty && this.view.editable;
     if (!show) { this.hide(); return; }
     for (const b of this.buttons) if (b.active) b.el.toggleClass('is-active', b.active(state));
     if (this.styleLabel) {

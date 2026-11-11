@@ -50,6 +50,12 @@ export class CanvasView extends TextFileView {
     if (coreCanvasOn(this.app)) this.addAction('layout-grid', t('Open in core Canvas'), () => { void switchCanvasView(this.leaf, 'native'); });
     this.setupTitleRename();
     this.scope = new Scope(this.app.scope);
+    // ⌘W closes this board's tab, as in any other tab (Obsidian's own "Close current tab").
+    this.scope.register(['Mod'], 'w', () => {
+      const commands = (this.app as unknown as { commands?: { executeCommandById(id: string): boolean } }).commands;
+      if (!commands?.executeCommandById('workspace:close')) this.leaf.detach();
+      return false;
+    });
     installShortcuts(this.scope, () => this.board);
     // Keep the board sized to its pane.
     const ro = new ResizeObserver(() => { board.applyViewport(); this.tryInitialView(); });
@@ -185,6 +191,8 @@ export class CanvasView extends TextFileView {
       catch (err) { new Notice(t('Could not rename: {msg}', { msg: (err as Error).message })); }
     };
     title.addEventListener('keydown', (e) => {
+      // Enter that picks a word in an input method (Zhuyin, Pinyin, Japanese) is not "done".
+      if (e.isComposing) return;
       if (e.key === 'Enter') { e.preventDefault(); void finish(true); title.blur(); }
       if (e.key === 'Escape') { e.preventDefault(); void finish(false); title.blur(); }
     });

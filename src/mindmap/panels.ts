@@ -11,6 +11,8 @@ import { colorPicker } from '../ui/color-picker';
 // ── Icons (100 × 100) ─────────────────────────────────────────────────
 
 const S = (d: string, w = 7) => `<path d="${d}" fill="none" stroke="currentColor" style="stroke-width:${w}px" stroke-linecap="round" stroke-linejoin="round"/>`;
+/** A filled rounded box: the central topic in the layout icons. */
+const F = (x: number, y: number, w: number, h: number) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h / 2}" fill="currentColor"/>`;
 const R = (x: number, y: number, w: number, h: number, rx: number, sw = 7, fill = 'none') =>
   `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${fill}" stroke="currentColor" style="stroke-width:${sw}px"/>`;
 
@@ -24,12 +26,15 @@ const ICONS: Record<string, string> = {
   'vc-mm-shape': R(10, 30, 80, 40, 20, 8),
   'vc-mm-line': S('M12 50 C40 50 40 18 88 18 M12 50 H88 M12 50 C40 50 40 82 88 82'),
   'vc-mm-branch': S('M14 30 H38 C52 30 52 14 66 14 H88 M38 30 C52 30 52 46 66 46 H88') + `<rect x="12" y="68" width="76" height="16" rx="4" fill="currentColor"/>`,
-  // Layouts
-  'vc-mm-l-right': R(6, 40, 26, 20, 8, 6) + S('M32 50 C44 50 44 20 58 20 H90 M32 50 H90 M32 50 C44 50 44 80 58 80 H90', 6),
-  'vc-mm-l-both': R(36, 40, 28, 20, 8, 6) + S('M64 50 C74 50 74 24 84 24 H96 M64 50 C74 50 74 76 84 76 H96 M36 50 C26 50 26 24 16 24 H4 M36 50 C26 50 26 76 16 76 H4', 6),
-  'vc-mm-l-down': R(34, 8, 32, 20, 6, 6) + S('M50 28 V46 M16 46 H84 M16 46 V60 M50 46 V60 M84 46 V60', 6) + R(4, 62, 24, 18, 4, 6) + R(38, 62, 24, 18, 4, 6) + R(72, 62, 24, 18, 4, 6),
-  'vc-mm-l-timeline': S('M4 50 H96', 6) + R(4, 40, 22, 20, 6, 6) + R(38, 40, 22, 20, 6, 6) + R(72, 40, 22, 20, 6, 6) + S('M46 60 V80 H58 M80 60 V80 H90', 5),
-  'vc-mm-l-list': R(6, 6, 38, 20, 6, 6) + S('M20 26 V40 H34 M20 40 V62 H34 M44 62 V80 H56', 6) + R(36, 32, 40, 16, 4, 5) + R(36, 54, 40, 16, 4, 5) + R(58, 72, 34, 16, 4, 5),
+  // Layouts: one drawing style for all (a solid central topic, outlined topics, the same lines),
+  // few and bold enough to read at button size.
+  'vc-mm-l-right': F(4, 40, 30, 20) + S('M34 50 C46 50 46 22 58 22 M34 50 H58 M34 50 C46 50 46 78 58 78', 6) + R(58, 14, 36, 16, 8, 6) + R(58, 42, 36, 16, 8, 6) + R(58, 70, 36, 16, 8, 6),
+  'vc-mm-l-both': F(34, 40, 32, 20) + S('M66 50 C74 50 74 26 80 26 M66 50 C74 50 74 74 80 74 M34 50 C26 50 26 26 20 26 M34 50 C26 50 26 74 20 74', 6) + R(80, 18, 16, 16, 8, 6) + R(80, 66, 16, 16, 8, 6) + R(4, 18, 16, 16, 8, 6) + R(4, 66, 16, 16, 8, 6),
+  'vc-mm-l-down': F(32, 8, 36, 20) + S('M50 28 V44 M17 44 H83 M17 44 V60 M50 44 V60 M83 44 V60', 6) + R(4, 60, 26, 16, 8, 6) + R(37, 60, 26, 16, 8, 6) + R(70, 60, 26, 16, 8, 6),
+  // Steps along one line, each step's topic hanging under it.
+  'vc-mm-l-timeline': S('M6 34 H94', 6) + F(4, 24, 28, 20) + R(38, 26, 24, 16, 8, 6) + R(70, 26, 24, 16, 8, 6) + S('M50 42 V62 M82 42 V62', 6) + R(38, 62, 24, 16, 8, 6) + R(70, 62, 24, 16, 8, 6),
+  // An indented outline: the central topic, then its topics under one guide line.
+  'vc-mm-l-list': F(6, 8, 52, 20) + S('M18 28 V80 M18 50 H30 M18 80 H30', 6) + R(30, 42, 60, 16, 8, 6) + R(30, 72, 46, 16, 8, 6),
   // Shapes
   'vc-mm-s-rect': R(10, 28, 80, 44, 0, 7),
   'vc-mm-s-rounded-sm': R(10, 28, 80, 44, 8, 7),

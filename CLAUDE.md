@@ -17,7 +17,7 @@ Obsidian 插件：无限白板，直接打开并编辑原生 `.canvas` 文件。
 ```bash
 npm install
 npm run build      # tsc 检查 + esbuild 打包 → main.js
-npm test           # vitest，目前 109 项
+npm test           # vitest，目前 111 项
 node scripts/i18n-missing.mjs   # 列出缺繁中翻译的文字
 ```
 

@@ -279,6 +279,16 @@ export function attachCorner(board: Board): void {
   const searchBtn = btn(view, 'search', t('Search the board'), () => { search.toggle(); searchBtn.toggleClass('is-active', search.open); });
   board.addDisposer(() => search.close());
   const mapBtn = btn(view, 'map', t('Minimap'), () => { minimap.toggle(); mapBtn.toggleClass('is-active', minimap.open); });
+  // Snap to grid, one click away (also in the appearance menu and the settings).
+  const snapBtn = btn(view, 'magnet', t('Snap to grid'), () => {
+    const s = board.plugin.settings;
+    s.snapToGrid = !s.snapToGrid;
+    void board.plugin.saveSettings();
+    board.plugin.refreshBoards();
+  });
+  const paintSnap = () => snapBtn.toggleClass('is-active', board.settings.snapToGrid);
+  paintSnap();
+  board.addRefresher(paintSnap);
   btn(view, 'palette', t('Appearance'), (e) => appearanceMenu(board, e));
 
   // 3. Zoom: + · 100% ▾ · −

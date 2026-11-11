@@ -8,7 +8,7 @@ import {
   type DropMode, type MMData, type MMTopic, type Placed, type Resolved, type Size,
   addBoundary, addChild, addSibling, addSummary, anyTopic, boundsOf, braceDownPath, bracePath, branchDown, branchSideways,
   cloneData, cloneTopic, countTopics, extrasCovering, findIn, respanBoundary, extrasSupported, gapsFor, isInside, layoutExtras, layoutMindMap,
-  dashesAround, movedTopics, moveTopics, newMindMap, normalizeData, pruneExtras, removeTopics, resolveStyles, siblingRange, SIZE_SCALE, summaryOfTopic,
+  dashesAround, movedTopics, runParent, topicLines, WHOLE_MAP, moveTopics, newMindMap, normalizeData, pruneExtras, removeTopics, resolveStyles, siblingRange, SIZE_SCALE, summaryOfTopic,
   toMarkdown, type ExtrasLayout,
 } from './model';
 import { boundaryBarItems, mindMapBarItems, themeItem } from './panels';
@@ -78,6 +78,8 @@ export class MindMapCard implements CardHandle, MindMapControl {
    */
   private armedId: string | null = null;
   private typingFromArmed = false;
+  /** The next edit starts with the caret after the text (Space), not with the text selected. */
+  private caretAtEnd = false;
   private committed: unknown = null;
   private offs: (() => void)[] = [];
   private pendingRender = 0;
@@ -215,10 +217,11 @@ export class MindMapCard implements CardHandle, MindMapControl {
     }
     const armedHere = !!this.armedId && this.armedId === cur && this.body.ownerDocument.activeElement === this.topicEls.get(cur);
     if (key === ' ') {
-      this.typingFromArmed = armedHere;
-      this.replaceOnEdit = !armedHere;
+      // Space edits the topic as it is: its text stays, the caret at the end.
+      this.typingFromArmed = false;
+      this.replaceOnEdit = false;
+      this.caretAtEnd = true;
       this.ctx.board.startEditing(this.node.id);
-      this.body.ownerDocument.execCommand('insertText', false, ' ');
       return true;
     }
     // Typing starts editing the topic, the keystroke (or the input method) replacing its text.
@@ -296,6 +299,22 @@ export class MindMapCard implements CardHandle, MindMapControl {
       this.setSel([]);
     }
     return out;
+  }
+
+  pasteText(text: string): boolean {
+    const at = this.primary ?? [...this.sel][0];
+    if (!at || this.editingId || summaryOfTopic(this.data, at)) return false;
+    const lines = topicLines(text);
+    if (!lines.length) return false;
+    const made: string[] = [];
+    this.apply(d => {
+      const f = findIn(d, at);
+      if (!f) return;
+      f.topic.collapsed = false;
+      for (const line of lines) { const tp = addChild(d, at, line); if (tp) made.push(tp.id); }
+    });
+    if (made.length) this.setSel(made);
+    return made.length > 0;
   }
 
   pasteParts(nodes: RawNode[]): boolean {
@@ -792,8 +811,8 @@ export class MindMapCard implements CardHandle, MindMapControl {
     // Summary topics of runs that are showing.
     if (extrasSupported(this.data.layout)) {
       for (const sm of this.data.summaries ?? []) {
-        const parent = findIn(this.data, sm.parent)?.topic;
-        if (parent && shown.has(parent.id) && !parent.collapsed && shown.has(sm.from)) walk(sm.topic);
+        const parent = runParent(this.data, sm.parent)?.topic;
+        if (parent && (parent.id === WHOLE_MAP || shown.has(parent.id)) && !parent.collapsed && shown.has(sm.from)) walk(sm.topic);
       }
     }
     return out;
@@ -1140,7 +1159,10 @@ export class MindMapCard implements CardHandle, MindMapControl {
     el.focus({ preventScroll: true });
     const range = document.createRange();
     const selection = window.getSelection();
-    if (this.replaceOnEdit || !at) {
+    if (this.caretAtEnd) {
+      range.selectNodeContents(el);
+      range.collapse(false);
+    } else if (this.replaceOnEdit || !at) {
       range.selectNodeContents(el);
       if (!this.replaceOnEdit) { /* Enter / F2: select everything, like Boardmix */ }
     } else {
@@ -1149,6 +1171,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
       else { range.selectNodeContents(el); range.collapse(false); }
     }
     this.replaceOnEdit = false;
+    this.caretAtEnd = false;
     selection?.removeAllRanges();
     selection?.addRange(range);
     return true;
@@ -1367,6 +1390,8 @@ export class MindMapCard implements CardHandle, MindMapControl {
         if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return;
         dragging = true;
         for (const el of srcEls) el.addClass('is-dragging');
+        // The floating bar steps aside while a topic is dragged, so it never covers where it goes.
+        this.ctx.board.root.addClass('is-dragging');
         const label = (dragged?.text || ' ') + (moving.length > 1 ? `  +${moving.length - 1}` : '');
         ghost = this.overlay.createDiv({ cls: 'vc-mm-ghost', text: label });
         hint = this.overlay.createDiv('vc-mm-drop');
@@ -1392,6 +1417,7 @@ export class MindMapCard implements CardHandle, MindMapControl {
       win.removeEventListener('keydown', key, true);
       this.dragCleanup = null;
       for (const el of srcEls) el.removeClass('is-dragging');
+      this.ctx.board.root.removeClass('is-dragging');
       clearMarks();
       ghost?.remove(); hint?.remove();
       if (commit && dragging && drop) {

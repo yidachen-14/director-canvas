@@ -8,7 +8,7 @@ import { boundsOf, scopeNodes } from './stage';
 import { exportPdf, type PageSize } from './pdf';
 import { canvasBytes, renderCanvas } from './raster';
 import { exportHtml } from './html';
-import { buildBundle, zipFiles } from './bundle';
+import { attachmentsOf, buildBundle, flatFiles, zipFiles } from './bundle';
 import { saveFile, saveFolder, usableFolder } from './files';
 
 export type Format = 'pdf' | 'png' | 'html' | 'bundle';
@@ -93,6 +93,20 @@ export async function runExport(board: Board, scope: Scope, format: Format, o: O
   } catch (e) {
     working.hide();
     console.error('Director Canvas: export failed', e);
+    new Notice(t('Export failed: {msg}', { msg: e instanceof Error ? e.message : String(e) }), 8000);
+  }
+}
+
+/** Save the selection's attachments into one folder (a ZIP where no folder can be picked). */
+export async function packAttachments(board: Board): Promise<void> {
+  const files = attachmentsOf(board.app, board.selectedNodes());
+  if (!files.length) { new Notice(t('No attachments in the selection.')); return; }
+  const name = safe(`${board.sourcePath.split('/').pop()!.replace(/\.canvas$/, '')} – ${t('Attachments')}`);
+  try {
+    const where = await saveFolder(board.app, board.settings.exportFolder, name, top => flatFiles(board.app, files, top), zipFiles);
+    if (where) new Notice(t('Packed {n} attachments: {path}', { n: files.length, path: where }), 6000);
+  } catch (e) {
+    console.error('Director Canvas: packing failed', e);
     new Notice(t('Export failed: {msg}', { msg: e instanceof Error ? e.message : String(e) }), 8000);
   }
 }
@@ -194,6 +208,14 @@ export function installExport(plugin: Plugin & { activeBoard(): Board | null }):
     },
   });
   contributeMenu({ where: 'multi', section: 'export', add: (menu, board) => exportItem(menu, `${t('Export the selection')}…`, board, { kind: 'selection' }) });
+  // Whatever is selected: its pictures, videos, audio and files, gathered into one folder.
+  contributeMenu({
+    where: 'card', section: 'export',
+    add: (menu, board) => {
+      if (!attachmentsOf(board.app, board.selectedNodes()).length) return;
+      menu.addItem(i => i.setTitle(`${t('Pack selected attachments')}…`).setIcon('package').setSection('export').onClick(() => void packAttachments(board)));
+    },
+  });
 
   for (const f of FORMATS) {
     plugin.addCommand({

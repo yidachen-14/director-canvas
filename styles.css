@@ -763,6 +763,7 @@
 }
 /* Read for a moment to fit the card to its text. */
 .vc-rich.is-measuring { min-height: 0; }
+.vc-rich.is-measuring-w { width: max-content; min-height: 0; }
 .vc-rich > :first-child { margin-top: 0; }
 .vc-rich > :last-child { margin-bottom: 0; }
 .vc-rich p { margin: 0 0 0.45em; }

@@ -54,6 +54,8 @@ export async function pasteInto(board: Board, data: DataTransfer, at: Point): Pr
   const sel = board.selectedNodes();
   if (payload && sel.length === 1 && board.cards.get(sel[0].id)?.handle.pasteParts?.(payload.nodes)) return;
   if (payload) { pasteNodes(board, payload, at); return; }
+  // Plain text onto a selected mind map topic: a new topic per line, under it.
+  if (text && !data.files?.length && sel.length === 1 && board.cards.get(sel[0].id)?.handle.pasteText?.(text)) return;
 
   const files = Array.from(data.files ?? []);
   if (files.length) { await addFiles(board, files, at); return; }

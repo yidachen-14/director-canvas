@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  addBoundary, dashesAround, findIn, respanBoundary, addChild, addSibling, addSummary, anyTopic, boundsOf, layoutExtras, siblingRange, findTopic, fromMarkdown, layoutMindMap, moveTopic, movedTopics, moveTopics, newMindMap, normalizeData,
+  addBoundary, dashesAround, findIn, topicLines, respanBoundary, addChild, addSibling, addSummary, anyTopic, boundsOf, layoutExtras, siblingRange, findTopic, fromMarkdown, layoutMindMap, moveTopic, movedTopics, moveTopics, newMindMap, normalizeData,
   removeTopics, resolveStyles, sidesOf, toMarkdown, type MMData, type Size,
 } from '../src/mindmap/model';
 
@@ -239,10 +239,30 @@ describe('summaries and boundaries', () => {
     const { d, a, c, a1 } = build();
     expect(siblingRange(d, [c.id, a.id])).toMatchObject({ from: 0, to: 2 });
     expect(siblingRange(d, [a.id, a1.id])).toBeNull();
-    expect(siblingRange(d, [d.root.id])).toBeNull();
+    // The central topic alone: a run over the whole map; with other topics: no run.
+    expect(siblingRange(d, [d.root.id])).toMatchObject({ from: 0, to: 0 });
+    expect(siblingRange(d, [d.root.id, a.id])).toBeNull();
     const t = addSummary(d, [c.id, a.id], 'Sum')!;
     expect(d.summaries![0]).toMatchObject({ parent: d.root.id, from: a.id, to: c.id });
     expect(anyTopic(d, t.id)?.text).toBe('Sum');
+  });
+
+  it('a summary and a boundary of the central topic wrap the whole map', () => {
+    const { d } = build();
+    addSummary(d, [d.root.id], 'All');
+    addBoundary(d, [d.root.id]);
+    const sizes = new Map<string, { w: number; h: number }>();
+    const placed = layoutMindMap(d, sizes);
+    const ex = layoutExtras(d, sizes, placed);
+    const ps = [...placed.entries()].filter(([id]) => id !== d.summaries![0].topic.id).map(([, q]) => q);
+    const right = Math.max(...ps.map(q => q.x + q.w)), top = Math.min(...ps.map(q => q.y)), bottom = Math.max(...ps.map(q => q.y + q.h));
+    const frame = ex.boundaries[0];
+    expect(frame.y).toBeLessThan(top);
+    expect(frame.y + frame.h).toBeGreaterThan(bottom);
+    expect(frame.x + frame.w).toBeGreaterThan(right);
+    // The brace stands past everything, and the summary topic past the brace.
+    expect(ex.braces[0].at).toBeGreaterThan(right);
+    expect(placed.get(d.summaries![0].topic.id)!.x).toBeGreaterThan(ex.braces[0].at);
   });
 
   it('places a summary beside its run and a boundary around it', () => {
@@ -344,5 +364,12 @@ describe('topic borders', () => {
     expect(parts[0]).toBeGreaterThan(7);
     expect(parts[0]).toBeLessThan(9);
     expect(dashesAround([], perimeter)).toBe('');
+  });
+});
+
+describe('pasting text onto a topic', () => {
+  it('makes a topic of every line, dropping blank lines and list markers', () => {
+    expect(topicLines('One\n\n  Two  \r\n- Three\n2. Four\n- [x] Five\n')).toEqual(['One', 'Two', 'Three', 'Four', 'Five']);
+    expect(topicLines('\n  \n')).toEqual([]);
   });
 });

@@ -239,6 +239,17 @@ class RichCard implements CardHandle {
     return Math.ceil(card.offsetHeight - this.host.clientHeight + textH);
   }
 
+  fitWidth(): number | undefined {
+    const rich = this.host.querySelector<HTMLElement>('.vc-rich');
+    const card = this.el.closest<HTMLElement>('.vc-node');
+    if (this.f.autoSize || !rich || !card || !this.host.getClientRects().length) return undefined;
+    // Laid out as wide as its longest line for a moment, to read that width.
+    rich.addClass('is-measuring-w');
+    const textW = rich.offsetWidth;
+    rich.removeClass('is-measuring-w');
+    return Math.min(4000, Math.ceil(card.offsetWidth - this.host.clientWidth + textW));
+  }
+
   destroy(): void {
     this.stopObserving?.();
     this.detachHandles();

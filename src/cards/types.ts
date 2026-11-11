@@ -74,8 +74,12 @@ export interface CardHandle {
   copyParts?(cut: boolean): RawNode[] | null;
   /** Mind maps: pasted mind maps go in under the selected topic; false when this card does not take them. */
   pasteParts?(nodes: RawNode[]): boolean;
+  /** Mind maps: pasted text goes in under the selected topic, a topic per line; false when it does not take it. */
+  pasteText?(text: string): boolean;
   /** Framed text cards: the card height at which the text fits exactly, at the current width. */
   fitHeight?(): number | undefined;
+  /** Framed text cards: the card width at which the longest line just fits. */
+  fitWidth?(): number | undefined;
   /** Card-specific entries for its right-click menu (only when it is the sole selection). */
   menu?(menu: import('obsidian').Menu): void;
 }

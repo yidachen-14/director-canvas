@@ -22,6 +22,8 @@ const ZONE_CURSOR: Record<Zone, string> = {
 };
 
 const DRAG_THRESHOLD = 3;
+/** Cards smaller than this on screen (px) offer no resize edges, so they are not resized by mistake. */
+const SMALL_ON_SCREEN = 28;
 const MIN_W = 40, MIN_H = 24;
 
 /** Card kinds a Text card can be dropped into. */
@@ -67,6 +69,11 @@ export function attachInteractions(board: Board): void {
       }
       const x0 = n.x, y0 = n.y, x1 = n.x + n.width, y1 = n.y + n.height;
       if (wx < x0 - out || wx > x1 + out || wy < y0 - out || wy > y1 + out) continue;
+      // Shown too small to grab an edge on purpose: the pointer only moves the card.
+      if (n.type !== 'group' && Math.min(n.width, n.height) * board.vp.zoom < SMALL_ON_SCREEN) {
+        if (wx > x0 && wx < x1 && wy > y0 && wy < y1) return null;
+        continue;
+      }
       const nearW = wx < x0 + inn, nearE = wx > x1 - inn, nearN = wy < y0 + inn, nearS = wy > y1 - inn;
       const corner = Math.max(inn * 2, 10 / board.vp.zoom);
       const cW = wx < x0 + corner, cE = wx > x1 - corner, cN = wy < y0 + corner, cS = wy > y1 - corner;
@@ -837,11 +844,23 @@ export function attachInteractions(board: Board): void {
     if (labelOf) return; // groups are renamed from their bar, not by double-clicking
     const z = zoneAt(w.x, w.y);
     if (z) {
-      // Double-clicking a text card's bottom edge fits its height to the text, keeping the top in place.
-      const h = z.zone === 's' ? board.cards.get(z.id)?.handle.fitHeight?.() : undefined;
+      // Double-clicking a text card's edge fits it to the text, the opposite edge staying put:
+      // the bottom or top edge its height, the left or right edge its width.
+      const handle = board.cards.get(z.id)?.handle;
       const node = board.model.node(z.id);
-      if (h && node && Math.abs(h - node.height) >= 1) {
-        board.model.transact(() => { node.height = Math.max(MIN_H, h); board.model.touch(z.id); });
+      if (!node) return;
+      if (z.zone === 's' || z.zone === 'n') {
+        const h = handle?.fitHeight?.();
+        if (h && Math.abs(Math.max(MIN_H, h) - node.height) >= 1) {
+          const nh = Math.max(MIN_H, h);
+          board.model.transact(() => { if (z.zone === 'n') node.y += node.height - nh; node.height = nh; board.model.touch(z.id); });
+        }
+      } else if (z.zone === 'e' || z.zone === 'w') {
+        const wd = handle?.fitWidth?.();
+        if (wd && Math.abs(Math.max(MIN_W, wd) - node.width) >= 1) {
+          const nw = Math.max(MIN_W, wd);
+          board.model.transact(() => { if (z.zone === 'w') node.x += node.width - nw; node.width = nw; board.model.touch(z.id); });
+        }
       }
       return;
     }

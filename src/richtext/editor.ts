@@ -74,6 +74,13 @@ export class RichText {
         return new Slice(doc.content, first?.isTextblock ? 1 : 0, last?.isTextblock ? 1 : 0);
       },
       transformPastedHTML: (html) => html.replace(/<meta[^>]*>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, ''),
+      // Whole paragraphs copied (⌘A in a card) are pasted like their text: the first and last join
+      // the line where they land, instead of breaking it with an empty line before and after.
+      transformPasted: (slice) => {
+        if (slice.openStart || slice.openEnd) return slice;
+        const first = slice.content.firstChild, last = slice.content.lastChild;
+        return new Slice(slice.content, first?.isTextblock ? 1 : 0, last?.isTextblock ? 1 : 0);
+      },
       handleDOMEvents: {
         blur: (_v, e) => {
           const next = (e).relatedTarget as HTMLElement | null;
